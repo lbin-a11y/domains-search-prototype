@@ -200,20 +200,20 @@ function ResultRow({
       }}
     >
       {/* Domain name + badges */}
-      <Box sx={{ flex: '1 1 0', minWidth: 0 }}>
+      <Flex alignItems="center" gap={2} sx={{ flex: '1 1 0', minWidth: 0, flexWrap: 'wrap' }}>
         <Text.Body
           m={0}
           fontWeight={result.badges.includes('exact') ? 'semibold' : 'book'}
-          sx={{ color: result.available ? 'fg.default' : 'fg.disabled' }}
+          sx={{ color: result.available ? 'fg.default' : 'fg.disabled', flexShrink: 0 }}
         >
           {result.name}
         </Text.Body>
         {result.badges.length > 0 && (
-          <Flex gap={1} alignItems="center" mt={1}>
+          <Flex gap={1} alignItems="center">
             {result.badges.map((b) => <Badge key={b} kind={b} />)}
           </Flex>
         )}
-      </Box>
+      </Flex>
 
       {/* Price */}
       <Flex alignItems="center" gap={2} sx={{ flexShrink: 0 }}>
@@ -644,7 +644,7 @@ export default function DomainSearch() {
           alignItems="center"
           justifyContent="space-between"
           px={6}
-          sx={{ height: 60, maxWidth: 1440, mx: 'auto' }}
+          sx={{ height: 66, maxWidth: 1440, mx: 'auto' }}
         >
           <Box
             as="button"
@@ -705,11 +705,14 @@ export default function DomainSearch() {
             </Flex>
           </Box>
 
-          {/* Compact search bar — full width on mobile */}
+          {/* Compact search bar — mobile only, shown after page search bar scrolls out */}
           <Flex
             alignItems="center"
             gap={2}
-            sx={{ flex: 1, mx: 5, maxWidth: 520, height: 36, px: 3, borderRadius: 8, background: '#f0f0f0', '@media (max-width: 767px)': { mx: 0, maxWidth: 'none' } }}
+            sx={{
+              display: 'none',
+              '@media (max-width: 767px)': { display: 'flex', flex: 1, mx: 3, height: 36, px: 3, borderRadius: 8, background: '#f0f0f0' },
+            }}
           >
             <Search color="fg.muted" sx={{ width: 16, height: 16, flexShrink: 0 }} />
             <Box
@@ -722,7 +725,7 @@ export default function DomainSearch() {
             />
           </Flex>
 
-          {/* Right: log in + cart (desktop only on mobile) */}
+          {/* Right: log in + cart */}
           <Flex alignItems="center" gap={5} sx={{ flexShrink: 0, '@media (max-width: 767px)': { display: 'none' } }}>
             <Text.Body m={0} color="fg.muted" sx={{ cursor: 'pointer', fontSize: '12px', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 500, '&:hover': { color: 'fg.default' } }}>Log In</Text.Body>
             <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center', opacity: hasCart ? 1 : 0, pointerEvents: hasCart ? 'auto' : 'none', transition: 'opacity 0.3s ease' }}>
