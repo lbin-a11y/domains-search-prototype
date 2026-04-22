@@ -186,13 +186,22 @@ function generateResultsFromQuery(rawQuery: string): SearchResult[] {
 
   // Assign premium/promoted badges pseudo-randomly seeded by stem — max 2 each,
   // spread across the list rather than always clustered at the top
+  // Count (1–3) and positions seeded by stem so results are stable per query
   const nonExact = results.slice(1)
   const premiumPool = nonExact.filter((r) => !r.connectedToSite && PREMIUM_TLDS.has(r.tld))
   const promotedPool = nonExact.filter((r) => !r.connectedToSite && PROMOTED_TLDS.has(r.tld))
-  const pick2 = (pool: SearchResult[]) =>
-    [...pool].sort((a, b) => hashStr(stem + a.tld + 'badge') - hashStr(stem + b.tld + 'badge')).slice(0, 2)
-  pick2(premiumPool).forEach((r) => { r.badges = ['premium'] })
-  pick2(promotedPool).forEach((r) => { if (!r.badges.length) r.badges = ['promoted'] })
+  const pickBadges = (pool: SearchResult[], seed: string, kind: BadgeKind) => {
+    if (!pool.length) return
+    const count = Math.min((hashStr(seed + 'count') % 3) + 1, pool.length)
+    const step = Math.max(1, Math.floor(pool.length / count))
+    const offset = hashStr(seed + 'offset') % step
+    for (let i = 0; i < count; i++) {
+      const idx = (offset + i * step) % pool.length
+      if (!pool[idx].badges.length) pool[idx].badges = [kind]
+    }
+  }
+  pickBadges(premiumPool, stem + 'premium', 'premium')
+  pickBadges(promotedPool, stem + 'promoted', 'promoted')
 
   // Connected first, then best available (exact match), then rest
   const connected = results.filter((r) => r.connectedToSite)
