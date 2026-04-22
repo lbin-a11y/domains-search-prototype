@@ -179,6 +179,8 @@ function ResultRow({
   onExploreSimilar,
   expandedResults,
   allowExpand = true,
+  cartIds,
+  favoritedIds,
 }: {
   result: DomainResult
   inCart: boolean
@@ -189,8 +191,11 @@ function ResultRow({
   onExploreSimilar: (result: DomainResult) => void
   expandedResults?: DomainResult[]
   allowExpand?: boolean
+  cartIds?: Set<string>
+  favoritedIds?: Set<string>
 }) {
   const isExpanded = expandedResults !== undefined
+  const [isHovered, setIsHovered] = useState(false)
 
   return (
     <Box>
@@ -199,6 +204,8 @@ function ResultRow({
         gap={3}
         px={4}
         py={3}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
         sx={{
           minHeight: 44,
           opacity: result.available ? 1 : 0.4,
@@ -235,6 +242,100 @@ function ResultRow({
           )}
         </Flex>
 
+        {/* Generate more + heart — hover only, left of price */}
+        {result.available && (
+          <Flex
+            alignItems="center"
+            gap={1}
+            sx={{
+              flexShrink: 0,
+              opacity: isHovered ? 1 : 0,
+              pointerEvents: isHovered ? 'auto' : 'none',
+              transition: 'opacity 0.15s ease',
+            }}
+          >
+            {allowExpand && (
+              <Box sx={{ position: 'relative', '&:hover [role="tooltip"]': { opacity: 1 } }}>
+                <Box
+                  as="button"
+                  onClick={() => onExploreSimilar(result)}
+                  aria-label="Generate more like this"
+                  sx={{
+                    border: 'none',
+                    cursor: 'pointer',
+                    width: 32,
+                    height: 32,
+                    borderRadius: 8,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: isExpanded ? 'var(--colors-bg-default)' : 'transparent',
+                    transition: 'background 0.2s ease',
+                    '&:hover': { background: 'var(--colors-bg-default)' },
+                  }}
+                >
+                  <Sparkles sx={{ width: 16, height: 16, color: isExpanded ? 'var(--colors-fg-default)' : 'var(--colors-fg-muted)' }} />
+                </Box>
+                <Box
+                  role="tooltip"
+                  sx={{
+                    position: 'absolute',
+                    bottom: 'calc(100% + 6px)',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    background: 'var(--colors-fg-default)',
+                    color: '#fff',
+                    fontSize: '11px',
+                    px: '8px',
+                    py: '4px',
+                    borderRadius: 4,
+                    whiteSpace: 'nowrap',
+                    pointerEvents: 'none',
+                    opacity: 0,
+                    transition: 'opacity 0.15s ease',
+                    zIndex: 10,
+                    '&::after': {
+                      content: '""',
+                      position: 'absolute',
+                      top: '100%',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      border: '4px solid transparent',
+                      borderTopColor: 'var(--colors-fg-default)',
+                    },
+                  }}
+                >
+                  Generate more like this
+                </Box>
+              </Box>
+            )}
+
+            <Box
+              as="button"
+              onClick={() => onFavorite(result)}
+              aria-label={isFavorited ? 'Remove from saved' : 'Save domain'}
+              sx={{
+                border: 'none',
+                cursor: 'pointer',
+                width: 32,
+                height: 32,
+                borderRadius: 8,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'transparent',
+                transition: 'background 0.2s ease',
+                '&:hover': { background: 'var(--colors-bg-default)' },
+              }}
+            >
+              {isFavorited
+                ? <HeartFilled sx={{ width: 16, height: 16, color: '#e05252' }} />
+                : <Heart sx={{ width: 16, height: 16, color: 'var(--colors-fg-muted)' }} />
+              }
+            </Box>
+          </Flex>
+        )}
+
         {/* Price */}
         <Flex alignItems="center" gap={2} sx={{ flexShrink: 0 }}>
           {result.salePrice !== null ? (
@@ -249,33 +350,7 @@ function ResultRow({
           )}
         </Flex>
 
-        {/* Explore similar button */}
-        {allowExpand && (
-          <Box
-            as="button"
-            onClick={() => onExploreSimilar(result)}
-            aria-label={`Explore similar domains for ${result.name}`}
-            title="Explore similar"
-            sx={{
-              border: 'none',
-              cursor: 'pointer',
-              width: 36,
-              height: 36,
-              borderRadius: 8,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-              background: isExpanded ? 'var(--colors-bg-default)' : 'transparent',
-              transition: 'background 0.2s ease',
-              '&:hover': { background: 'var(--colors-bg-default)' },
-            }}
-          >
-            <Sparkles sx={{ width: 18, height: 18, color: isExpanded ? 'var(--colors-fg-default)' : 'var(--colors-fg-muted)' }} />
-          </Box>
-        )}
-
-        {/* Cart toggle button */}
+        {/* Cart toggle — rightmost, always visible */}
         {result.available ? (
           <Box
             as="button"
@@ -293,9 +368,7 @@ function ResultRow({
               flexShrink: 0,
               background: inCart ? 'var(--colors-fg-default)' : 'transparent',
               transition: 'background 0.2s ease',
-              '&:hover': {
-                background: inCart ? '#333' : 'var(--colors-bg-default)',
-              },
+              '&:hover': { background: inCart ? '#333' : 'var(--colors-bg-default)' },
             }}
           >
             {inCart
@@ -306,39 +379,9 @@ function ResultRow({
         ) : (
           <Box sx={{ width: 36, flexShrink: 0 }} />
         )}
-
-        {/* Favorite button — available domains only */}
-        {result.available ? (
-          <Box
-            as="button"
-            onClick={() => onFavorite(result)}
-            aria-label={isFavorited ? 'Remove from saved' : 'Save domain'}
-            sx={{
-              border: 'none',
-              cursor: 'pointer',
-              width: 36,
-              height: 36,
-              borderRadius: 8,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-              background: 'transparent',
-              transition: 'background 0.2s ease',
-              '&:hover': { background: 'var(--colors-bg-default)' },
-            }}
-          >
-            {isFavorited
-              ? <HeartFilled sx={{ width: 18, height: 18, color: '#e05252' }} />
-              : <Heart sx={{ width: 18, height: 18, color: 'var(--colors-fg-muted)' }} />
-            }
-          </Box>
-        ) : (
-          <Box sx={{ width: 36, flexShrink: 0 }} />
-        )}
       </Flex>
 
-      {/* Expanded similar results */}
+      {/* Generated similar results */}
       {expandedResults !== undefined && (
         <Box
           sx={{
@@ -351,17 +394,17 @@ function ResultRow({
         >
           {expandedResults.length === 0 ? (
             <Box px={4} py={3}>
-              <Text.Body m={0} color="fg.muted" sx={{ fontSize: '13px' }}>No additional results found.</Text.Body>
+              <Text.Body m={0} color="fg.muted" sx={{ fontSize: '13px' }}>No results found.</Text.Body>
             </Box>
           ) : (
             expandedResults.map((r) => (
               <ResultRow
                 key={r.id}
                 result={r}
-                inCart={inCart}
+                inCart={cartIds ? cartIds.has(r.id) : false}
                 onToggleCart={onToggleCart}
                 isTop={false}
-                isFavorited={false}
+                isFavorited={favoritedIds ? favoritedIds.has(r.id) : false}
                 onFavorite={onFavorite}
                 onExploreSimilar={() => {}}
                 allowExpand={false}
@@ -768,6 +811,30 @@ export default function DomainSearch() {
     }
   }
 
+  function generateSimilar(result: DomainResult, existingIds: Set<string>): DomainResult[] {
+    const sld = getSld(result.name)
+    const altSlds = relatedNames(sld)
+    const tldPool = TLD_CATALOG.filter((t) => ['.com', '.co', '.io', '.net', '.studio', '.art', '.shop', '.design'].includes(t.tld))
+    const candidates: DomainResult[] = []
+    for (const altSld of altSlds) {
+      for (const cat of tldPool) {
+        const id = `${altSld}${cat.tld}`
+        if (existingIds.has(id)) continue
+        const badges: DomainBadge[] = cat.promoted ? ['promoted'] : cat.premium ? ['premium'] : []
+        candidates.push({
+          id,
+          name: `${altSld}${cat.tld}`,
+          tld: cat.tld,
+          badges,
+          originalPrice: cat.base,
+          salePrice: cat.sale,
+          available: hashStr(id) % 4 !== 0,
+        })
+      }
+    }
+    return candidates.slice(0, 4)
+  }
+
   function handleExploreSimilar(result: DomainResult) {
     if (expandedSimilar[result.id] !== undefined) {
       setExpandedSimilar((prev) => {
@@ -777,11 +844,11 @@ export default function DomainSearch() {
       })
       return
     }
-    const sld = getSld(result.name)
-    const generated = generateResults(sld)
     const existingIds = new Set(results.map((r) => r.id))
-    const novel = generated.filter((r) => !existingIds.has(r.id)).slice(0, 6)
-    setExpandedSimilar((prev) => ({ ...prev, [result.id]: novel }))
+    for (const expResults of Object.values(expandedSimilar)) {
+      for (const r of expResults) existingIds.add(r.id)
+    }
+    setExpandedSimilar((prev) => ({ ...prev, [result.id]: generateSimilar(result, existingIds) }))
   }
 
   const cartItems = results.filter((r) => cart.has(r.id))
@@ -1066,6 +1133,8 @@ export default function DomainSearch() {
                         onFavorite={handleFavoriteClick}
                         onExploreSimilar={handleExploreSimilar}
                         expandedResults={expandedSimilar[r.id]}
+                        cartIds={cart}
+                        favoritedIds={new Set(favorites.keys())}
                       />
                     ))}
                   </Box>
