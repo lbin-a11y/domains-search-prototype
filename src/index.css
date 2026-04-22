@@ -1,0 +1,112 @@
+/* Clarkson (sans) */
+@font-face {
+  font-family: 'Clarkson';
+  src: url('./assets/fonts/Clarkson-Light.otf') format('opentype');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Clarkson';
+  src: url('./assets/fonts/Clarkson-BookProduct.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Clarkson';
+  src: url('./assets/fonts/Clarkson-Medium.otf') format('opentype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Clarkson';
+  src: url('./assets/fonts/Clarkson-Semibold.otf') format('opentype');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Clarkson';
+  src: url('./assets/fonts/Clarkson-Bold.otf') format('opentype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ClarksonSerif */
+@font-face {
+  font-family: 'ClarksonSerif';
+  src: url('./assets/fonts/ClarksonSerif-Light.otf') format('opentype');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'ClarksonSerif';
+  src: url('./assets/fonts/ClarksonSerif-LightItalic.otf') format('opentype');
+  font-weight: 300;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'ClarksonSerif';
+  src: url('./assets/fonts/ClarksonSerif-Regular.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'ClarksonSerif';
+  src: url('./assets/fonts/ClarksonSerif-Italic.otf') format('opentype');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'ClarksonSerif';
+  src: url('./assets/fonts/ClarksonSerif-Medium.otf') format('opentype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'ClarksonSerif';
+  src: url('./assets/fonts/ClarksonSerif-MediumItalic.otf') format('opentype');
+  font-weight: 500;
+  font-style: italic;
+  font-display: swap;
+}
+
+* {
+  font-family: 'Clarkson', sans-serif;
+}
+
+body {
+  margin: 0;
+}
+
+p,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  margin: 0;
+}
+
+#root {
+  width: 100%;
+  min-height: 100vh;
+}
