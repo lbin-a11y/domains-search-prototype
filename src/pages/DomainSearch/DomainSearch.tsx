@@ -284,9 +284,30 @@ function CartSidebar({
   onAdd: (id: string) => void
 }) {
   const [matchingOpen, setMatchingOpen] = useState<Record<string, boolean>>({})
+  const prevItemIdsRef = useRef<Set<string>>(new Set())
 
   const subtotal = items.reduce((sum, r) => sum + (r.salePrice ?? r.originalPrice), 0)
   const cartIds = new Set(items.map((i) => i.id))
+
+  // Auto-open the matching domains section whenever a new SLD enters the cart
+  useEffect(() => {
+    const currentIds = new Set(items.map((i) => i.id))
+    const newItems = items.filter((i) => !prevItemIdsRef.current.has(i.id))
+
+    if (newItems.length > 0) {
+      setMatchingOpen((prev) => {
+        const next = { ...prev }
+        for (const item of newItems) {
+          const sld = getSld(item.name)
+          const hasMatching = results.some((r) => getSld(r.name) === sld && r.available && !currentIds.has(r.id))
+          if (hasMatching) next[sld] = true
+        }
+        return next
+      })
+    }
+
+    prevItemIdsRef.current = currentIds
+  }, [items, results])
 
   // Group cart items by SLD — preserving insertion order of first-seen SLD
   const sldOrder: string[] = []
@@ -308,8 +329,6 @@ function CartSidebar({
         background: '#fff',
         borderRadius: 12,
         boxShadow: '0 218px 61px 0 transparent, 0 139px 56px 0 rgba(0,0,0,0.01), 0 78px 47px 0 rgba(0,0,0,0.05), 0 -1px 35px 0 rgba(0,0,0,0.09), 0 4px 19px 0 rgba(0,0,0,0.1)',
-        position: 'sticky',
-        top: 80,
         height: 'calc(100vh - 160px)',
         display: 'flex',
         flexDirection: 'column',
@@ -861,7 +880,7 @@ export default function DomainSearch() {
 
           {/* ── Right: cart sidebar (2/5) — hidden on mobile ── */}
           {hasCart && (
-            <Box sx={{ flex: 2, minWidth: 0, '@media (max-width: 767px)': { display: 'none' } }}>
+            <Box sx={{ flex: 2, minWidth: 0, alignSelf: 'flex-start', position: 'sticky', top: 80, '@media (max-width: 767px)': { display: 'none' } }}>
               <CartSidebar items={cartItems} results={results} onRemove={removeFromCart} onAdd={toggleCart} />
             </Box>
           )}
