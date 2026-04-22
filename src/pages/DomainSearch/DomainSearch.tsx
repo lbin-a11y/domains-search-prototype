@@ -1,7 +1,7 @@
 import { useState, useEffect, useId, useRef } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { Box, Flex, Text, Field } from '@sqs/rosetta-primitives'
-import { ActivityIndicator, TextInput } from '@sqs/rosetta-elements'
+import { ActivityIndicator, TextInput, Tabs } from '@sqs/rosetta-elements'
 import {
   LogoSquarespace,
   Search,
@@ -14,7 +14,14 @@ import {
   ChevronSmallUp,
   ChevronSmallDown,
   InfoCircle,
+  Heart,
+  HeartFilled,
+  Sparkles,
 } from '@sqs/rosetta-icons'
+import { useAppContext } from '../../context/AppContext'
+import type { FavoritedDomain } from '../../context/AppContext'
+import AuthModal from './AuthModal'
+import FavoritesTab from './FavoritesTab'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -167,100 +174,246 @@ function ResultRow({
   inCart,
   onToggleCart,
   isTop,
+  isFavorited,
+  onFavorite,
+  onExploreSimilar,
+  expandedResults,
+  allowExpand = true,
+  cartIds,
+  favoritedIds,
 }: {
   result: DomainResult
   inCart: boolean
   onToggleCart: (id: string) => void
   isTop: boolean
+  isFavorited: boolean
+  onFavorite: (result: DomainResult) => void
+  onExploreSimilar: (result: DomainResult) => void
+  expandedResults?: DomainResult[]
+  allowExpand?: boolean
+  cartIds?: Set<string>
+  favoritedIds?: Set<string>
 }) {
+  const isExpanded = expandedResults !== undefined
+  const [isHovered, setIsHovered] = useState(false)
+
   return (
-    <Flex
-      alignItems="center"
-      gap={3}
-      px={4}
-      py={3}
-      sx={{
-        minHeight: 44,
-        opacity: result.available ? 1 : 0.4,
-        cursor: result.available ? 'pointer' : 'default',
-        ...(isTop ? {
-          border: '1px solid',
-          borderColor: 'border.default',
-          borderRadius: 8,
-          mb: 2,
-        } : {}),
-        ...(result.available ? {
-          transition: 'background 0.15s ease, transform 0.15s ease, border-radius 0.15s ease',
-          '&:hover': {
-            background: 'var(--colors-bg-default)',
-            transform: 'translateX(4px)',
+    <Box>
+      <Flex
+        alignItems="center"
+        gap={3}
+        px={4}
+        py={3}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        sx={{
+          minHeight: 44,
+          opacity: result.available ? 1 : 0.4,
+          cursor: result.available ? 'pointer' : 'default',
+          ...(isTop ? {
+            border: '1px solid',
+            borderColor: 'border.default',
             borderRadius: 8,
-          },
-        } : {}),
-      }}
-    >
-      {/* Domain name + badges */}
-      <Flex alignItems="center" gap={2} sx={{ flex: '1 1 0', minWidth: 0, flexWrap: 'wrap' }}>
-        <Text.Body
-          m={0}
-          fontWeight={result.badges.includes('exact') ? 'semibold' : 'book'}
-          sx={{ color: result.available ? 'fg.default' : 'fg.disabled', flexShrink: 0 }}
-        >
-          {result.name}
-        </Text.Body>
-        {result.badges.length > 0 && (
-          <Flex gap={1} alignItems="center">
-            {result.badges.map((b) => <Badge key={b} kind={b} />)}
+            mb: 2,
+          } : {}),
+          ...(result.available ? {
+            transition: 'background 0.15s ease, transform 0.15s ease, border-radius 0.15s ease',
+            '&:hover': {
+              background: 'var(--colors-bg-default)',
+              transform: 'translateX(4px)',
+              borderRadius: 8,
+            },
+          } : {}),
+        }}
+      >
+        {/* Domain name + badges */}
+        <Flex alignItems="center" gap={2} sx={{ flex: '1 1 0', minWidth: 0, flexWrap: 'wrap' }}>
+          <Text.Body
+            m={0}
+            fontWeight={result.badges.includes('exact') ? 'semibold' : 'book'}
+            sx={{ color: result.available ? 'fg.default' : 'fg.disabled', flexShrink: 0 }}
+          >
+            {result.name}
+          </Text.Body>
+          {result.badges.length > 0 && (
+            <Flex gap={1} alignItems="center">
+              {result.badges.map((b) => <Badge key={b} kind={b} />)}
+            </Flex>
+          )}
+        </Flex>
+
+        {/* Generate more + heart — hover only, left of price */}
+        {result.available && (
+          <Flex
+            alignItems="center"
+            gap={1}
+            sx={{
+              flexShrink: 0,
+              opacity: isHovered ? 1 : 0,
+              pointerEvents: isHovered ? 'auto' : 'none',
+              transition: 'opacity 0.15s ease',
+            }}
+          >
+            {allowExpand && (
+              <Box sx={{ position: 'relative', '&:hover [role="tooltip"]': { opacity: 1 } }}>
+                <Box
+                  as="button"
+                  onClick={() => onExploreSimilar(result)}
+                  aria-label="Generate more like this"
+                  sx={{
+                    border: 'none',
+                    cursor: 'pointer',
+                    width: 32,
+                    height: 32,
+                    borderRadius: 8,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: isExpanded ? 'var(--colors-bg-default)' : 'transparent',
+                    transition: 'background 0.2s ease',
+                    '&:hover': { background: 'var(--colors-bg-default)' },
+                  }}
+                >
+                  <Sparkles sx={{ width: 16, height: 16, color: isExpanded ? 'var(--colors-fg-default)' : 'var(--colors-fg-muted)' }} />
+                </Box>
+                <Box
+                  role="tooltip"
+                  sx={{
+                    position: 'absolute',
+                    bottom: 'calc(100% + 6px)',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    background: 'var(--colors-fg-default)',
+                    color: '#fff',
+                    fontSize: '11px',
+                    px: '8px',
+                    py: '4px',
+                    borderRadius: 4,
+                    whiteSpace: 'nowrap',
+                    pointerEvents: 'none',
+                    opacity: 0,
+                    transition: 'opacity 0.15s ease',
+                    zIndex: 10,
+                    '&::after': {
+                      content: '""',
+                      position: 'absolute',
+                      top: '100%',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      border: '4px solid transparent',
+                      borderTopColor: 'var(--colors-fg-default)',
+                    },
+                  }}
+                >
+                  Generate more like this
+                </Box>
+              </Box>
+            )}
+
+            <Box
+              as="button"
+              onClick={() => onFavorite(result)}
+              aria-label={isFavorited ? 'Remove from saved' : 'Save domain'}
+              sx={{
+                border: 'none',
+                cursor: 'pointer',
+                width: 32,
+                height: 32,
+                borderRadius: 8,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'transparent',
+                transition: 'background 0.2s ease',
+                '&:hover': { background: 'var(--colors-bg-default)' },
+              }}
+            >
+              {isFavorited
+                ? <HeartFilled sx={{ width: 16, height: 16, color: '#e05252' }} />
+                : <Heart sx={{ width: 16, height: 16, color: 'var(--colors-fg-muted)' }} />
+              }
+            </Box>
           </Flex>
         )}
-      </Flex>
 
-      {/* Price */}
-      <Flex alignItems="center" gap={2} sx={{ flexShrink: 0 }}>
-        {result.salePrice !== null ? (
-          <>
-            <Text.Caption m={0} color="fg.disabled" sx={{ textDecoration: 'line-through', fontSize: '13px' }}>
-              ${result.originalPrice}
-            </Text.Caption>
-            <Text.Body m={0}>${result.salePrice}</Text.Body>
-          </>
+        {/* Price */}
+        <Flex alignItems="center" gap={2} sx={{ flexShrink: 0 }}>
+          {result.salePrice !== null ? (
+            <>
+              <Text.Caption m={0} color="fg.disabled" sx={{ textDecoration: 'line-through', fontSize: '13px' }}>
+                ${result.originalPrice}
+              </Text.Caption>
+              <Text.Body m={0}>${result.salePrice}</Text.Body>
+            </>
+          ) : (
+            <Text.Body m={0}>${result.originalPrice}</Text.Body>
+          )}
+        </Flex>
+
+        {/* Cart toggle — rightmost, always visible */}
+        {result.available ? (
+          <Box
+            as="button"
+            onClick={() => onToggleCart(result.id)}
+            aria-label={inCart ? 'Remove from cart' : 'Add to cart'}
+            sx={{
+              border: 'none',
+              cursor: 'pointer',
+              width: 36,
+              height: 36,
+              borderRadius: 8,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+              background: inCart ? 'var(--colors-fg-default)' : 'transparent',
+              transition: 'background 0.2s ease',
+              '&:hover': { background: inCart ? '#333' : 'var(--colors-bg-default)' },
+            }}
+          >
+            {inCart
+              ? <Checkmark sx={{ width: 16, height: 16, color: '#ffffff' }} />
+              : <ShoppingBag sx={{ width: 18, height: 18, color: 'var(--colors-fg-muted)' }} />
+            }
+          </Box>
         ) : (
-          <Text.Body m={0}>${result.originalPrice}</Text.Body>
+          <Box sx={{ width: 36, flexShrink: 0 }} />
         )}
       </Flex>
 
-      {/* Cart toggle button */}
-      {result.available ? (
+      {/* Generated similar results */}
+      {expandedResults !== undefined && (
         <Box
-          as="button"
-          onClick={() => onToggleCart(result.id)}
-          aria-label={inCart ? 'Remove from cart' : 'Add to cart'}
           sx={{
-            border: 'none',
-            cursor: 'pointer',
-            width: 36,
-            height: 36,
-            borderRadius: 8,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-            background: inCart ? 'var(--colors-fg-default)' : 'transparent',
-            transition: 'background 0.2s ease',
-            '&:hover': {
-              background: inCart ? '#333' : 'var(--colors-bg-default)',
-            },
+            borderLeft: '2px solid',
+            borderColor: 'border.default',
+            ml: 6,
+            mb: 2,
+            borderRadius: '0 0 6px 6px',
           }}
         >
-          {inCart
-            ? <Checkmark sx={{ width: 16, height: 16, color: '#ffffff' }} />
-            : <ShoppingBag sx={{ width: 18, height: 18, color: 'var(--colors-fg-muted)' }} />
-          }
+          {expandedResults.length === 0 ? (
+            <Box px={4} py={3}>
+              <Text.Body m={0} color="fg.muted" sx={{ fontSize: '13px' }}>No results found.</Text.Body>
+            </Box>
+          ) : (
+            expandedResults.map((r) => (
+              <ResultRow
+                key={r.id}
+                result={r}
+                inCart={cartIds ? cartIds.has(r.id) : false}
+                onToggleCart={onToggleCart}
+                isTop={false}
+                isFavorited={favoritedIds ? favoritedIds.has(r.id) : false}
+                onFavorite={onFavorite}
+                onExploreSimilar={() => {}}
+                allowExpand={false}
+              />
+            ))
+          )}
         </Box>
-      ) : (
-        <Box sx={{ width: 36, flexShrink: 0 }} />
       )}
-    </Flex>
+    </Box>
   )
 }
 
@@ -416,7 +569,7 @@ function CartSidebar({
               {/* Add matching domains section */}
               {matching.length > 0 && (
                 <Box>
-                  {/* Toggle row — NO borderTop here; the last cart item's borderBottom is the divider */}
+                  {/* Toggle row */}
                   <Box
                     as="button"
                     onClick={() => setMatchingOpen((prev) => ({ ...prev, [sld]: !isOpen }))}
@@ -432,7 +585,6 @@ function CartSidebar({
                       textAlign: 'left',
                     }}
                   >
-                    {/* Label + info icon grouped together */}
                     <Flex alignItems="center" gap={1} sx={{ flex: 1 }}>
                       <Text.Caption m={0} color="fg.muted" sx={{ fontSize: '12px', lineHeight: 1 }}>
                         Add matching domains
@@ -445,12 +597,11 @@ function CartSidebar({
                     }
                   </Box>
 
-                  {/* Matching items — each in its own rounded gray card with white gutters */}
                   {isOpen && (
                     <Box px="8px" pb="8px" sx={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       {matching.map((m) => {
                         const stem = getSld(m.name)
-                        const ext = m.name.slice(stem.length + 1) // "studio" (no dot)
+                        const ext = m.name.slice(stem.length + 1)
                         const price = m.salePrice ?? m.originalPrice
                         return (
                           <Flex
@@ -464,7 +615,6 @@ function CartSidebar({
                               background: '#f5f5f5',
                             }}
                           >
-                            {/* Domain: stem normal + .ext bold */}
                             <Box sx={{ flex: '1 1 0', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               <Text.Body as="span" m={0} sx={{ fontSize: '14px' }}>{stem}.</Text.Body>
                               <Text.Body as="span" m={0} fontWeight="semibold" sx={{ fontSize: '14px' }}>{ext}</Text.Body>
@@ -556,6 +706,12 @@ export default function DomainSearch() {
   const navigate = useNavigate()
   const q = searchParams.get('q') ?? ''
 
+  const { isLoggedIn, login, logout, favorites, addFavorite, removeFavorite } = useAppContext()
+  const [authModalOpen, setAuthModalOpen] = useState(false)
+  const [pageTab, setPageTab] = useState<'search' | 'favorites'>('search')
+  const [expandedSimilar, setExpandedSimilar] = useState<Record<string, DomainResult[]>>({})
+  const pendingFavoriteRef = useRef<FavoritedDomain | null>(null)
+
   const [inputValue, setInputValue] = useState(q)
   const [results, setResults] = useState<DomainResult[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -630,14 +786,83 @@ export default function DomainSearch() {
     })
   }
 
+  function handleFavoriteClick(result: DomainResult) {
+    if (!isLoggedIn) {
+      pendingFavoriteRef.current = {
+        id: result.id,
+        name: result.name,
+        tld: result.tld,
+        originalPrice: result.originalPrice,
+        salePrice: result.salePrice,
+      }
+      setAuthModalOpen(true)
+      return
+    }
+    if (favorites.has(result.id)) {
+      removeFavorite(result.id)
+    } else {
+      addFavorite({
+        id: result.id,
+        name: result.name,
+        tld: result.tld,
+        originalPrice: result.originalPrice,
+        salePrice: result.salePrice,
+      })
+    }
+  }
+
+  function generateSimilar(result: DomainResult, existingIds: Set<string>): DomainResult[] {
+    const sld = getSld(result.name)
+    const altSlds = relatedNames(sld)
+    const tldPool = TLD_CATALOG.filter((t) => ['.com', '.co', '.io', '.net', '.studio', '.art', '.shop', '.design'].includes(t.tld))
+    const candidates: DomainResult[] = []
+    for (const altSld of altSlds) {
+      for (const cat of tldPool) {
+        const id = `${altSld}${cat.tld}`
+        if (existingIds.has(id)) continue
+        const badges: DomainBadge[] = cat.promoted ? ['promoted'] : cat.premium ? ['premium'] : []
+        candidates.push({
+          id,
+          name: `${altSld}${cat.tld}`,
+          tld: cat.tld,
+          badges,
+          originalPrice: cat.base,
+          salePrice: cat.sale,
+          available: hashStr(id) % 4 !== 0,
+        })
+      }
+    }
+    return candidates.slice(0, 4)
+  }
+
+  function handleExploreSimilar(result: DomainResult) {
+    if (expandedSimilar[result.id] !== undefined) {
+      setExpandedSimilar((prev) => {
+        const next = { ...prev }
+        delete next[result.id]
+        return next
+      })
+      return
+    }
+    const existingIds = new Set(results.map((r) => r.id))
+    for (const expResults of Object.values(expandedSimilar)) {
+      for (const r of expResults) existingIds.add(r.id)
+    }
+    setExpandedSimilar((prev) => ({ ...prev, [result.id]: generateSimilar(result, existingIds) }))
+  }
+
   const cartItems = results.filter((r) => cart.has(r.id))
   const cartCount = cart.size
   const hasCart = cartCount > 0
+  const panelVisible = hasCart
+
+  // suppress unused variable warning for heroPassed
+  void heroPassed
 
   return (
     <Box sx={{ minHeight: '100vh', background: '#fff' }}>
 
-      {/* ── Inline nav — scrolls with the page, not sticky ── */}
+      {/* ── Inline nav ── */}
       <Box sx={{ background: '#fff' }}>
         <Flex
           as="nav"
@@ -663,7 +888,25 @@ export default function DomainSearch() {
             ))}
           </Flex>
           <Flex alignItems="center" gap={5}>
-            <Text.Body m={0} color="fg.muted" sx={{ cursor: 'pointer', fontSize: '12px', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 500, '&:hover': { color: 'fg.default' }, '@media (max-width: 767px)': { display: 'none' } }}>Log In</Text.Body>
+            {isLoggedIn ? (
+              <Text.Body
+                m={0}
+                color="fg.muted"
+                onClick={logout}
+                sx={{ cursor: 'pointer', fontSize: '12px', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 500, '&:hover': { color: 'fg.default' }, '@media (max-width: 767px)': { display: 'none' } }}
+              >
+                Log out
+              </Text.Body>
+            ) : (
+              <Text.Body
+                m={0}
+                color="fg.muted"
+                onClick={() => setAuthModalOpen(true)}
+                sx={{ cursor: 'pointer', fontSize: '12px', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 500, '&:hover': { color: 'fg.default' }, '@media (max-width: 767px)': { display: 'none' } }}
+              >
+                Log in
+              </Text.Body>
+            )}
             <Box as="button" aria-label="Open menu" sx={{ display: 'none', '@media (max-width: 767px)': { display: 'flex' }, flexDirection: 'column', justifyContent: 'center', gap: '5px', background: 'none', border: 'none', cursor: 'pointer', p: 1 }}>
               {[0, 1, 2].map((i) => <Box key={i} sx={{ width: 22, height: 2, borderRadius: 1, background: 'var(--colors-fg-default)' }} />)}
             </Box>
@@ -671,7 +914,7 @@ export default function DomainSearch() {
         </Flex>
       </Box>
 
-      {/* ── Sticky nav — fixed, slides in once user scrolls past the search bar ── */}
+      {/* ── Sticky nav ── */}
       <Box
         sx={{
           position: 'fixed',
@@ -692,7 +935,6 @@ export default function DomainSearch() {
           px={6}
           sx={{ height: 60, maxWidth: 1440, mx: 'auto' }}
         >
-          {/* Logo — hidden on mobile */}
           <Box
             as="button"
             onClick={() => navigate('/')}
@@ -727,7 +969,11 @@ export default function DomainSearch() {
 
           {/* Right: log in + cart */}
           <Flex alignItems="center" gap={5} sx={{ flexShrink: 0, '@media (max-width: 767px)': { display: 'none' } }}>
-            <Text.Body m={0} color="fg.muted" sx={{ cursor: 'pointer', fontSize: '12px', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 500, '&:hover': { color: 'fg.default' } }}>Log In</Text.Body>
+            {isLoggedIn ? (
+              <Text.Body m={0} color="fg.muted" onClick={logout} sx={{ cursor: 'pointer', fontSize: '12px', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 500, '&:hover': { color: 'fg.default' } }}>Log out</Text.Body>
+            ) : (
+              <Text.Body m={0} color="fg.muted" onClick={() => setAuthModalOpen(true)} sx={{ cursor: 'pointer', fontSize: '12px', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 500, '&:hover': { color: 'fg.default' } }}>Log in</Text.Body>
+            )}
             <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center', opacity: hasCart ? 1 : 0, pointerEvents: hasCart ? 'auto' : 'none', transition: 'opacity 0.3s ease' }}>
               <Box as="button" sx={{ background: 'none', border: 'none', cursor: 'pointer', p: 1, display: 'flex', alignItems: 'center', color: 'fg.default' }}>
                 <ShoppingBag sx={{ width: 20, height: 20 }} />
@@ -743,7 +989,7 @@ export default function DomainSearch() {
       {/* ── Page content ── */}
       <Box
         sx={{
-          maxWidth: hasCart ? 1440 : 900,
+          maxWidth: panelVisible ? 1440 : 900,
           mx: 'auto',
           px: 8,
           pt: 80,
@@ -754,11 +1000,11 @@ export default function DomainSearch() {
       >
         <Flex sx={{ gap: '100px', '@media (max-width: 767px)': { gap: 0 } }} alignItems="flex-start">
 
-          {/* ── Left: search + results (3/5) ── */}
+          {/* ── Left: title + tabs + content ── */}
           <Box sx={{ flex: 3, minWidth: 0 }}>
 
-            {/* Heading — observed by IntersectionObserver to trigger nav transition */}
-            <Box ref={heroRef} mb={6} px={4}>
+            {/* Heading */}
+            <Box ref={heroRef} mb={4} px={4}>
               <Box
                 as="div"
                 m={0}
@@ -784,105 +1030,138 @@ export default function DomainSearch() {
               </Text.Body>
             </Box>
 
-            {/* Search input */}
-            <Flex
-              ref={searchBarRef}
-              alignItems="center"
-              mb={8}
-              onFocus={() => setSearchFocused(true)}
-              onBlur={() => setSearchFocused(false)}
-              sx={{
-                border: searchFocused ? '1px solid' : 'none',
-                borderColor: 'fg.default',
-                borderRadius: 8,
-                height: 52,
-                background: searchFocused ? '#fff' : '#f5f5f5',
-                overflow: 'hidden',
-                transition: 'background 0.15s ease',
-              }}
-            >
-              <Flex alignItems="center" gap={3} px={4} sx={{ flex: 1, minWidth: 0 }}>
-                <Search color="fg.muted" sx={{ flexShrink: 0 }} />
-                <Field.Root name="domain-search" sx={{ flex: 1, minWidth: 0 }}>
-                  <label id={labelId} style={{ display: 'none' }}>Search for a domain</label>
-                  <TextInput
-                    ref={inputRef}
-                    aria-labelledby={labelId}
-                    placeholder="Search for a domain"
-                    value={inputValue}
-                    onChange={(value: string) => setInputValue(value)}
-                    onKeyDown={handleKeyDown}
-                    sx={{
-                      border: 'none',
-                      outline: 'none',
-                      background: 'transparent',
-                      width: '100%',
-                      color: 'fg.default',
-                      fontSize: 3,
-                      padding: 0,
-                    }}
-                  />
-                </Field.Root>
-              </Flex>
-              {inputValue && (
-                <Box
-                  as="button"
-                  onClick={handleClear}
-                  aria-label="Clear search"
+            {/* Page-level tabs: Search / Favorites */}
+            <Box px={4} mb={6}>
+              <Tabs
+                value={pageTab}
+                onChange={(v: string) => setPageTab(v as 'search' | 'favorites')}
+                options={[
+                  { label: 'Search', value: 'search' },
+                  { label: favorites.size > 0 ? `Favorites (${favorites.size})` : 'Favorites', value: 'favorites' },
+                ]}
+              />
+            </Box>
+
+            {/* Search tab content */}
+            {pageTab === 'search' && (
+              <>
+                {/* Search input */}
+                <Flex
+                  ref={searchBarRef}
+                  alignItems="center"
+                  mb={8}
+                  onFocus={() => setSearchFocused(true)}
+                  onBlur={() => setSearchFocused(false)}
                   sx={{
-                    background: '#d9d9d9',
-                    border: 'none',
-                    borderRadius: '50%',
-                    width: 24,
-                    height: 24,
-                    mr: 3,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0,
-                    color: 'fg.default',
-                    transition: 'background 0.12s',
-                    '&:hover': { background: '#c8c8c8' },
+                    border: searchFocused ? '1px solid' : 'none',
+                    borderColor: 'fg.default',
+                    borderRadius: 8,
+                    height: 52,
+                    background: searchFocused ? '#fff' : '#f5f5f5',
+                    overflow: 'hidden',
+                    transition: 'background 0.15s ease',
                   }}
                 >
-                  <CrossSmall sx={{ width: 14, height: 14 }} />
-                </Box>
-              )}
-            </Flex>
+                  <Flex alignItems="center" gap={3} px={4} sx={{ flex: 1, minWidth: 0 }}>
+                    <Search color="fg.muted" sx={{ flexShrink: 0 }} />
+                    <Field.Root name="domain-search" sx={{ flex: 1, minWidth: 0 }}>
+                      <label id={labelId} style={{ display: 'none' }}>Search for a domain</label>
+                      <TextInput
+                        ref={inputRef}
+                        aria-labelledby={labelId}
+                        placeholder="Search for a domain"
+                        value={inputValue}
+                        onChange={(value: string) => setInputValue(value)}
+                        onKeyDown={handleKeyDown}
+                        sx={{
+                          border: 'none',
+                          outline: 'none',
+                          background: 'transparent',
+                          width: '100%',
+                          color: 'fg.default',
+                          fontSize: 3,
+                          padding: 0,
+                        }}
+                      />
+                    </Field.Root>
+                  </Flex>
+                  {inputValue && (
+                    <Box
+                      as="button"
+                      onClick={handleClear}
+                      aria-label="Clear search"
+                      sx={{
+                        background: '#d9d9d9',
+                        border: 'none',
+                        borderRadius: '50%',
+                        width: 24,
+                        height: 24,
+                        mr: 3,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                        color: 'fg.default',
+                        transition: 'background 0.12s',
+                        '&:hover': { background: '#c8c8c8' },
+                      }}
+                    >
+                      <CrossSmall sx={{ width: 14, height: 14 }} />
+                    </Box>
+                  )}
+                </Flex>
 
-            {/* Loading */}
-            {isLoading && (
-              <Flex justifyContent="center" alignItems="center" sx={{ minHeight: 300 }}>
-                <ActivityIndicator />
-              </Flex>
+                {/* Loading */}
+                {isLoading && (
+                  <Flex justifyContent="center" alignItems="center" sx={{ minHeight: 300 }}>
+                    <ActivityIndicator />
+                  </Flex>
+                )}
+
+                {/* Results */}
+                {!isLoading && results.length > 0 && (
+                  <Box>
+                    {results.map((r, i) => (
+                      <ResultRow
+                        key={r.id}
+                        result={r}
+                        inCart={cart.has(r.id)}
+                        onToggleCart={toggleCart}
+                        isTop={i === 0}
+                        isFavorited={favorites.has(r.id)}
+                        onFavorite={handleFavoriteClick}
+                        onExploreSimilar={handleExploreSimilar}
+                        expandedResults={expandedSimilar[r.id]}
+                        cartIds={cart}
+                        favoritedIds={new Set(favorites.keys())}
+                      />
+                    ))}
+                  </Box>
+                )}
+
+                {/* Empty state */}
+                {!isLoading && !q && (
+                  <Flex justifyContent="center" alignItems="center" sx={{ minHeight: 200 }}>
+                    <Text.Body m={0} color="fg.muted">Enter a domain name to search.</Text.Body>
+                  </Flex>
+                )}
+              </>
             )}
 
-            {/* Results */}
-            {!isLoading && results.length > 0 && (
-              <Box>
-                {results.map((r, i) => (
-                  <ResultRow
-                    key={r.id}
-                    result={r}
-                    inCart={cart.has(r.id)}
-                    onToggleCart={toggleCart}
-                    isTop={i === 0}
-                  />
-                ))}
-              </Box>
-            )}
-
-            {/* Empty state */}
-            {!isLoading && !q && (
-              <Flex justifyContent="center" alignItems="center" sx={{ minHeight: 200 }}>
-                <Text.Body m={0} color="fg.muted">Enter a domain name to search.</Text.Body>
-              </Flex>
+            {/* Favorites tab content */}
+            {pageTab === 'favorites' && (
+              <FavoritesTab
+                favorites={favorites}
+                cart={cart}
+                onToggleCart={toggleCart}
+                onRemoveFavorite={removeFavorite}
+              />
             )}
           </Box>
 
-          {/* ── Right: cart sidebar (2/5) — hidden on mobile ── */}
-          {hasCart && (
+          {/* ── Right: cart sidebar — hidden on mobile ── */}
+          {panelVisible && (
             <Box sx={{ flex: 2, minWidth: 0, alignSelf: 'flex-start', position: 'sticky', top: 80, '@media (max-width: 767px)': { display: 'none' } }}>
               <CartSidebar items={cartItems} results={results} onRemove={removeFromCart} onAdd={toggleCart} />
             </Box>
@@ -890,6 +1169,20 @@ export default function DomainSearch() {
 
         </Flex>
       </Box>
+
+      {/* ── Auth modal ── */}
+      <AuthModal
+        isOpen={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+        onSuccess={() => {
+          login()
+          if (pendingFavoriteRef.current) {
+            addFavorite(pendingFavoriteRef.current)
+            pendingFavoriteRef.current = null
+          }
+          setAuthModalOpen(false)
+        }}
+      />
     </Box>
   )
 }
