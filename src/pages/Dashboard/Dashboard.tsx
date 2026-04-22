@@ -13,6 +13,10 @@ import {
   ChevronSmallUp,
   Checkmark,
   ShoppingBag,
+  Star,
+  Diamond,
+  Trash,
+  InfoCircle,
 } from '@sqs/rosetta-icons'
 
 // ── Mock data ────────────────────────────────────────────────────────────────
@@ -28,6 +32,10 @@ const OWNED_DOMAINS = [
   { id: '1', name: 'mayasceramicsstudio.com', renewsAt: 'Jan 12, 2026', price: 18 },
   { id: '2', name: 'myceramics.net', renewsAt: 'Mar 5, 2026', price: 15 },
 ]
+
+const CONNECTED_DOMAIN_NAMES = new Set(OWNED_DOMAINS.map((d) => d.name))
+const PREMIUM_TLDS = new Set(['.io', '.co', '.me'])
+const PROMOTED_TLDS = new Set(['.live', '.store', '.online', '.studio', '.art', '.design', '.agency', '.shop'])
 
 const SETTINGS_NAV = ['Website', 'Domains & Email', 'Selling', 'Permissions & Ownership', 'Billing']
 
@@ -136,23 +144,77 @@ function hashStr(s: string): number {
   return Math.abs(h)
 }
 
+type BadgeKind = 'exact' | 'premium' | 'promoted' | 'connected'
+
 interface SearchResult {
   id: string; name: string; tld: string; available: boolean
   price: number; salePrice: number | null; tag: string | null
+  badges: BadgeKind[]
+  connectedToSite?: boolean
 }
 
 function generateResultsFromQuery(rawQuery: string): SearchResult[] {
   const stem = rawQuery.trim().toLowerCase().replace(/\s+/g, '').replace(/^\./, '').replace(/\.[a-z]+$/, '')
   if (!stem) return []
+
   const results: SearchResult[] = []
   const exactTld = rawQuery.includes('.') ? '.' + rawQuery.split('.').pop()! : '.com'
   const exactCatalog = OVERLAY_TLD_CATALOG.find((t) => t.tld === exactTld) ?? { tld: exactTld, base: 20, sale: 14 }
-  results.push({ id: `${stem}${exactTld}`, name: stem + exactTld, tld: exactTld, available: true, price: exactCatalog.base, salePrice: exactCatalog.sale, tag: 'Best match' })
+
+  const exactName = stem + exactTld
+  const exactConnected = CONNECTED_DOMAIN_NAMES.has(exactName)
+  results.push({
+    id: exactName, name: exactName, tld: exactTld,
+    available: !exactConnected,
+    price: exactCatalog.base, salePrice: exactCatalog.sale, tag: 'Best match',
+    badges: exactConnected ? ['connected'] : ['exact'],
+    connectedToSite: exactConnected,
+  })
+
   for (const cat of OVERLAY_TLD_CATALOG) {
     if (cat.tld === exactTld) continue
-    results.push({ id: `${stem}${cat.tld}`, name: stem + cat.tld, tld: cat.tld, available: hashStr(stem + cat.tld) % 4 !== 0, price: cat.base, salePrice: cat.sale, tag: null })
+    const domainName = stem + cat.tld
+    const isConn = CONNECTED_DOMAIN_NAMES.has(domainName)
+    results.push({
+      id: domainName, name: domainName, tld: cat.tld,
+      available: isConn ? false : hashStr(stem + cat.tld) % 4 !== 0,
+      price: cat.base, salePrice: cat.sale, tag: null,
+      badges: isConn ? ['connected'] : [],
+      connectedToSite: isConn,
+    })
   }
-  return results
+
+  // Assign premium/promoted badges pseudo-randomly seeded by stem — max 2 each,
+  // spread across the list rather than always clustered at the top
+  // Count (1–3) and positions seeded by stem so results are stable per query
+  const nonExact = results.slice(1)
+  const premiumPool = nonExact.filter((r) => !r.connectedToSite && PREMIUM_TLDS.has(r.tld))
+  const promotedPool = nonExact.filter((r) => !r.connectedToSite && PROMOTED_TLDS.has(r.tld))
+  const pickBadges = (pool: SearchResult[], seed: string, kind: BadgeKind) => {
+    if (!pool.length) return
+    const count = Math.min((hashStr(seed + 'count') % 3) + 1, pool.length)
+    const step = Math.max(1, Math.floor(pool.length / count))
+    const offset = hashStr(seed + 'offset') % step
+    for (let i = 0; i < count; i++) {
+      const idx = (offset + i * step) % pool.length
+      if (!pool[idx].badges.length) pool[idx].badges = [kind]
+    }
+  }
+  pickBadges(premiumPool, stem + 'premium', 'premium')
+  pickBadges(promotedPool, stem + 'promoted', 'promoted')
+
+  // Connected first, then best available (exact match), then rest
+  const connected = results.filter((r) => r.connectedToSite)
+  const rest = results.filter((r) => !r.connectedToSite)
+  const bestIdx = rest.findIndex((r) => r.tag === 'Best match' || r.badges.includes('exact'))
+  const best = bestIdx >= 0 ? rest.splice(bestIdx, 1) : []
+
+  return [...connected, ...best, ...rest]
+}
+
+function getSld(name: string): string {
+  const dot = name.lastIndexOf('.')
+  return dot > 0 ? name.slice(0, dot) : name
 }
 
 // ── Get New Domain overlay ────────────────────────────────────────────────────
@@ -167,95 +229,268 @@ function businessNameToStem(name: string): string {
 
 const DEFAULT_STEM = businessNameToStem(MOCK_USER.name) // "mayasceramicsstudio"
 
+function ResultBadge({ kind }: { kind: BadgeKind }) {
+  if (kind === 'exact') return (
+    <Flex alignItems="center" gap={1} px={2} py={1} sx={{ borderRadius: 20, background: '#e6f4ea', flexShrink: 0 }}>
+      <Checkmark sx={{ width: 12, height: 12, color: '#1a7a3a' }} />
+      <Text.Caption m={0} sx={{ fontSize: '11px', fontWeight: 600, color: '#1a7a3a', lineHeight: 1 }}>Exact match</Text.Caption>
+    </Flex>
+  )
+  if (kind === 'premium') return (
+    <Flex alignItems="center" gap={1} px={2} py={1} sx={{ borderRadius: 20, background: '#e8f0fe', flexShrink: 0 }}>
+      <Star sx={{ width: 11, height: 11, color: '#0862d1' }} />
+      <Text.Caption m={0} sx={{ fontSize: '11px', fontWeight: 600, color: '#0862d1', lineHeight: 1 }}>Premium</Text.Caption>
+    </Flex>
+  )
+  if (kind === 'promoted') return (
+    <Flex alignItems="center" gap={1} px={2} py={1} sx={{ borderRadius: 20, background: '#e0f7fa', flexShrink: 0 }}>
+      <Diamond sx={{ width: 11, height: 11, color: '#00838f' }} />
+      <Text.Caption m={0} sx={{ fontSize: '11px', fontWeight: 600, color: '#00838f', lineHeight: 1 }}>Promoted</Text.Caption>
+    </Flex>
+  )
+  if (kind === 'connected') return (
+    <Flex alignItems="center" gap={1} px={2} py={1} sx={{ borderRadius: 20, background: '#f0f0f0', flexShrink: 0 }}>
+      <CheckmarkCircle sx={{ width: 11, height: 11, color: '#555' }} />
+      <Text.Caption m={0} sx={{ fontSize: '11px', fontWeight: 600, color: '#555', lineHeight: 1 }}>Connected to site</Text.Caption>
+    </Flex>
+  )
+  return null
+}
+
 function SearchResultRow({
-  result,
-  inCart,
-  onAdd,
-  onRemove,
+  result, inCart, onAdd, onRemove, isTop,
 }: {
   result: SearchResult
   inCart: boolean
   onAdd: (r: SearchResult) => void
   onRemove: (id: string) => void
+  isTop?: boolean
 }) {
-  function handleRowClick() {
-    if (!result.available) return
+  const isClickable = result.available && !result.connectedToSite
+
+  function handleToggle() {
+    if (!isClickable) return
     inCart ? onRemove(result.id) : onAdd(result)
   }
 
   return (
     <Flex
       alignItems="center"
-      onClick={handleRowClick}
+      gap={3}
+      px={4}
+      py={3}
+      onClick={handleToggle}
       sx={{
-        minHeight: 66,
-        py: '11px',
-        borderBottom: '1px solid #ebebeb',
-        opacity: result.available ? 1 : 0.38,
-        cursor: result.available ? 'pointer' : 'default',
-        '&:last-child': { borderBottom: 'none' },
+        minHeight: 44,
+        opacity: (!result.available && !result.connectedToSite) ? 0.4 : 1,
+        cursor: isClickable ? 'pointer' : 'default',
+        ...(isTop ? {
+          border: '1px solid',
+          borderColor: 'border.default',
+          borderRadius: 8,
+          mb: 2,
+        } : {}),
+        ...(isClickable ? {
+          transition: 'background 0.15s ease, transform 0.15s ease, border-radius 0.15s ease',
+          '&:hover': { background: 'var(--colors-bg-default)', transform: 'translateX(4px)', borderRadius: 8 },
+        } : {}),
       }}
     >
-      {/* Domain name */}
-      <Text.Body
-        m={0}
-        sx={{ flex: 1, fontSize: '14px', color: result.available ? '#000' : '#aaa', textDecoration: result.available ? 'none' : 'line-through' }}
-      >
-        {result.name}
-      </Text.Body>
+      {/* Domain name + badges inline */}
+      <Flex alignItems="center" gap={2} flexWrap="wrap" sx={{ flex: '1 1 0', minWidth: 0 }}>
+        <Text.Body m={0} fontWeight={result.badges.includes('exact') ? 'semibold' : 'book'}
+          sx={{ color: result.available ? 'fg.default' : 'fg.disabled', flexShrink: 0 }}>
+          {result.name}
+        </Text.Body>
+        {result.badges.map((b) => <ResultBadge key={b} kind={b} />)}
+      </Flex>
 
-      {/* Right side — differs by cart state */}
-      {result.available && (
-        inCart ? (
-          <Flex alignItems="center" gap={4} sx={{ flexShrink: 0 }}>
-            <Text.Caption m={0} sx={{ fontSize: '13px', color: '#000' }}>Added to cart</Text.Caption>
-            <Checkmark sx={{ width: 16, height: 16, color: '#000' }} />
-          </Flex>
-        ) : (
-          <Flex alignItems="center" gap={3} sx={{ flexShrink: 0 }}>
-            <Flex alignItems="baseline" gap={2}>
-              {result.salePrice !== null && (
-                <Text.Caption m={0} sx={{ fontSize: '13px', color: '#aaa', textDecoration: 'line-through' }}>
-                  ${result.price}
-                </Text.Caption>
-              )}
-              <Text.Body m={0} sx={{ fontSize: '14px', color: '#000' }}>
-                ${result.salePrice ?? result.price}
-              </Text.Body>
-            </Flex>
-            <Box
-              as="button"
-              onClick={(e: React.MouseEvent) => e.stopPropagation()}
-              sx={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', p: '4px', flexShrink: 0, color: '#000', '&:hover': { color: '#555' } }}
-            >
-              <ShoppingBag sx={{ width: 18, height: 18 }} />
-            </Box>
-          </Flex>
-        )
+      {/* Price */}
+      {!result.connectedToSite && (
+        <Flex alignItems="center" gap={2} sx={{ flexShrink: 0 }}>
+          {result.salePrice !== null ? (
+            <>
+              <Text.Caption m={0} color="fg.disabled" sx={{ textDecoration: 'line-through', fontSize: '13px' }}>
+                ${result.price}
+              </Text.Caption>
+              <Text.Body m={0}>${result.salePrice}</Text.Body>
+            </>
+          ) : (
+            <Text.Body m={0}>${result.price}</Text.Body>
+          )}
+        </Flex>
+      )}
+
+      {/* Cart button or spacer */}
+      {result.connectedToSite ? (
+        <Box sx={{ width: 36, flexShrink: 0 }} />
+      ) : result.available ? (
+        <Box
+          as="button"
+          onClick={(e: React.MouseEvent) => { e.stopPropagation(); handleToggle() }}
+          aria-label={inCart ? 'Remove from cart' : 'Add to cart'}
+          sx={{
+            border: 'none', cursor: 'pointer', width: 36, height: 36, borderRadius: 8,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+            background: inCart ? 'var(--colors-fg-default)' : 'transparent',
+            transition: 'background 0.2s ease',
+            '&:hover': { background: inCart ? '#333' : 'var(--colors-bg-default)' },
+          }}
+        >
+          {inCart
+            ? <Checkmark sx={{ width: 16, height: 16, color: '#ffffff' }} />
+            : <ShoppingBag sx={{ width: 18, height: 18, color: 'var(--colors-fg-muted)' }} />}
+        </Box>
+      ) : (
+        <Box sx={{ width: 36, flexShrink: 0 }} />
       )}
     </Flex>
   )
 }
 
+function CartCard({
+  cart, results, onRemove, onAdd, onPurchase, isLoading,
+}: {
+  cart: SearchResult[]
+  results: SearchResult[]
+  onRemove: (id: string) => void
+  onAdd: (r: SearchResult) => void
+  onPurchase: () => void
+  isLoading: boolean
+}) {
+  const [matchingOpen, setMatchingOpen] = useState<Record<string, boolean>>({})
+  const prevItemIdsRef = useRef<Set<string>>(new Set())
+  const subtotal = cart.reduce((sum, r) => sum + (r.salePrice ?? r.price), 0)
+  const cartIds = new Set(cart.map((i) => i.id))
+
+  useEffect(() => {
+    const currentIds = new Set(cart.map((i) => i.id))
+    const newItems = cart.filter((i) => !prevItemIdsRef.current.has(i.id))
+    if (newItems.length > 0) {
+      setMatchingOpen((prev) => {
+        const next = { ...prev }
+        for (const item of newItems) {
+          const sld = getSld(item.name)
+          const hasMatching = results.some((r) => getSld(r.name) === sld && r.available && !currentIds.has(r.id) && !r.connectedToSite)
+          if (hasMatching) next[sld] = true
+        }
+        return next
+      })
+    }
+    prevItemIdsRef.current = currentIds
+  }, [cart, results])
+
+  const sldOrder: string[] = []
+  const groups: Record<string, SearchResult[]> = {}
+  for (const item of cart) {
+    const sld = getSld(item.name)
+    if (!groups[sld]) { groups[sld] = []; sldOrder.push(sld) }
+    groups[sld].push(item)
+  }
+
+  function getMatching(sld: string): SearchResult[] {
+    return results.filter((r) => getSld(r.name) === sld && r.available && !cartIds.has(r.id) && !r.connectedToSite).slice(0, 4)
+  }
+
+  return (
+    <Box sx={{ background: '#fff', borderRadius: 12, height: 'calc(100vh - 212px)', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 218px 61px 0 transparent, 0 139px 56px 0 rgba(0,0,0,0.01), 0 78px 47px 0 rgba(0,0,0,0.05), 0 -1px 35px 0 rgba(0,0,0,0.09), 0 4px 19px 0 rgba(0,0,0,0.1)' }}>
+      <Box px={6} pt={6} pb={3}>
+        <Text.Body m={0} fontWeight="semibold" sx={{ fontSize: '18px', letterSpacing: '-0.01em' }}>Cart Overview</Text.Body>
+        <Text.Caption m={0} color="fg.muted" sx={{ fontSize: '13px', mt: 3 }}>Domain ({cart.length})</Text.Caption>
+      </Box>
+
+      <Box sx={{ flex: '1 1 0', overflowY: 'auto', px: 5, pb: 4 }}>
+        {sldOrder.map((sld) => {
+          const groupItems = groups[sld]
+          const matching = getMatching(sld)
+          const isOpen = matchingOpen[sld] ?? false
+          return (
+            <Box key={sld} mb={3} sx={{ border: '1px solid', borderColor: 'border.default', borderRadius: 8, overflow: 'hidden' }}>
+              {groupItems.map((item, idx) => {
+                const price = item.salePrice ?? item.price
+                const isLast = idx === groupItems.length - 1
+                return (
+                  <Flex key={item.id} alignItems="center" gap={3} px={4} sx={{ minHeight: 48, borderBottom: (!isLast || matching.length > 0) ? '1px solid' : 'none', borderColor: 'border.default' }}>
+                    <Text.Body m={0} fontWeight="semibold" sx={{ flex: '1 1 0', minWidth: 0, fontSize: '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</Text.Body>
+                    <Text.Body m={0} sx={{ fontSize: '14px', flexShrink: 0 }}>${price}</Text.Body>
+                    <Box as="button" onClick={() => onRemove(item.id)} aria-label={`Remove ${item.name}`}
+                      sx={{ background: 'none', border: 'none', cursor: 'pointer', p: '4px', display: 'flex', alignItems: 'center', flexShrink: 0, color: 'fg.muted', borderRadius: 4, '&:hover': { color: 'fg.default' } }}>
+                      <Trash sx={{ width: 14, height: 14 }} />
+                    </Box>
+                  </Flex>
+                )
+              })}
+              {matching.length > 0 && (
+                <Box>
+                  <Box as="button" onClick={() => setMatchingOpen((prev) => ({ ...prev, [sld]: !isOpen }))}
+                    sx={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', px: '16px', py: '10px', textAlign: 'left' }}>
+                    <Flex alignItems="center" gap={1} sx={{ flex: 1 }}>
+                      <Text.Caption m={0} color="fg.muted" sx={{ fontSize: '12px', lineHeight: 1 }}>Add matching domains</Text.Caption>
+                      <InfoCircle sx={{ width: 12, height: 12, color: 'var(--colors-fg-muted)', flexShrink: 0 }} />
+                    </Flex>
+                    {isOpen
+                      ? <ChevronSmallUp sx={{ width: 14, height: 14, color: 'var(--colors-fg-muted)', flexShrink: 0 }} />
+                      : <ChevronSmallDown sx={{ width: 14, height: 14, color: 'var(--colors-fg-muted)', flexShrink: 0 }} />}
+                  </Box>
+                  {isOpen && (
+                    <Box px="8px" pb="8px" sx={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      {matching.map((m) => {
+                        const stemPart = getSld(m.name)
+                        const ext = m.name.slice(stemPart.length + 1)
+                        return (
+                          <Flex key={m.id} alignItems="center" gap={3} px={3} sx={{ minHeight: 44, borderRadius: 6, background: '#f5f5f5' }}>
+                            <Box sx={{ flex: '1 1 0', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              <Text.Body as="span" m={0} sx={{ fontSize: '14px' }}>{stemPart}.</Text.Body>
+                              <Text.Body as="span" m={0} fontWeight="semibold" sx={{ fontSize: '14px' }}>{ext}</Text.Body>
+                            </Box>
+                            <Text.Body m={0} sx={{ fontSize: '14px', flexShrink: 0 }}>${m.salePrice ?? m.price}</Text.Body>
+                            <Box as="button" onClick={() => onAdd(m)}
+                              sx={{ background: 'none', border: 'none', cursor: 'pointer', p: 0, flexShrink: 0, color: 'var(--colors-fg-default)', fontSize: '13px', fontWeight: 700, letterSpacing: '0.04em', '&:hover': { opacity: 0.7 } }}>
+                              ADD
+                            </Box>
+                          </Flex>
+                        )
+                      })}
+                    </Box>
+                  )}
+                </Box>
+              )}
+            </Box>
+          )
+        })}
+      </Box>
+
+      <Box sx={{ borderTop: '1px solid', borderColor: 'border.default', flexShrink: 0 }}>
+        <Flex alignItems="center" justifyContent="space-between" px={6} py={4}>
+          <Flex alignItems="center" gap={2}>
+            <ShoppingBag sx={{ width: 16, height: 16, color: 'var(--colors-fg-muted)' }} />
+            <Text.Body m={0} sx={{ fontSize: '14px' }}>{cart.length} Item{cart.length !== 1 ? 's' : ''}</Text.Body>
+          </Flex>
+          <Text.Body m={0} sx={{ fontSize: '15px' }}>${subtotal}</Text.Body>
+        </Flex>
+        <Box px={5} pb={5}>
+          <Box as="button" onClick={onPurchase}
+            sx={{ width: '100%', background: isLoading ? '#888' : 'var(--colors-fg-default)', color: '#fff', border: 'none', borderRadius: 4, height: 48, cursor: isLoading ? 'default' : 'pointer', fontSize: '13px', fontWeight: 400, letterSpacing: '0.08em', textTransform: 'uppercase', transition: 'opacity 0.15s ease', '&:hover': { opacity: isLoading ? 1 : 0.82 } }}>
+            {isLoading ? 'Connecting…' : 'Checkout'}
+          </Box>
+        </Box>
+      </Box>
+    </Box>
+  )
+}
+
 function GetNewDomainOverlay({
-  cart,
-  onAdd,
-  onRemove,
-  onClose,
-  onCheckout,
+  cart, onAdd, onRemove, onClose, onPurchaseComplete,
 }: {
   cart: SearchResult[]
   onAdd: (r: SearchResult) => void
   onRemove: (id: string) => void
   onClose: () => void
-  onCheckout: () => void
+  onPurchaseComplete: () => void
 }) {
   const [query, setQuery] = useState('')
-  const [results, setResults] = useState<SearchResult[]>(
-    () => generateResultsFromQuery(DEFAULT_STEM)
-  )
-  const [cartOpen, setCartOpen] = useState(false)
-  const cartRef = useRef<HTMLDivElement>(null)
+  const [results, setResults] = useState<SearchResult[]>(() => generateResultsFromQuery(DEFAULT_STEM))
+  const [purchaseState, setPurchaseState] = useState<'idle' | 'loading' | 'success'>('idle')
   const labelId = useId()
 
   useEffect(() => {
@@ -265,192 +500,87 @@ function GetNewDomainOverlay({
     return () => clearTimeout(timer)
   }, [query])
 
-  useEffect(() => {
-    if (!cartOpen) return
-    function handleClick(e: MouseEvent) {
-      if (cartRef.current && !cartRef.current.contains(e.target as Node)) setCartOpen(false)
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [cartOpen])
-
   const cartIds = new Set(cart.map((c) => c.id))
-  const cartLabel = cart.length === 1 ? '1 DOMAIN' : `${cart.length} DOMAINS`
 
-  return (
-    <Box
-      sx={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 100,
-        background: '#fff',
-        display: 'flex',
-        flexDirection: 'column',
-      }}
-    >
-        {/* Header: logo + X, no bottom border */}
-        <Flex
-          alignItems="center"
-          justifyContent="space-between"
-          px={4}
-          sx={{ height: 88, flexShrink: 0 }}
-        >
+  function handlePurchase() {
+    setPurchaseState('loading')
+    setTimeout(() => setPurchaseState('success'), 1500)
+  }
+
+  // ── Success state ──────────────────────────────────────────────────────────
+  if (purchaseState === 'success') {
+    const purchasedNames = cart.map((c) => c.name)
+    return (
+      <Box sx={{ position: 'fixed', inset: 0, zIndex: 100, background: '#fff', display: 'flex', flexDirection: 'column' }}>
+        <Flex alignItems="center" px={4} sx={{ height: 88, flexShrink: 0 }}>
           <LogoSquarespace />
-          <Box
-            as="button"
-            onClick={onClose}
-            sx={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#444', p: '4px', borderRadius: 4, '&:hover': { background: '#f5f5f5' } }}
-          >
-            <CrossSmall sx={{ width: 20, height: 20 }} />
-          </Box>
         </Flex>
-
-        {/* Scrollable body */}
-        <Box sx={{ flex: 1, overflowY: 'auto', px: '20%' }}>
-
-          {/* Title row + CHECKOUT — matches content indent */}
-          <Flex
-            alignItems="center"
-            justifyContent="space-between"
-            pt={5}
-            pb={4}
-          >
-            <Text.Body m={0} fontWeight="semibold" sx={{ fontSize: '26px' }}>
-              Get a New Domain
-            </Text.Body>
-
-            <Flex alignItems="center" gap={6}>
-              {/* Cart dropdown — only when items in cart */}
-              {cart.length > 0 && (
-                <Box ref={cartRef} sx={{ position: 'relative' }}>
-                  <Flex
-                    as="button"
-                    alignItems="center"
-                    gap={1}
-                    onClick={() => setCartOpen((v) => !v)}
-                    sx={{
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer',
-                      p: 0,
-                      '& .cart-label': {
-                        backgroundImage: 'linear-gradient(currentColor, currentColor)',
-                        backgroundSize: '0% 1px',
-                        backgroundPosition: 'right bottom',
-                        backgroundRepeat: 'no-repeat',
-                        transition: 'background-size 0.28s ease',
-                        paddingBottom: '1px',
-                      },
-                      '&:hover .cart-label': {
-                        backgroundSize: '100% 1px',
-                        backgroundPosition: 'left bottom',
-                      },
-                    }}
-                  >
-                    <Box
-                      as="span"
-                      className="cart-label"
-                      sx={{ fontSize: '14px', fontWeight: 500 }}
-                    >
-                      {cartLabel}
-                    </Box>
-                    {cartOpen
-                      ? <ChevronSmallUp sx={{ width: 16, height: 16 }} />
-                      : <ChevronSmallDown sx={{ width: 16, height: 16 }} />}
-                  </Flex>
-
-                  {/* Popover */}
-                  {cartOpen && (
-                    <Box
-                      sx={{
-                        position: 'absolute',
-                        top: 'calc(100% + 8px)',
-                        right: 0,
-                        minWidth: 280,
-                        background: '#fff',
-                        border: '1px solid #e8e8e8',
-                        borderRadius: 6,
-                        boxShadow: '0 4px 20px rgba(0,0,0,0.10)',
-                        zIndex: 10,
-                        overflow: 'hidden',
-                      }}
-                    >
-                      {cart.map((item) => (
-                        <Flex
-                          key={item.id}
-                          alignItems="center"
-                          gap={3}
-                          px={4}
-                          py={3}
-                          sx={{ borderBottom: '1px solid #f0f0f0', '&:last-child': { borderBottom: 'none' } }}
-                        >
-                          <Box
-                            as="button"
-                            onClick={() => onRemove(item.id)}
-                            sx={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#888', flexShrink: 0, p: 0, '&:hover': { color: '#000' } }}
-                          >
-                            <CrossSmall sx={{ width: 16, height: 16 }} />
-                          </Box>
-                          <Text.Body m={0} sx={{ flex: 1, fontSize: '13px', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {item.name}
-                          </Text.Body>
-                          <Text.Caption m={0} color="fg.muted" sx={{ fontSize: '13px', flexShrink: 0 }}>
-                            ${item.salePrice ?? item.price} / yr
-                          </Text.Caption>
-                        </Flex>
-                      ))}
-                    </Box>
-                  )}
-                </Box>
-              )}
-
-              <Button.Primary
-                size="medium"
-                disabled={cart.length === 0}
-                onClick={onCheckout}
-              >
-                CHECKOUT
-              </Button.Primary>
-            </Flex>
-          </Flex>
-
-
-          {/* Search bar — same horizontal indent as title and rows */}
-          <Flex
-            alignItems="center"
-            gap={2}
-            mb={3}
-            px={4}
-            sx={{
-              border: '1px solid #d8d8d8',
-              borderRadius: 6,
-              height: 44,
-              background: '#f5f5f5',
-              '&:focus-within': { borderColor: '#999', background: '#fff' },
-              transition: 'border-color 0.15s, background 0.15s',
-            }}
-          >
-            <Search color="fg.muted" sx={{ flexShrink: 0, width: 16, height: 16 }} />
-            <Field.Root name="overlay-domain-search" sx={{ flex: 1, minWidth: 0 }}>
-              <label id={labelId} style={{ display: 'none' }}>Search for your domain</label>
-              <TextInput
-                aria-labelledby={labelId}
-                placeholder="Search for your domain"
-                value={query}
-                onChange={(v: string) => setQuery(v)}
-                sx={{ border: 'none', outline: 'none', background: 'transparent', width: '100%', fontSize: '14px', padding: 0, color: 'fg.default' }}
-              />
-            </Field.Root>
-          </Flex>
-
-          {/* Results */}
-          <Box>
-            {results.map((r) => (
-              <SearchResultRow key={r.id} result={r} inCart={cartIds.has(r.id)} onAdd={onAdd} onRemove={onRemove} />
-            ))}
+        <Flex flexDirection="column" alignItems="center" justifyContent="center" sx={{ flex: 1, px: 6, textAlign: 'center' }}>
+          <Box sx={{ width: 64, height: 64, borderRadius: '50%', background: '#e6f4ea', display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 5 }}>
+            <CheckmarkCircle sx={{ width: 32, height: 32, color: '#1a7a3a' }} />
           </Box>
+          <Text.Title m={0} fontWeight="semibold" sx={{ mb: 2 }}>Domain is now live</Text.Title>
+          <Text.Body m={0} color="fg.muted" sx={{ mb: 2 }}>
+            {purchasedNames.join(', ')} {purchasedNames.length === 1 ? 'is' : 'are'} connected to{' '}
+            <Box as="span" sx={{ fontWeight: 600, color: '#000' }}>{MOCK_USER.name}</Box>
+          </Text.Body>
+          <Text.Caption m={0} color="fg.muted" sx={{ mb: 6 }}>DNS propagation may take up to 48 hours.</Text.Caption>
+          <Button.Primary size="medium" onClick={onPurchaseComplete}>Back to Domains</Button.Primary>
+        </Flex>
+      </Box>
+    )
+  }
 
+  // ── Search state ───────────────────────────────────────────────────────────
+  return (
+    <Box sx={{ position: 'fixed', inset: 0, zIndex: 100, background: '#fff', display: 'flex', flexDirection: 'column' }}>
+      <Flex alignItems="center" justifyContent="space-between" px={4} sx={{ height: 88, flexShrink: 0 }}>
+        <LogoSquarespace />
+        <Box as="button" onClick={onClose}
+          sx={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#444', p: '4px', borderRadius: 4, '&:hover': { background: '#f5f5f5' } }}>
+          <CrossSmall sx={{ width: 20, height: 20 }} />
         </Box>
+      </Flex>
+
+      <Box sx={{ flex: 1, overflowY: 'auto' }}>
+        <Box sx={{ maxWidth: cart.length > 0 ? 1440 : 900, mx: 'auto', px: 8, pt: 5, pb: 10, transition: 'max-width 0.35s ease' }}>
+          <Flex sx={{ gap: '100px', alignItems: 'flex-start' }}>
+            {/* Left: search + results */}
+            <Box sx={{ flex: 3, minWidth: 0 }}>
+              <Text.Body m={0} fontWeight="semibold" sx={{ fontSize: '26px', mb: 4 }}>Get a new domain</Text.Body>
+
+              <Flex alignItems="center" gap={2} mb={3} px={4}
+                sx={{ border: '1px solid #d8d8d8', borderRadius: 6, height: 44, background: '#f5f5f5', '&:focus-within': { borderColor: '#999', background: '#fff' }, transition: 'border-color 0.15s, background 0.15s' }}>
+                <Search color="fg.muted" sx={{ flexShrink: 0, width: 16, height: 16 }} />
+                <Field.Root name="overlay-domain-search" sx={{ flex: 1, minWidth: 0 }}>
+                  <label id={labelId} style={{ display: 'none' }}>Search for your domain</label>
+                  <TextInput aria-labelledby={labelId} placeholder="Search for your domain" value={query}
+                    onChange={(v: string) => setQuery(v)}
+                    sx={{ border: 'none', outline: 'none', background: 'transparent', width: '100%', fontSize: '14px', padding: 0, color: 'fg.default' }} />
+                </Field.Root>
+              </Flex>
+
+              <Box>
+                {(() => {
+                  const firstAvailableId = results.find((r) => r.available && !r.connectedToSite)?.id
+                  return results.map((r) => (
+                    <SearchResultRow key={r.id} result={r} inCart={cartIds.has(r.id)}
+                      onAdd={onAdd} onRemove={onRemove} isTop={r.id === firstAvailableId} />
+                  ))
+                })()}
+              </Box>
+            </Box>
+
+            {/* Right: cart card */}
+            {cart.length > 0 && (
+              <Box sx={{ flex: 2, minWidth: 0, alignSelf: 'flex-start', position: 'sticky', top: 24, pt: '76px' }}>
+                <CartCard cart={cart} results={results} onRemove={onRemove} onAdd={onAdd}
+                  onPurchase={handlePurchase} isLoading={purchaseState === 'loading'} />
+              </Box>
+            )}
+          </Flex>
+        </Box>
+      </Box>
     </Box>
   )
 }
@@ -988,7 +1118,7 @@ export default function Dashboard() {
           onAdd={addToCart}
           onRemove={removeFromCart}
           onClose={() => navigate(-1)}
-          onCheckout={() => setCheckoutOpen(true)}
+          onPurchaseComplete={() => { setCart([]); navigate(-1) }}
         />
       )}
 
