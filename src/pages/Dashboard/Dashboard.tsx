@@ -8,6 +8,7 @@ import {
   Search,
   CheckmarkCircle,
   ArrowRight,
+  ArrowLeft,
   CrossSmall,
   ChevronSmallDown,
   ChevronSmallUp,
@@ -194,43 +195,81 @@ function SearchResultRow({
         opacity: result.available ? 1 : 0.38,
         cursor: result.available ? 'pointer' : 'default',
         '&:last-child': { borderBottom: 'none' },
+        '@media (max-width: 767px)': { px: '16px', py: '10px', gap: '8px', minHeight: 'auto' },
       }}
     >
-      {/* Domain name */}
-      <Text.Body
-        m={0}
-        sx={{ flex: 1, fontSize: '14px', color: result.available ? '#000' : '#aaa', textDecoration: result.available ? 'none' : 'line-through' }}
-      >
-        {result.name}
-      </Text.Body>
+      {/* Name + mobile subline */}
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Text.Body
+          m={0}
+          sx={{ fontSize: '14px', color: result.available ? '#000' : '#aaa', textDecoration: result.available ? 'none' : 'line-through' }}
+        >
+          {result.name}
+        </Text.Body>
+        {/* Mobile: price below name (not-in-cart) */}
+        {result.available && !inCart && (
+          <Flex alignItems="baseline" gap={1} sx={{ display: 'none', '@media (max-width: 767px)': { display: 'flex' }, mt: '2px' }}>
+            {result.salePrice !== null && (
+              <Text.Caption m={0} sx={{ fontSize: '12px', color: '#aaa', textDecoration: 'line-through' }}>
+                ${result.price}
+              </Text.Caption>
+            )}
+            <Text.Caption m={0} sx={{ fontSize: '12px', color: '#666' }}>
+              ${result.salePrice ?? result.price}
+            </Text.Caption>
+          </Flex>
+        )}
+        {/* Mobile: "Added to cart" below name (in-cart) */}
+        {result.available && inCart && (
+          <Text.Caption m={0} sx={{ display: 'none', '@media (max-width: 767px)': { display: 'block' }, fontSize: '12px', color: '#888', mt: '2px' }}>
+            Added to cart
+          </Text.Caption>
+        )}
+      </Box>
 
-      {/* Right side — differs by cart state */}
+      {/* Desktop: price — hidden on mobile */}
+      {result.available && !inCart && (
+        <Flex alignItems="baseline" gap={2} sx={{ flexShrink: 0, '@media (max-width: 767px)': { display: 'none' } }}>
+          {result.salePrice !== null && (
+            <Text.Caption m={0} sx={{ fontSize: '13px', color: '#aaa', textDecoration: 'line-through' }}>
+              ${result.price}
+            </Text.Caption>
+          )}
+          <Text.Body m={0} sx={{ fontSize: '14px', color: '#000' }}>
+            ${result.salePrice ?? result.price}
+          </Text.Body>
+        </Flex>
+      )}
+
+      {/* Desktop: "Added to cart" + checkmark — hidden on mobile */}
+      {result.available && inCart && (
+        <Flex alignItems="center" gap={4} sx={{ flexShrink: 0, '@media (max-width: 767px)': { display: 'none' } }}>
+          <Text.Caption m={0} sx={{ fontSize: '13px', color: '#000' }}>Added to cart</Text.Caption>
+          <Checkmark sx={{ width: 16, height: 16, color: '#000' }} />
+        </Flex>
+      )}
+
+      {/* Action icon — cart bag or checkmark */}
       {result.available && (
         inCart ? (
-          <Flex alignItems="center" gap={4} sx={{ flexShrink: 0 }}>
-            <Text.Caption m={0} sx={{ fontSize: '13px', color: '#000' }}>Added to cart</Text.Caption>
-            <Checkmark sx={{ width: 16, height: 16, color: '#000' }} />
-          </Flex>
+          /* Mobile: simple checkmark; desktop: handled above */
+          <Box sx={{ display: 'none', '@media (max-width: 767px)': { display: 'flex' }, alignItems: 'center', justifyContent: 'center', width: 28, flexShrink: 0 }}>
+            <Checkmark sx={{ width: 15, height: 15, color: '#000' }} />
+          </Box>
         ) : (
-          <Flex alignItems="center" gap={3} sx={{ flexShrink: 0 }}>
-            <Flex alignItems="baseline" gap={2}>
-              {result.salePrice !== null && (
-                <Text.Caption m={0} sx={{ fontSize: '13px', color: '#aaa', textDecoration: 'line-through' }}>
-                  ${result.price}
-                </Text.Caption>
-              )}
-              <Text.Body m={0} sx={{ fontSize: '14px', color: '#000' }}>
-                ${result.salePrice ?? result.price}
-              </Text.Body>
-            </Flex>
-            <Box
-              as="button"
-              onClick={(e: React.MouseEvent) => e.stopPropagation()}
-              sx={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', p: '4px', flexShrink: 0, color: '#000', '&:hover': { color: '#555' } }}
-            >
-              <ShoppingBag sx={{ width: 18, height: 18 }} />
-            </Box>
-          </Flex>
+          <Box
+            as="button"
+            onClick={(e: React.MouseEvent) => { e.stopPropagation(); onAdd(result) }}
+            sx={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', p: '4px', flexShrink: 0,
+              color: '#000', '&:hover': { color: '#555' },
+              ml: 4,
+              '@media (max-width: 767px)': { p: '2px', color: 'var(--colors-fg-muted)', ml: 2 },
+            }}
+          >
+            <ShoppingBag sx={{ width: 18, height: 18 }} />
+          </Box>
         )
       )}
     </Flex>
@@ -255,6 +294,7 @@ function GetNewDomainOverlay({
     () => generateResultsFromQuery(DEFAULT_STEM)
   )
   const [cartOpen, setCartOpen] = useState(false)
+  const [miniCartOpen, setMiniCartOpen] = useState(false)
   const cartRef = useRef<HTMLDivElement>(null)
   const labelId = useId()
 
@@ -286,6 +326,7 @@ function GetNewDomainOverlay({
         background: '#fff',
         display: 'flex',
         flexDirection: 'column',
+        overflow: 'hidden',
       }}
     >
         {/* Header: logo + X, no bottom border */}
@@ -306,7 +347,7 @@ function GetNewDomainOverlay({
         </Flex>
 
         {/* Scrollable body */}
-        <Box sx={{ flex: 1, overflowY: 'auto', px: '20%' }}>
+        <Box sx={{ flex: 1, overflowY: 'auto', px: '20%', '@media (max-width: 767px)': { px: '20px' } }}>
 
           {/* Title row + CHECKOUT — matches content indent */}
           <Flex
@@ -319,7 +360,7 @@ function GetNewDomainOverlay({
               Get a New Domain
             </Text.Body>
 
-            <Flex alignItems="center" gap={6}>
+            <Flex alignItems="center" gap={6} sx={{ '@media (max-width: 767px)': { display: 'none' } }}>
               {/* Cart dropdown — only when items in cart */}
               {cart.length > 0 && (
                 <Box ref={cartRef} sx={{ position: 'relative' }}>
@@ -451,6 +492,95 @@ function GetNewDomainOverlay({
           </Box>
 
         </Box>
+
+        {/* Mobile bottom bar — shown only on mobile when cart has items */}
+        {cart.length > 0 && (
+          <>
+            {/* Dark scrim — always rendered on mobile, fades in/out */}
+            <Box
+              onClick={() => setMiniCartOpen(false)}
+              sx={{
+                display: 'none',
+                '@media (max-width: 767px)': { display: 'block' },
+                position: 'absolute',
+                inset: 0,
+                background: 'rgba(0,0,0,0.45)',
+                zIndex: 1,
+                opacity: miniCartOpen ? 1 : 0,
+                pointerEvents: miniCartOpen ? 'auto' : 'none',
+                transition: 'opacity 0.25s ease',
+              }}
+            />
+
+            <Box
+              sx={{
+                display: 'none',
+                '@media (max-width: 767px)': { display: 'flex', flexDirection: 'column' },
+                flexShrink: 0,
+                borderTop: '1px solid #e8e8e8',
+                background: '#fff',
+                position: 'relative',
+                zIndex: 2,
+              }}
+            >
+              {/* Bar: cart label toggle + checkout */}
+              <Flex alignItems="center" justifyContent="space-between" px={4} py={3}>
+                <Flex
+                  as="button"
+                  alignItems="center"
+                  gap={1}
+                  onClick={() => setMiniCartOpen((v) => !v)}
+                  sx={{ background: 'none', border: 'none', cursor: 'pointer', p: 0 }}
+                >
+                  <Text.Body m={0} sx={{ fontSize: '13px', fontWeight: 500 }}>{cartLabel}</Text.Body>
+                  <Box sx={{ transition: 'transform 0.25s ease', transform: miniCartOpen ? 'rotate(180deg)' : 'rotate(0deg)', display: 'flex', alignItems: 'center' }}>
+                    <ChevronSmallUp sx={{ width: 14, height: 14 }} />
+                  </Box>
+                </Flex>
+                <Button.Primary size="small" onClick={onCheckout}>
+                  CHECKOUT
+                </Button.Primary>
+              </Flex>
+
+              {/* Mini cart items — always rendered, expand/collapse via max-height */}
+              <Box
+                sx={{
+                  maxHeight: miniCartOpen ? `${cart.length * 56}px` : '0px',
+                  overflow: 'hidden',
+                  opacity: miniCartOpen ? 1 : 0,
+                  transition: 'max-height 0.3s ease, opacity 0.2s ease',
+                  borderTop: miniCartOpen ? '1px solid #e8e8e8' : 'none',
+                }}
+              >
+                {cart.map((item) => (
+                  <Flex
+                    key={item.id}
+                    alignItems="center"
+                    gap={3}
+                    px={4}
+                    py={3}
+                    sx={{ borderBottom: '1px solid #f0f0f0', '&:last-child': { borderBottom: 'none' } }}
+                  >
+                    <Box
+                      as="button"
+                      onClick={() => onRemove(item.id)}
+                      sx={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#888', flexShrink: 0, p: 0, '&:hover': { color: '#000' } }}
+                    >
+                      <CrossSmall sx={{ width: 16, height: 16 }} />
+                    </Box>
+                    <Text.Body m={0} sx={{ flex: 1, fontSize: '13px', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {item.name}
+                    </Text.Body>
+                    <Text.Caption m={0} color="fg.muted" sx={{ fontSize: '13px', flexShrink: 0 }}>
+                      ${item.salePrice ?? item.price} / yr
+                    </Text.Caption>
+                  </Flex>
+                ))}
+              </Box>
+            </Box>
+          </>
+        )}
+
     </Box>
   )
 }
@@ -614,13 +744,30 @@ function SettingsModal({
         px={5}
         sx={{ height: 52, borderBottom: '1px solid #e8e8e8', flexShrink: 0 }}
       >
-        <Text.Body m={0} fontWeight="semibold" sx={{ fontSize: '15px' }}>
+        {/* Desktop: "Settings" title */}
+        <Text.Body m={0} fontWeight="semibold" sx={{ fontSize: '15px', '@media (max-width: 767px)': { display: 'none' } }}>
           Settings
         </Text.Body>
-        <Flex alignItems="center" gap={1}>
+
+        {/* Mobile: ← DOMAINS & EMAIL */}
+        <Flex alignItems="center" gap={2} sx={{ display: 'none', '@media (max-width: 767px)': { display: 'flex' } }}>
           <Box
             as="button"
-            sx={{ background: 'none', border: 'none', cursor: 'pointer', p: '6px', borderRadius: 4, display: 'flex', alignItems: 'center', color: '#666', '&:hover': { background: '#f5f5f5' } }}
+            onClick={onClose}
+            sx={{ background: 'none', border: 'none', cursor: 'pointer', p: '4px', display: 'flex', alignItems: 'center', color: '#000' }}
+          >
+            <ArrowLeft sx={{ width: 16, height: 16 }} />
+          </Box>
+          <Text.Body m={0} sx={{ fontSize: '11px', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+            Domains &amp; Email
+          </Text.Body>
+        </Flex>
+
+        <Flex alignItems="center" gap={1}>
+          {/* Search — desktop only */}
+          <Box
+            as="button"
+            sx={{ background: 'none', border: 'none', cursor: 'pointer', p: '6px', borderRadius: 4, display: 'flex', alignItems: 'center', color: '#666', '&:hover': { background: '#f5f5f5' }, '@media (max-width: 767px)': { display: 'none' } }}
           >
             <Search sx={{ width: 17, height: 17 }} />
           </Box>
@@ -637,7 +784,7 @@ function SettingsModal({
       {/* Body */}
       <Flex sx={{ flex: 1, overflow: 'hidden' }}>
 
-        {/* Left nav */}
+        {/* Left nav — desktop only */}
         <Box
           sx={{
             width: 220,
@@ -646,6 +793,7 @@ function SettingsModal({
             pt: 3,
             pb: 3,
             overflowY: 'auto',
+            '@media (max-width: 767px)': { display: 'none' },
           }}
         >
           {SETTINGS_NAV.map((item) => {
@@ -685,15 +833,20 @@ function SettingsModal({
         </Box>
 
         {/* Main content */}
-        <Box sx={{ flex: 1, overflowY: 'auto', px: 8, pt: 6, pb: 10 }}>
+        <Box sx={{ flex: 1, overflowY: 'auto', px: 8, pt: 6, pb: 10, '@media (max-width: 767px)': { px: 5, pt: 5 } }}>
 
-          {/* Breadcrumb */}
+          {/* Breadcrumb — desktop: "Domains & Email / Domains", mobile: "Settings  Domains & Email" */}
           <Flex alignItems="center" gap={1} mb={3}>
+            <Text.Caption m={0} sx={{ fontSize: '12px', color: '#000', textDecoration: 'underline', cursor: 'pointer', textUnderlineOffset: '2px' }}>
+              Settings
+            </Text.Caption>
+            <Text.Caption m={0} color="fg.muted" sx={{ fontSize: '12px' }}>/</Text.Caption>
             <Text.Caption m={0} sx={{ fontSize: '12px', color: '#000', textDecoration: 'underline', cursor: 'pointer', textUnderlineOffset: '2px' }}>
               Domains &amp; Email
             </Text.Caption>
-            <Text.Caption m={0} color="fg.muted" sx={{ fontSize: '12px' }}>/</Text.Caption>
-            <Text.Caption m={0} color="fg.muted" sx={{ fontSize: '12px' }}>Domains</Text.Caption>
+            {/* Desktop shows third level */}
+            <Text.Caption m={0} color="fg.muted" sx={{ fontSize: '12px', '@media (max-width: 767px)': { display: 'none' } }}>/</Text.Caption>
+            <Text.Caption m={0} color="fg.muted" sx={{ fontSize: '12px', '@media (max-width: 767px)': { display: 'none' } }}>Domains</Text.Caption>
           </Flex>
 
           {/* Title */}
@@ -727,6 +880,7 @@ function SettingsModal({
                 letterSpacing: '0.06em',
                 '&:hover': { background: '#222' },
                 transition: 'background 0.12s',
+                '@media (max-width: 767px)': { height: 44, fontSize: '13px' },
               }}
             >
               GET A DOMAIN
@@ -746,6 +900,7 @@ function SettingsModal({
                 letterSpacing: '0.04em',
                 '&:hover': { borderColor: '#888' },
                 transition: 'border-color 0.12s',
+                '@media (max-width: 767px)': { border: 'none', height: 44, fontSize: '13px', px: 0, textAlign: 'left' },
               }}
             >
               USE A DOMAIN I OWN
