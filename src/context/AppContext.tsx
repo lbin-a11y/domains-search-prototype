@@ -10,6 +10,7 @@ export interface FavoritedDomain {
 
 interface AppContextValue {
   isLoggedIn: boolean
+  userName: string | null
   login: () => void
   logout: () => void
   favorites: Map<string, FavoritedDomain>
@@ -21,14 +22,17 @@ const AppContext = createContext<AppContextValue | null>(null)
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [userName, setUserName] = useState<string | null>(null)
   const [favorites, setFavorites] = useState<Map<string, FavoritedDomain>>(new Map())
 
   function login() {
     setIsLoggedIn(true)
+    setUserName('Lee Borden')
   }
 
   function logout() {
     setIsLoggedIn(false)
+    setUserName(null)
     setFavorites(new Map())
   }
 
@@ -45,7 +49,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AppContext.Provider value={{ isLoggedIn, login, logout, favorites, addFavorite, removeFavorite }}>
+    <AppContext.Provider value={{ isLoggedIn, userName, login, logout, favorites, addFavorite, removeFavorite }}>
       {children}
     </AppContext.Provider>
   )

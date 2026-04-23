@@ -1,7 +1,7 @@
-import { useState, useEffect, useId, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useId, useRef } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { Box, Flex, Text, Field } from '@sqs/rosetta-primitives'
-import { ActivityIndicator, TextInput, Tabs } from '@sqs/rosetta-elements'
+import { ActivityIndicator, TextInput } from '@sqs/rosetta-elements'
 import {
   LogoSquarespace,
   Search,
@@ -131,6 +131,30 @@ function generateResults(rawQuery: string): DomainResult[] {
   return results
 }
 
+// ── Skeleton row (loading placeholder) ───────────────────────────────────────
+
+function SkeletonRow({ delay = 0 }: { delay?: number }) {
+  return (
+    <Box
+      style={{ animationDelay: `${delay}ms` }}
+      sx={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 3,
+        px: 4,
+        height: 44,
+        opacity: 0,
+        animation: 'skelFadeIn 0.18s ease forwards',
+        '@keyframes skelFadeIn': { from: { opacity: 0 }, to: { opacity: 1 } },
+      }}
+    >
+      <Box sx={{ flex: '1 1 0', height: 13, borderRadius: 4, background: '#ebebeb', animation: 'skelPulse 1.4s ease-in-out infinite', '@keyframes skelPulse': { '0%,100%': { opacity: 1 }, '50%': { opacity: 0.45 } } }} />
+      <Box sx={{ width: 50, height: 13, borderRadius: 4, background: '#ebebeb', animation: 'skelPulse 1.4s ease-in-out 0.15s infinite' }} />
+      <Box sx={{ width: 32, height: 32, borderRadius: 8, background: '#ebebeb', animation: 'skelPulse 1.4s ease-in-out 0.3s infinite', flexShrink: 0 }} />
+    </Box>
+  )
+}
+
 // ── Badge ─────────────────────────────────────────────────────────────────────
 
 function Badge({ kind }: { kind: DomainBadge }) {
@@ -178,7 +202,10 @@ function ResultRow({
   onFavorite,
   onExploreSimilar,
   expandedResults,
+  isExpanding = false,
+  isCollapsing = false,
   allowExpand = true,
+  animateFavorite = false,
   cartIds,
   favoritedIds,
 }: {
@@ -190,42 +217,196 @@ function ResultRow({
   onFavorite: (result: DomainResult) => void
   onExploreSimilar: (result: DomainResult) => void
   expandedResults?: DomainResult[]
+  isExpanding?: boolean
+  isCollapsing?: boolean
   allowExpand?: boolean
+  animateFavorite?: boolean
   cartIds?: Set<string>
   favoritedIds?: Set<string>
 }) {
-  const isExpanded = expandedResults !== undefined
+  const isExpanded = expandedResults !== undefined || isExpanding || isCollapsing
   const [isHovered, setIsHovered] = useState(false)
+  const [heartPhase, setHeartPhase] = useState<'idle' | 'burst' | 'fade'>('idle')
+  const [swipeOffset, setSwipeOffset] = useState(0)
+  const [isSwiped, setIsSwiped] = useState(false)
+  const touchStartXRef = useRef<number>(0)
+  const touchStartYRef = useRef<number>(0)
+  const isScrollingRef = useRef<boolean | null>(null)
+  const rowRef = useRef<HTMLDivElement>(null)
+  const flexRef = useRef<HTMLDivElement>(null)
+
+  const REVEAL_WIDTH = allowExpand ? 88 : 44
+
+  function triggerHeartAnim() {
+    setHeartPhase('burst')
+    window.setTimeout(() => setHeartPhase('fade'), 180)
+    window.setTimeout(() => setHeartPhase('idle'), 430)
+  }
+
+  useEffect(() => {
+    if (animateFavorite) triggerHeartAnim()
+  }, [animateFavorite])
+
+  // Non-passive touchmove so we can preventDefault during horizontal swipes
+  useEffect(() => {
+    const el = flexRef.current
+    if (!el) return
+    const handler = (e: TouchEvent) => {
+      if (isScrollingRef.current === false) e.preventDefault()
+    }
+    el.addEventListener('touchmove', handler, { passive: false })
+    return () => el.removeEventListener('touchmove', handler)
+  }, [])
+
+  // Close on tap outside
+  useEffect(() => {
+    if (!isSwiped) return
+    function onOutsideTouch(e: TouchEvent) {
+      if (rowRef.current && !rowRef.current.contains(e.target as Node)) {
+        setIsSwiped(false)
+        setSwipeOffset(0)
+      }
+    }
+    document.addEventListener('touchstart', onOutsideTouch)
+    return () => document.removeEventListener('touchstart', onOutsideTouch)
+  }, [isSwiped])
+
+  function handleTouchStart(e: React.TouchEvent) {
+    touchStartXRef.current = e.touches[0].clientX
+    touchStartYRef.current = e.touches[0].clientY
+    isScrollingRef.current = null
+  }
+
+  function handleTouchMove(e: React.TouchEvent) {
+    const dx = e.touches[0].clientX - touchStartXRef.current
+    const dy = e.touches[0].clientY - touchStartYRef.current
+    if (isScrollingRef.current === null) {
+      if (Math.abs(dy) > Math.abs(dx) + 3) { isScrollingRef.current = true; return }
+      else if (Math.abs(dx) > 5) { isScrollingRef.current = false }
+      else return
+    }
+    if (isScrollingRef.current) return
+    if (dx < 0 && !isSwiped) return
+    const base = isSwiped ? REVEAL_WIDTH : 0
+    const raw = base + dx
+    setSwipeOffset(Math.max(0, Math.min(raw, REVEAL_WIDTH)))
+  }
+
+  function handleTouchEnd() {
+    if (isScrollingRef.current === true) return
+    const threshold = REVEAL_WIDTH * 0.4
+    if (!isSwiped) {
+      if (swipeOffset >= threshold) setIsSwiped(true)
+      setSwipeOffset(0)
+    } else {
+      if (swipeOffset < REVEAL_WIDTH - threshold) setIsSwiped(false)
+      setSwipeOffset(0)
+    }
+  }
+
+  const translateX = isSwiped ? (swipeOffset > 0 ? swipeOffset : REVEAL_WIDTH) : swipeOffset
+  const swipeStyle: React.CSSProperties | undefined =
+    (swipeOffset === 0 && !isSwiped)
+      ? undefined
+      : {
+          transform: `translateX(${translateX}px)`,
+          transition: swipeOffset > 0 ? 'none' : 'transform 0.22s cubic-bezier(0.4,0,0.2,1)',
+        }
+
+  const SPARK_ANGLES = [0, 60, 120, 180, 240, 300]
+  const SPARK_DIST = 18
+
+  function sparkStyle(angle: number): React.CSSProperties {
+    const rad = (angle * Math.PI) / 180
+    const tx = Math.cos(rad) * SPARK_DIST
+    const ty = Math.sin(rad) * SPARK_DIST
+    const bTx = heartPhase === 'burst' ? tx * 0.6 : heartPhase === 'fade' ? tx : 0
+    const bTy = heartPhase === 'burst' ? ty * 0.6 : heartPhase === 'fade' ? ty : 0
+    const scale = heartPhase === 'idle' ? 0 : heartPhase === 'burst' ? 1 : 0.3
+    const opacity = heartPhase === 'idle' ? 0 : heartPhase === 'burst' ? 1 : 0
+    const transition = heartPhase === 'burst'
+      ? 'transform 0.18s cubic-bezier(0.2,0,0.1,1), opacity 0.18s ease'
+      : heartPhase === 'fade'
+      ? 'transform 0.22s ease-in, opacity 0.2s ease-in'
+      : 'none'
+    return {
+      transform: `translate(calc(-50% + ${bTx}px), calc(-50% + ${bTy}px)) scale(${scale})`,
+      opacity,
+      transition,
+    }
+  }
 
   return (
     <Box>
-      <Flex
-        alignItems="center"
-        gap={3}
-        px={4}
-        py={3}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
-        sx={{
-          minHeight: 44,
-          opacity: result.available ? 1 : 0.4,
-          cursor: result.available ? 'pointer' : 'default',
-          ...(isTop ? {
-            border: '1px solid',
-            borderColor: 'border.default',
-            borderRadius: 8,
-            mb: 2,
-          } : {}),
-          ...(result.available ? {
-            transition: 'background 0.15s ease, transform 0.15s ease, border-radius 0.15s ease',
-            '&:hover': {
-              background: 'var(--colors-bg-default)',
-              transform: 'translateX(4px)',
+      {/* Clipping wrapper — overflow:hidden clips the revealed panel; expanded results stay outside */}
+      <Box ref={rowRef as React.RefObject<HTMLDivElement>} sx={{ position: 'relative', overflow: 'hidden' }}>
+        {/* Revealed icon panel — slides in from the left on swipe */}
+        <Box
+          sx={{
+            position: 'absolute', top: 0, left: 0, bottom: 0,
+            width: REVEAL_WIDTH, display: 'none', alignItems: 'center', zIndex: 1,
+          }}
+        >
+          {allowExpand && result.available && (
+            <Box
+              as="button"
+              onClick={() => { onExploreSimilar(result); setIsSwiped(false) }}
+              aria-label="Generate more like this"
+              sx={{ border: 'none', cursor: 'pointer', width: 44, height: 44,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent' }}
+            >
+              <Sparkles sx={{ width: 20, height: 20, color: 'var(--colors-fg-default)' }} />
+            </Box>
+          )}
+          {result.available && (
+            <Box
+              as="button"
+              onClick={() => { onFavorite(result); triggerHeartAnim(); setIsSwiped(false) }}
+              aria-label={isFavorited ? 'Remove from saved' : 'Add to favorites'}
+              sx={{ border: 'none', cursor: 'pointer', width: 44, height: 44,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent' }}
+            >
+              {isFavorited
+                ? <HeartFilled sx={{ width: 20, height: 20, color: 'var(--colors-fg-default)' }} />
+                : <Heart sx={{ width: 20, height: 20, color: 'var(--colors-fg-muted)' }} />
+              }
+            </Box>
+          )}
+        </Box>
+
+        <Flex
+          ref={flexRef as React.RefObject<HTMLDivElement>}
+          style={swipeStyle}
+          alignItems="center"
+          gap={3}
+          px={4}
+          py={3}
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          sx={{
+            minHeight: 44,
+            position: 'relative', zIndex: 2,
+            opacity: result.available ? 1 : 0.4,
+            cursor: result.available ? 'pointer' : 'default',
+            ...(isTop ? {
+              border: '1px solid',
+              borderColor: 'border.default',
               borderRadius: 8,
-            },
-          } : {}),
-        }}
-      >
+              mb: 2,
+            } : {}),
+            ...(result.available ? {
+              transition: 'background 0.15s ease, transform 0.15s ease, border-radius 0.15s ease',
+              '&:hover': {
+                background: 'var(--colors-bg-default)',
+                transform: 'translateX(4px)',
+                borderRadius: 8,
+              },
+            } : {}),
+          }}
+        >
         {/* Domain name + badges */}
         <Flex alignItems="center" gap={2} sx={{ flex: '1 1 0', minWidth: 0, flexWrap: 'wrap' }}>
           <Text.Body
@@ -242,102 +423,118 @@ function ResultRow({
           )}
         </Flex>
 
-        {/* Generate more + heart — hover only, left of price */}
+        {/* Icons + price: tight gap between them */}
+        <Flex alignItems="center" gap={1} sx={{ flexShrink: 0 }}>
+
+        {/* Icons left of price: sparkle + heart — desktop only */}
         {result.available && (
-          <Flex
-            alignItems="center"
-            gap={1}
-            sx={{
-              flexShrink: 0,
-              opacity: isHovered ? 1 : 0,
-              pointerEvents: isHovered ? 'auto' : 'none',
-              transition: 'opacity 0.15s ease',
-            }}
-          >
+          <Flex alignItems="center" gap={1} sx={{ flexShrink: 0, '@media (max-width: 767px)': { display: 'none' } }}>
+
+            {/* Sparkle — hover or active when expanded */}
             {allowExpand && (
-              <Box sx={{ position: 'relative', '&:hover [role="tooltip"]': { opacity: 1 } }}>
-                <Box
-                  as="button"
-                  onClick={() => onExploreSimilar(result)}
-                  aria-label="Generate more like this"
-                  sx={{
-                    border: 'none',
-                    cursor: 'pointer',
-                    width: 32,
-                    height: 32,
-                    borderRadius: 8,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    background: isExpanded ? 'var(--colors-bg-default)' : 'transparent',
-                    transition: 'background 0.2s ease',
-                    '&:hover': { background: 'var(--colors-bg-default)' },
-                  }}
-                >
-                  <Sparkles sx={{ width: 16, height: 16, color: isExpanded ? 'var(--colors-fg-default)' : 'var(--colors-fg-muted)' }} />
-                </Box>
-                <Box
-                  role="tooltip"
-                  sx={{
-                    position: 'absolute',
-                    bottom: 'calc(100% + 6px)',
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    background: 'var(--colors-fg-default)',
-                    color: '#fff',
-                    fontSize: '11px',
-                    px: '8px',
-                    py: '4px',
-                    borderRadius: 4,
-                    whiteSpace: 'nowrap',
-                    pointerEvents: 'none',
-                    opacity: 0,
-                    transition: 'opacity 0.15s ease',
-                    zIndex: 10,
-                    '&::after': {
-                      content: '""',
-                      position: 'absolute',
-                      top: '100%',
-                      left: '50%',
-                      transform: 'translateX(-50%)',
-                      border: '4px solid transparent',
-                      borderTopColor: 'var(--colors-fg-default)',
-                    },
-                  }}
-                >
-                  Generate more like this
+              <Box
+                sx={{
+                  opacity: (isHovered || isExpanded) ? 1 : 0,
+                  pointerEvents: (isHovered || isExpanded) ? 'auto' : 'none',
+                  transition: 'opacity 0.15s ease',
+                  '@media (max-width: 767px)': { display: 'none' },
+                }}
+              >
+                <Box sx={{ position: 'relative', '&:hover [role="tooltip"]': { opacity: 1 } }}>
+                  <Box
+                    as="button"
+                    onClick={() => onExploreSimilar(result)}
+                    aria-label="Generate more like this"
+                    sx={{
+                      border: 'none', cursor: 'pointer', width: 32, height: 32, borderRadius: 8,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: 'transparent',
+                      transition: 'background 0.2s ease',
+                      '&:hover': { background: 'var(--colors-bg-default)' },
+                    }}
+                  >
+                    <Sparkles sx={{ width: 16, height: 16, color: isExpanded ? 'var(--colors-fg-default)' : 'var(--colors-fg-muted)', transition: 'color 0.2s ease' }} />
+                  </Box>
+                  <Box
+                    role="tooltip"
+                    sx={{
+                      position: 'absolute', bottom: 'calc(100% + 6px)', left: '50%',
+                      transform: 'translateX(-50%)', background: 'var(--colors-fg-default)',
+                      color: '#fff', fontSize: '11px', px: '8px', py: '4px', borderRadius: 4,
+                      whiteSpace: 'nowrap', pointerEvents: 'none', opacity: 0,
+                      transition: 'opacity 0.15s ease', zIndex: 10,
+                      '&::after': { content: '""', position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)', border: '4px solid transparent', borderTopColor: 'var(--colors-fg-default)' },
+                    }}
+                  >
+                    Generate more like this
+                  </Box>
                 </Box>
               </Box>
             )}
 
+            {/* Heart — always visible when favorited, hover-visible otherwise */}
             <Box
-              as="button"
-              onClick={() => onFavorite(result)}
-              aria-label={isFavorited ? 'Remove from saved' : 'Save domain'}
               sx={{
-                border: 'none',
-                cursor: 'pointer',
-                width: 32,
-                height: 32,
-                borderRadius: 8,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: 'transparent',
-                transition: 'background 0.2s ease',
-                '&:hover': { background: 'var(--colors-bg-default)' },
+                opacity: (isHovered || isFavorited) ? 1 : 0,
+                pointerEvents: (isHovered || isFavorited) ? 'auto' : 'none',
+                transition: 'opacity 0.15s ease',
+                '@media (max-width: 767px)': { display: 'none' },
               }}
             >
-              {isFavorited
-                ? <HeartFilled sx={{ width: 16, height: 16, color: '#e05252' }} />
-                : <Heart sx={{ width: 16, height: 16, color: 'var(--colors-fg-muted)' }} />
-              }
+              <Box sx={{ position: 'relative', overflow: 'visible', '&:hover [role="tooltip"]': { opacity: 1 } }}>
+                {SPARK_ANGLES.map((angle) => (
+                  <Box
+                    key={angle}
+                    style={sparkStyle(angle)}
+                    sx={{
+                      position: 'absolute', top: '50%', left: '50%',
+                      width: '5px', height: '5px', borderRadius: '50%',
+                      background: 'var(--colors-fg-default)', pointerEvents: 'none', zIndex: 20,
+                    }}
+                  />
+                ))}
+                <Box
+                  as="button"
+                  onClick={() => { onFavorite(result); triggerHeartAnim() }}
+                  aria-label={isFavorited ? 'Remove from saved' : 'Add to favorites'}
+                  style={{
+                    transform: heartPhase === 'burst' ? 'scale(1.35)' : 'scale(1)',
+                    transition: heartPhase === 'burst' ? 'transform 0.12s ease-out' : 'transform 0.2s ease-in',
+                  }}
+                  sx={{
+                    border: 'none', cursor: 'pointer', width: 32, height: 32, borderRadius: 8,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: 'transparent', '&:hover': { background: 'var(--colors-bg-default)' },
+                  }}
+                >
+                  {isFavorited
+                    ? <HeartFilled sx={{ width: 16, height: 16, color: 'var(--colors-fg-default)' }} />
+                    : <Heart sx={{ width: 16, height: 16, color: 'var(--colors-fg-muted)' }} />
+                  }
+                </Box>
+                {!isFavorited && (
+                  <Box
+                    role="tooltip"
+                    sx={{
+                      position: 'absolute', bottom: 'calc(100% + 6px)', left: '50%',
+                      transform: 'translateX(-50%)', background: 'var(--colors-fg-default)',
+                      color: '#fff', fontSize: '11px', px: '8px', py: '4px', borderRadius: 4,
+                      whiteSpace: 'nowrap', pointerEvents: 'none', opacity: 0,
+                      transition: 'opacity 0.15s ease', zIndex: 10,
+                      '&::after': { content: '""', position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)', border: '4px solid transparent', borderTopColor: 'var(--colors-fg-default)' },
+                    }}
+                  >
+                    Add to favorites
+                  </Box>
+                )}
+              </Box>
             </Box>
+
           </Flex>
         )}
 
-        {/* Price */}
-        <Flex alignItems="center" gap={2} sx={{ flexShrink: 0 }}>
+        {/* Price — fixed width */}
+        <Flex alignItems="center" gap={2} sx={{ flexShrink: 0, width: '82px', justifyContent: 'flex-end' }}>
           {result.salePrice !== null ? (
             <>
               <Text.Caption m={0} color="fg.disabled" sx={{ textDecoration: 'line-through', fontSize: '13px' }}>
@@ -350,6 +547,8 @@ function ResultRow({
           )}
         </Flex>
 
+        </Flex>{/* end icons+price wrapper */}
+
         {/* Cart toggle — rightmost, always visible */}
         {result.available ? (
           <Box
@@ -357,32 +556,53 @@ function ResultRow({
             onClick={() => onToggleCart(result.id)}
             aria-label={inCart ? 'Remove from cart' : 'Add to cart'}
             sx={{
-              border: 'none',
-              cursor: 'pointer',
-              width: 36,
-              height: 36,
-              borderRadius: 8,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
+              border: 'none', cursor: 'pointer', width: 36, height: 36, borderRadius: 8,
+              position: 'relative', flexShrink: 0,
               background: inCart ? 'var(--colors-fg-default)' : 'transparent',
-              transition: 'background 0.2s ease',
+              transition: 'background 0.25s ease',
               '&:hover': { background: inCart ? '#333' : 'var(--colors-bg-default)' },
             }}
           >
-            {inCart
-              ? <Checkmark sx={{ width: 16, height: 16, color: '#ffffff' }} />
-              : <ShoppingBag sx={{ width: 18, height: 18, color: 'var(--colors-fg-muted)' }} />
-            }
+            <Box sx={{
+              position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              opacity: inCart ? 0 : 1,
+              transform: inCart ? 'scale(0.4) rotate(-15deg)' : 'scale(1) rotate(0deg)',
+              transition: 'opacity 0.2s ease, transform 0.22s cubic-bezier(0.34,1.56,0.64,1)',
+            }}>
+              <ShoppingBag sx={{ width: 18, height: 18, color: 'var(--colors-fg-muted)' }} />
+            </Box>
+            <Box sx={{
+              position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              opacity: inCart ? 1 : 0,
+              transform: inCart ? 'scale(1) rotate(0deg)' : 'scale(0.4) rotate(15deg)',
+              transition: 'opacity 0.2s ease, transform 0.22s cubic-bezier(0.34,1.56,0.64,1)',
+            }}>
+              <Checkmark sx={{ width: 16, height: 16, color: '#ffffff' }} />
+            </Box>
           </Box>
         ) : (
           <Box sx={{ width: 36, flexShrink: 0 }} />
         )}
-      </Flex>
+        </Flex>
+      </Box>{/* end clipping wrapper */}
 
       {/* Generated similar results */}
-      {expandedResults !== undefined && (
+      {(expandedResults !== undefined || isExpanding || isCollapsing) && (
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateRows: isCollapsing ? '0fr' : '1fr',
+            transition: 'grid-template-rows 0.28s cubic-bezier(0.4,0,0.2,1)',
+            overflow: 'hidden',
+          }}
+        >
+        <Box
+          sx={{
+            minHeight: 0,
+            opacity: isCollapsing ? 0 : 1,
+            transition: 'opacity 0.2s ease',
+          }}
+        >
         <Box
           sx={{
             borderLeft: '2px solid',
@@ -392,25 +612,46 @@ function ResultRow({
             borderRadius: '0 0 6px 6px',
           }}
         >
-          {expandedResults.length === 0 ? (
+          {isExpanding ? (
+            <>
+              <SkeletonRow delay={0} />
+              <SkeletonRow delay={80} />
+              <SkeletonRow delay={160} />
+              <SkeletonRow delay={240} />
+            </>
+          ) : expandedResults!.length === 0 ? (
             <Box px={4} py={3}>
               <Text.Body m={0} color="fg.muted" sx={{ fontSize: '13px' }}>No results found.</Text.Body>
             </Box>
           ) : (
-            expandedResults.map((r) => (
-              <ResultRow
+            expandedResults!.map((r, idx) => (
+              <Box
                 key={r.id}
-                result={r}
-                inCart={cartIds ? cartIds.has(r.id) : false}
-                onToggleCart={onToggleCart}
-                isTop={false}
-                isFavorited={favoritedIds ? favoritedIds.has(r.id) : false}
-                onFavorite={onFavorite}
-                onExploreSimilar={() => {}}
-                allowExpand={false}
-              />
+                style={{ animationDelay: `${idx * 55}ms` }}
+                sx={{
+                  opacity: 0,
+                  animation: 'rowSlideIn 0.22s ease forwards',
+                  '@keyframes rowSlideIn': {
+                    from: { opacity: 0, transform: 'translateY(6px)' },
+                    to: { opacity: 1, transform: 'translateY(0)' },
+                  },
+                }}
+              >
+                <ResultRow
+                  result={r}
+                  inCart={cartIds ? cartIds.has(r.id) : false}
+                  onToggleCart={onToggleCart}
+                  isTop={false}
+                  isFavorited={favoritedIds ? favoritedIds.has(r.id) : false}
+                  onFavorite={onFavorite}
+                  onExploreSimilar={() => {}}
+                  allowExpand={false}
+                />
+              </Box>
             ))
           )}
+        </Box>
+        </Box>
         </Box>
       )}
     </Box>
@@ -482,7 +723,7 @@ function CartSidebar({
         background: '#fff',
         borderRadius: 12,
         boxShadow: '0 218px 61px 0 transparent, 0 139px 56px 0 rgba(0,0,0,0.01), 0 78px 47px 0 rgba(0,0,0,0.05), 0 -1px 35px 0 rgba(0,0,0,0.09), 0 4px 19px 0 rgba(0,0,0,0.1)',
-        height: 'calc(100vh - 160px)',
+        height: 'calc(100vh - 200px)',
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
@@ -706,11 +947,23 @@ export default function DomainSearch() {
   const navigate = useNavigate()
   const q = searchParams.get('q') ?? ''
 
-  const { isLoggedIn, login, logout, favorites, addFavorite, removeFavorite } = useAppContext()
+  const { isLoggedIn, userName, login, logout, favorites, addFavorite, removeFavorite } = useAppContext()
+
+  function getInitials(name: string): string {
+    const parts = name.trim().split(/\s+/)
+    if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+    return parts[0].slice(0, 2).toUpperCase()
+  }
   const [authModalOpen, setAuthModalOpen] = useState(false)
+  const [authTransition, setAuthTransition] = useState(false)
+  const [pendingAnimationId, setPendingAnimationId] = useState<string | null>(null)
   const [pageTab, setPageTab] = useState<'search' | 'favorites'>('search')
   const [expandedSimilar, setExpandedSimilar] = useState<Record<string, DomainResult[]>>({})
+  const [expandedLoading, setExpandedLoading] = useState<Record<string, boolean>>({})
+  const [collapsingIds, setCollapsingIds] = useState<Set<string>>(new Set())
   const pendingFavoriteRef = useRef<FavoritedDomain | null>(null)
+  const tabsBarRef = useRef<HTMLElement>(null)
+  const [tabIndicator, setTabIndicator] = useState<{ left: number; width: number } | null>(null)
 
   const [inputValue, setInputValue] = useState(q)
   const [results, setResults] = useState<DomainResult[]>([])
@@ -753,6 +1006,41 @@ export default function DomainSearch() {
     }, 700)
     return () => window.clearTimeout(t)
   }, [q])
+
+  useLayoutEffect(() => {
+    const bar = tabsBarRef.current
+    if (!bar) return
+    const buttons = bar.querySelectorAll<HTMLButtonElement>('button')
+    const idx = pageTab === 'search' ? 0 : 1
+    const btn = buttons[idx]
+    if (btn) {
+      setTabIndicator({ left: btn.offsetLeft, width: btn.offsetWidth })
+    }
+  }, [pageTab])
+
+  function handleLoginSuccess() {
+    setAuthModalOpen(false)
+    setAuthTransition(true)
+    const pending = pendingFavoriteRef.current
+    window.setTimeout(() => {
+      login()
+      if (pending) {
+        addFavorite(pending)
+        setPendingAnimationId(pending.id)
+        pendingFavoriteRef.current = null
+        window.setTimeout(() => setPendingAnimationId(null), 600)
+      }
+      setAuthTransition(false)
+    }, 500)
+  }
+
+  function handleLogout() {
+    setAuthTransition(true)
+    window.setTimeout(() => {
+      logout()
+      setAuthTransition(false)
+    }, 500)
+  }
 
   function handleSearch() {
     const trimmed = inputValue.trim()
@@ -836,19 +1124,24 @@ export default function DomainSearch() {
   }
 
   function handleExploreSimilar(result: DomainResult) {
-    if (expandedSimilar[result.id] !== undefined) {
-      setExpandedSimilar((prev) => {
-        const next = { ...prev }
-        delete next[result.id]
-        return next
-      })
+    if (expandedSimilar[result.id] !== undefined || expandedLoading[result.id]) {
+      setCollapsingIds((prev) => new Set([...prev, result.id]))
+      window.setTimeout(() => {
+        setExpandedSimilar((prev) => { const next = { ...prev }; delete next[result.id]; return next })
+        setExpandedLoading((prev) => { const next = { ...prev }; delete next[result.id]; return next })
+        setCollapsingIds((prev) => { const next = new Set(prev); next.delete(result.id); return next })
+      }, 300)
       return
     }
+    setExpandedLoading((prev) => ({ ...prev, [result.id]: true }))
     const existingIds = new Set(results.map((r) => r.id))
     for (const expResults of Object.values(expandedSimilar)) {
       for (const r of expResults) existingIds.add(r.id)
     }
-    setExpandedSimilar((prev) => ({ ...prev, [result.id]: generateSimilar(result, existingIds) }))
+    window.setTimeout(() => {
+      setExpandedLoading((prev) => { const next = { ...prev }; delete next[result.id]; return next })
+      setExpandedSimilar((prev) => ({ ...prev, [result.id]: generateSimilar(result, existingIds) }))
+    }, 700)
   }
 
   const cartItems = results.filter((r) => cart.has(r.id))
@@ -862,6 +1155,23 @@ export default function DomainSearch() {
   return (
     <Box sx={{ minHeight: '100vh', background: '#fff' }}>
 
+      {/* ── Auth transition overlay ── */}
+      {authTransition && (
+        <Box
+          sx={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'var(--colors-bg-default)',
+          }}
+        >
+          <ActivityIndicator />
+        </Box>
+      )}
+
       {/* ── Inline nav ── */}
       <Box sx={{ background: '#fff' }}>
         <Flex
@@ -869,7 +1179,7 @@ export default function DomainSearch() {
           alignItems="center"
           justifyContent="space-between"
           px={6}
-          sx={{ height: 66, maxWidth: 1440, mx: 'auto' }}
+          sx={{ height: 80, maxWidth: 1440, mx: 'auto' }}
         >
           <Box
             as="button"
@@ -887,30 +1197,77 @@ export default function DomainSearch() {
               <Text.Body key={link} m={0} color="fg.muted" sx={{ cursor: 'pointer', fontSize: '12px', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 500, '&:hover': { color: 'fg.default' } }}>{link}</Text.Body>
             ))}
           </Flex>
-          <Flex alignItems="center" gap={5}>
-            {isLoggedIn ? (
-              <Text.Body
-                m={0}
-                color="fg.muted"
-                onClick={logout}
-                sx={{ cursor: 'pointer', fontSize: '12px', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 500, '&:hover': { color: 'fg.default' }, '@media (max-width: 767px)': { display: 'none' } }}
-              >
-                Log out
-              </Text.Body>
+          <Flex alignItems="center" gap={3} sx={{ '@media (max-width: 767px)': { display: 'none' } }}>
+            {isLoggedIn && userName ? (
+              <>
+                {/* Avatar + chevron — click toggles logged out */}
+                <Flex alignItems="center" gap="4px" onClick={handleLogout} sx={{ cursor: 'pointer' }}>
+                  <Flex
+                    alignItems="center"
+                    justifyContent="center"
+                    sx={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: '50%',
+                      background: '#404040',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        color: '#fff',
+                        letterSpacing: '0.03em',
+                        lineHeight: 1,
+                        fontFamily: 'inherit',
+                      }}
+                    >
+                      {getInitials(userName)}
+                    </Box>
+                  </Flex>
+                  <ChevronSmallDown sx={{ width: 12, height: 12, color: 'var(--colors-fg-muted)' }} />
+                </Flex>
+                {/* Manage Domains CTA */}
+                <Box
+                  as="button"
+                  onClick={() => navigate('/')}
+                  sx={{
+                    background: '#fff',
+                    border: '1.5px solid',
+                    borderColor: 'fg.default',
+                    borderRadius: 0,
+                    px: '18px',
+                    height: 38,
+                    cursor: 'pointer',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    letterSpacing: '0.1em',
+                    textTransform: 'uppercase',
+                    fontFamily: 'inherit',
+                    color: 'fg.default',
+                    whiteSpace: 'nowrap',
+                    transition: 'background 0.15s',
+                    '&:hover': { background: '#f5f5f5' },
+                  }}
+                >
+                  Manage Domains
+                </Box>
+              </>
             ) : (
               <Text.Body
                 m={0}
                 color="fg.muted"
                 onClick={() => setAuthModalOpen(true)}
-                sx={{ cursor: 'pointer', fontSize: '12px', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 500, '&:hover': { color: 'fg.default' }, '@media (max-width: 767px)': { display: 'none' } }}
+                sx={{ cursor: 'pointer', fontSize: '12px', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 500, '&:hover': { color: 'fg.default' } }}
               >
                 Log in
               </Text.Body>
             )}
-            <Box as="button" aria-label="Open menu" sx={{ display: 'none', '@media (max-width: 767px)': { display: 'flex' }, flexDirection: 'column', justifyContent: 'center', gap: '5px', background: 'none', border: 'none', cursor: 'pointer', p: 1 }}>
-              {[0, 1, 2].map((i) => <Box key={i} sx={{ width: 22, height: 2, borderRadius: 1, background: 'var(--colors-fg-default)' }} />)}
-            </Box>
           </Flex>
+          <Box as="button" aria-label="Open menu" sx={{ display: 'none', '@media (max-width: 767px)': { display: 'flex' }, flexDirection: 'column', justifyContent: 'center', gap: '5px', background: 'none', border: 'none', cursor: 'pointer', p: 1 }}>
+            {[0, 1, 2].map((i) => <Box key={i} sx={{ width: 22, height: 2, borderRadius: 1, background: 'var(--colors-fg-default)' }} />)}
+          </Box>
         </Flex>
       </Box>
 
@@ -924,7 +1281,7 @@ export default function DomainSearch() {
           zIndex: 200,
           background: '#fff',
           boxShadow: '0 1px 12px rgba(0,0,0,0.08)',
-          transform: searchBarPassed ? 'translateY(0)' : 'translateY(-100%)',
+          transform: (searchBarPassed && pageTab === 'search') ? 'translateY(0)' : 'translateY(-100%)',
           transition: 'transform 0.28s ease',
         }}
       >
@@ -933,7 +1290,7 @@ export default function DomainSearch() {
           alignItems="center"
           justifyContent="space-between"
           px={6}
-          sx={{ height: 60, maxWidth: 1440, mx: 'auto' }}
+          sx={{ height: 72, maxWidth: 1440, mx: 'auto' }}
         >
           <Box
             as="button"
@@ -967,10 +1324,47 @@ export default function DomainSearch() {
             />
           </Flex>
 
-          {/* Right: log in + cart */}
-          <Flex alignItems="center" gap={5} sx={{ flexShrink: 0, '@media (max-width: 767px)': { display: 'none' } }}>
-            {isLoggedIn ? (
-              <Text.Body m={0} color="fg.muted" onClick={logout} sx={{ cursor: 'pointer', fontSize: '12px', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 500, '&:hover': { color: 'fg.default' } }}>Log out</Text.Body>
+          {/* Right: auth + cart */}
+          <Flex alignItems="center" gap={3} sx={{ flexShrink: 0, '@media (max-width: 767px)': { display: 'none' }, opacity: authTransition ? 0.35 : 1, transition: 'opacity 0.3s ease', pointerEvents: authTransition ? 'none' : 'auto' }}>
+            {isLoggedIn && userName ? (
+              <>
+                <Flex alignItems="center" gap="4px" onClick={handleLogout} sx={{ cursor: 'pointer' }}>
+                  <Flex
+                    alignItems="center"
+                    justifyContent="center"
+                    sx={{ width: 34, height: 34, borderRadius: '50%', background: '#404040', flexShrink: 0 }}
+                  >
+                    <Box sx={{ fontSize: '11px', fontWeight: 700, color: '#fff', letterSpacing: '0.03em', lineHeight: 1, fontFamily: 'inherit' }}>
+                      {getInitials(userName)}
+                    </Box>
+                  </Flex>
+                  <ChevronSmallDown sx={{ width: 12, height: 12, color: 'var(--colors-fg-muted)' }} />
+                </Flex>
+                <Box
+                  as="button"
+                  onClick={() => navigate('/')}
+                  sx={{
+                    background: '#fff',
+                    border: '1.5px solid',
+                    borderColor: 'fg.default',
+                    borderRadius: 0,
+                    px: '18px',
+                    height: 36,
+                    cursor: 'pointer',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    letterSpacing: '0.1em',
+                    textTransform: 'uppercase',
+                    fontFamily: 'inherit',
+                    color: 'fg.default',
+                    whiteSpace: 'nowrap',
+                    transition: 'background 0.15s',
+                    '&:hover': { background: '#f5f5f5' },
+                  }}
+                >
+                  Manage Domains
+                </Box>
+              </>
             ) : (
               <Text.Body m={0} color="fg.muted" onClick={() => setAuthModalOpen(true)} sx={{ cursor: 'pointer', fontSize: '12px', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 500, '&:hover': { color: 'fg.default' } }}>Log in</Text.Body>
             )}
@@ -1030,16 +1424,61 @@ export default function DomainSearch() {
               </Text.Body>
             </Box>
 
-            {/* Page-level tabs: Search / Favorites */}
-            <Box px={4} mb={6}>
-              <Tabs
-                value={pageTab}
-                onChange={(v: string) => setPageTab(v as 'search' | 'favorites')}
-                options={[
-                  { label: 'Search', value: 'search' },
-                  { label: favorites.size > 0 ? `Favorites (${favorites.size})` : 'Favorites', value: 'favorites' },
-                ]}
-              />
+            {/* Page-level tabs: Search / Favorites — sliding indicator */}
+            <Box
+              ref={tabsBarRef as React.RefObject<HTMLDivElement>}
+              px={4}
+              mb={6}
+              sx={{ borderBottom: '1px solid', borderColor: 'border.default', position: 'relative' }}
+            >
+              <Flex>
+                {([
+                  { value: 'search', label: 'Search' },
+                  { value: 'favorites', label: favorites.size > 0 ? `Favorites (${favorites.size})` : 'Favorites' },
+                ] as const).map(({ value, label }) => {
+                  const isActive = pageTab === value
+                  return (
+                    <Box
+                      key={value}
+                      as="button"
+                      onClick={() => {
+                        setPageTab(value)
+                        setSearchBarPassed(false)
+                      }}
+                      sx={{
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        pb: '12px',
+                        px: 0,
+                        mr: 6,
+                        fontFamily: 'inherit',
+                        fontSize: '14px',
+                        fontWeight: isActive ? 600 : 400,
+                        color: isActive ? 'var(--colors-fg-default)' : 'var(--colors-fg-muted)',
+                        transition: 'color 0.2s ease',
+                        '&:hover': { color: 'var(--colors-fg-default)' },
+                      }}
+                    >
+                      {label}
+                    </Box>
+                  )
+                })}
+              </Flex>
+              {/* Sliding active indicator */}
+              {tabIndicator && (
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    bottom: '-1px',
+                    height: '2px',
+                    background: 'var(--colors-fg-default)',
+                    transition: 'left 0.22s cubic-bezier(0.4,0,0.2,1), width 0.22s cubic-bezier(0.4,0,0.2,1)',
+                    left: tabIndicator.left,
+                    width: tabIndicator.width,
+                  }}
+                />
+              )}
             </Box>
 
             {/* Search tab content */}
@@ -1133,6 +1572,9 @@ export default function DomainSearch() {
                         onFavorite={handleFavoriteClick}
                         onExploreSimilar={handleExploreSimilar}
                         expandedResults={expandedSimilar[r.id]}
+                        isExpanding={expandedLoading[r.id] ?? false}
+                        isCollapsing={collapsingIds.has(r.id)}
+                        animateFavorite={pendingAnimationId === r.id}
                         cartIds={cart}
                         favoritedIds={new Set(favorites.keys())}
                       />
@@ -1162,7 +1604,7 @@ export default function DomainSearch() {
 
           {/* ── Right: cart sidebar — hidden on mobile ── */}
           {panelVisible && (
-            <Box sx={{ flex: 2, minWidth: 0, alignSelf: 'flex-start', position: 'sticky', top: 80, '@media (max-width: 767px)': { display: 'none' } }}>
+            <Box sx={{ flex: 2, minWidth: 0, alignSelf: 'flex-start', position: 'sticky', top: 96, '@media (max-width: 767px)': { display: 'none' } }}>
               <CartSidebar items={cartItems} results={results} onRemove={removeFromCart} onAdd={toggleCart} />
             </Box>
           )}
@@ -1174,14 +1616,7 @@ export default function DomainSearch() {
       <AuthModal
         isOpen={authModalOpen}
         onClose={() => setAuthModalOpen(false)}
-        onSuccess={() => {
-          login()
-          if (pendingFavoriteRef.current) {
-            addFavorite(pendingFavoriteRef.current)
-            pendingFavoriteRef.current = null
-          }
-          setAuthModalOpen(false)
-        }}
+        onSuccess={handleLoginSuccess}
       />
     </Box>
   )
