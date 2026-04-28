@@ -339,7 +339,7 @@ function ResultRow({
   return (
     <Box>
       {/* Clipping wrapper — overflow:hidden clips the revealed panel; expanded results stay outside */}
-      <Box ref={rowRef as React.RefObject<HTMLDivElement>} sx={{ position: 'relative', overflow: 'hidden' }}>
+      <Box ref={rowRef as React.RefObject<HTMLDivElement>} sx={{ position: 'relative', overflow: 'hidden', '@media (min-width: 768px)': { overflow: 'visible' } }}>
         {/* Revealed icon panel — slides in from the left on swipe */}
         <Box
           sx={{
