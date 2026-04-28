@@ -170,7 +170,7 @@ function ResultRow({
 }: {
   result: DomainResult
   inCart: boolean
-  onToggleCart: (id: string) => void
+  onToggleCart: (result: DomainResult) => void
   isTop: boolean
 }) {
   return (
@@ -233,7 +233,7 @@ function ResultRow({
       {result.available ? (
         <Box
           as="button"
-          onClick={() => onToggleCart(result.id)}
+          onClick={() => onToggleCart(result)}
           aria-label={inCart ? 'Remove from cart' : 'Add to cart'}
           sx={{
             border: 'none',
@@ -281,7 +281,7 @@ function CartSidebar({
   items: DomainResult[]
   results: DomainResult[]
   onRemove: (id: string) => void
-  onAdd: (id: string) => void
+  onAdd: (result: DomainResult) => void
 }) {
   const [matchingOpen, setMatchingOpen] = useState<Record<string, boolean>>({})
   const prevItemIdsRef = useRef<Set<string>>(new Set())
@@ -474,7 +474,7 @@ function CartSidebar({
                             </Text.Body>
                             <Box
                               as="button"
-                              onClick={() => onAdd(m.id)}
+                              onClick={() => onAdd(m)}
                               sx={{
                                 background: 'none',
                                 border: 'none',
@@ -560,6 +560,7 @@ export default function DomainSearch() {
   const [results, setResults] = useState<DomainResult[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [cart, setCart] = useState<Set<string>>(new Set())
+  const [cartDomains, setCartDomains] = useState<Map<string, DomainResult>>(new Map())
   const [searchFocused, setSearchFocused] = useState(false)
   const [heroPassed, setHeroPassed] = useState(false)
   const [searchBarPassed, setSearchBarPassed] = useState(false)
@@ -594,9 +595,26 @@ export default function DomainSearch() {
     const t = window.setTimeout(() => {
       setResults(generateResults(q))
       setIsLoading(false)
-    }, 700)
+    }, 200)
     return () => window.clearTimeout(t)
   }, [q])
+
+  useEffect(() => {
+    const trimmed = inputValue.trim()
+    if (trimmed) {
+      setIsLoading(true)
+      setResults([])
+    } else {
+      setIsLoading(false)
+      setResults([])
+      setSearchParams({}, { replace: true })
+      return
+    }
+    const t = window.setTimeout(() => {
+      setSearchParams({ q: trimmed }, { replace: true })
+    }, 300)
+    return () => window.clearTimeout(t)
+  }, [inputValue]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleSearch() {
     const trimmed = inputValue.trim()
@@ -614,10 +632,16 @@ export default function DomainSearch() {
     inputRef.current?.focus()
   }
 
-  function toggleCart(id: string) {
+  function toggleCart(result: DomainResult) {
+    const { id } = result
     setCart((prev) => {
       const next = new Set(prev)
       next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+    setCartDomains((prev) => {
+      const next = new Map(prev)
+      next.has(id) ? next.delete(id) : next.set(id, result)
       return next
     })
   }
@@ -628,9 +652,14 @@ export default function DomainSearch() {
       next.delete(id)
       return next
     })
+    setCartDomains((prev) => {
+      const next = new Map(prev)
+      next.delete(id)
+      return next
+    })
   }
 
-  const cartItems = results.filter((r) => cart.has(r.id))
+  const cartItems = Array.from(cartDomains.values())
   const cartCount = cart.size
   const hasCart = cartCount > 0
 
