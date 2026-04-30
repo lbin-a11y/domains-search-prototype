@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useId } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Box, Flex, Text, Button, Field } from '@sqs/rosetta-primitives'
-import { Card, Stack, TextInput } from '@sqs/rosetta-elements'
+import { Card, Cell, Stack, TextInput } from '@sqs/rosetta-elements'
 import { Dialog } from '@sqs/rosetta-compositions'
 import {
   LogoSquarespace,
@@ -258,13 +258,14 @@ function ResultBadge({ kind }: { kind: BadgeKind }) {
 }
 
 function SearchResultRow({
-  result, inCart, onAdd, onRemove, isTop,
+  result, inCart, onAdd, onRemove, isTop, suppressBorderBottom,
 }: {
   result: SearchResult
   inCart: boolean
   onAdd: (r: SearchResult) => void
   onRemove: (id: string) => void
   isTop?: boolean
+  suppressBorderBottom?: boolean
 }) {
   const isClickable = result.available && !result.connectedToSite
 
@@ -273,78 +274,76 @@ function SearchResultRow({
     inCart ? onRemove(result.id) : onAdd(result)
   }
 
-  return (
-    <Flex
-      alignItems="center"
-      gap={3}
-      px={4}
-      py={3}
-      onClick={handleToggle}
+  const priceNode = result.connectedToSite ? null : !result.available ? (
+    <Text.Caption m={0} color="fg.muted">unavailable</Text.Caption>
+  ) : result.salePrice !== null ? (
+    <Flex alignItems="baseline" gap={1}>
+      <Text.Caption m={0} color="fg.disabled" sx={{ textDecoration: 'line-through', fontSize: '13px' }}>${result.price}</Text.Caption>
+      <Text.Body m={0}>${result.salePrice}</Text.Body>
+    </Flex>
+  ) : (
+    <Text.Body m={0}>${result.price}</Text.Body>
+  )
+
+  const cartButton = !result.connectedToSite && result.available ? (
+    <Box
+      as="button"
+      onClick={(e: React.MouseEvent) => { e.stopPropagation(); handleToggle() }}
+      aria-label={inCart ? 'Remove from cart' : 'Add to cart'}
       sx={{
-        minHeight: 44,
-        opacity: (!result.available && !result.connectedToSite) ? 0.4 : 1,
-        cursor: isClickable ? 'pointer' : 'default',
-        ...(isTop ? {
-          border: '1px solid',
-          borderColor: 'border.default',
-          borderRadius: 8,
-          mb: 2,
-        } : {}),
-        ...(isClickable ? {
-          transition: 'background 0.15s ease, transform 0.15s ease, border-radius 0.15s ease',
-          '&:hover': { background: 'var(--colors-bg-default)', transform: 'translateX(4px)', borderRadius: 8 },
-        } : {}),
+        border: 'none', cursor: 'pointer', width: 36, height: 36, borderRadius: 8,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+        background: inCart ? 'var(--colors-fg-default)' : 'transparent',
+        transition: 'background 0.2s ease',
+        '&:hover': { background: inCart ? '#333' : 'var(--colors-bg-default)' },
       }}
     >
-      {/* Domain name + badges inline */}
-      <Flex alignItems="center" gap={2} flexWrap="wrap" sx={{ flex: '1 1 0', minWidth: 0 }}>
-        <Text.Body m={0} fontWeight={result.badges.includes('exact') ? 'semibold' : 'book'}
-          sx={{ color: result.available ? 'fg.default' : 'fg.disabled', flexShrink: 0 }}>
-          {result.name}
-        </Text.Body>
-        {result.badges.map((b) => <ResultBadge key={b} kind={b} />)}
-      </Flex>
+      {inCart
+        ? <Checkmark sx={{ width: 16, height: 16, color: '#ffffff' }} />
+        : <ShoppingBag sx={{ width: 18, height: 18, color: 'var(--colors-fg-muted)' }} />}
+    </Box>
+  ) : <Box sx={{ width: 36, height: 36, flexShrink: 0 }} />
 
-      {/* Price */}
-      {!result.connectedToSite && (
-        <Flex alignItems="center" gap={2} sx={{ flexShrink: 0 }}>
-          {result.salePrice !== null ? (
-            <>
-              <Text.Caption m={0} color="fg.disabled" sx={{ textDecoration: 'line-through', fontSize: '13px' }}>
-                ${result.price}
-              </Text.Caption>
-              <Text.Body m={0}>${result.salePrice}</Text.Body>
-            </>
-          ) : (
-            <Text.Body m={0}>${result.price}</Text.Body>
+  return (
+    <Cell
+      onClick={handleToggle}
+      label={
+        <Flex alignItems="center" gap={2} flexWrap="nowrap" sx={{ minWidth: 0 }}>
+          <Text.Body
+            as="span"
+            m={0}
+            fontWeight={result.badges.includes('exact') ? 'semibold' : 'book'}
+            sx={{ color: result.available ? 'fg.default' : 'fg.disabled', flexShrink: 0 }}
+          >
+            {result.name}
+          </Text.Body>
+          {result.badges.length > 0 && (
+            <Flex gap={1} flexShrink={0}>
+              {result.badges.map((b) => <ResultBadge key={b} kind={b} />)}
+            </Flex>
           )}
         </Flex>
-      )}
-
-      {/* Cart button or spacer */}
-      {result.connectedToSite ? (
-        <Box sx={{ width: 36, flexShrink: 0 }} />
-      ) : result.available ? (
-        <Box
-          as="button"
-          onClick={(e: React.MouseEvent) => { e.stopPropagation(); handleToggle() }}
-          aria-label={inCart ? 'Remove from cart' : 'Add to cart'}
-          sx={{
-            border: 'none', cursor: 'pointer', width: 36, height: 36, borderRadius: 8,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-            background: inCart ? 'var(--colors-fg-default)' : 'transparent',
-            transition: 'background 0.2s ease',
-            '&:hover': { background: inCart ? '#333' : 'var(--colors-bg-default)' },
-          }}
-        >
-          {inCart
-            ? <Checkmark sx={{ width: 16, height: 16, color: '#ffffff' }} />
-            : <ShoppingBag sx={{ width: 18, height: 18, color: 'var(--colors-fg-muted)' }} />}
-        </Box>
-      ) : (
-        <Box sx={{ width: 36, flexShrink: 0 }} />
-      )}
-    </Flex>
+      }
+      interiorAccessory={
+        <Flex alignItems="center" gap={2}>
+          {priceNode}
+          {cartButton}
+        </Flex>
+      }
+      sx={{
+        px: 4,
+        py: 3,
+        opacity: (!result.available && !result.connectedToSite) ? 0.4 : 1,
+        cursor: isClickable ? 'pointer' : 'default',
+        ...(isTop
+          ? { border: '1px solid', borderColor: 'border.default', borderRadius: 8, mb: 2 }
+          : { borderBottom: suppressBorderBottom ? 'none' : '1px solid', borderColor: 'border.default' }),
+        ...(isClickable ? {
+          '&:hover': { backgroundColor: 'gray.950' },
+          '&:active': { backgroundColor: 'gray.900' },
+        } : {}),
+      }}
+    />
   )
 }
 
@@ -547,7 +546,8 @@ function GetNewDomainOverlay({
           <Flex sx={{ gap: '100px', alignItems: 'flex-start' }}>
             {/* Left: search + results */}
             <Box sx={{ flex: 3, minWidth: 0 }}>
-              <Text.Body m={0} fontWeight="semibold" sx={{ fontSize: '26px', mb: 4 }}>Get a new domain</Text.Body>
+              <Text.Body m={0} fontWeight="semibold" sx={{ fontSize: '26px', mb: 1 }}>Get a new domain</Text.Body>
+              <Text.Body m={0} color="fg.muted" sx={{ mb: 4 }}>Each domain name registration comes with a free suite of tools including WHOIS privacy and SSL certificate.</Text.Body>
 
               <Flex alignItems="center" gap={2} mb={3} px={4}
                 sx={{ border: '1px solid #d8d8d8', borderRadius: 6, height: 44, background: '#f5f5f5', '&:focus-within': { borderColor: '#999', background: '#fff' }, transition: 'border-color 0.15s, background 0.15s' }}>
@@ -562,10 +562,15 @@ function GetNewDomainOverlay({
 
               <Box>
                 {(() => {
-                  const firstAvailableId = results.find((r) => r.available && !r.connectedToSite)?.id
-                  return results.map((r) => (
+                  const unavailable = results.find((r) => !r.connectedToSite && !r.available)
+                  const available = results.filter((r) => !r.connectedToSite && r.available)
+                  const filtered = unavailable ? [unavailable, ...available] : available
+                  const firstAvailableIdx = filtered.findIndex((r) => r.available)
+                  return filtered.map((r, i) => (
                     <SearchResultRow key={r.id} result={r} inCart={cartIds.has(r.id)}
-                      onAdd={onAdd} onRemove={onRemove} isTop={r.id === firstAvailableId} />
+                      onAdd={onAdd} onRemove={onRemove}
+                      isTop={i === firstAvailableIdx}
+                      suppressBorderBottom={firstAvailableIdx !== -1 && i === firstAvailableIdx - 1} />
                   ))
                 })()}
               </Box>
