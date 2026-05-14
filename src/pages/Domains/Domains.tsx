@@ -13,7 +13,6 @@ import {
   Website,
   Mail,
   ArrowRight,
-  ShoppingBag,
 } from '@sqs/rosetta-icons'
 
 const PRICING_ROWS = [

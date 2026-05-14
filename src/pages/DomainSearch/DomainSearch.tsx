@@ -562,7 +562,7 @@ export default function DomainSearch() {
   const [cart, setCart] = useState<Set<string>>(new Set())
   const [cartDomains, setCartDomains] = useState<Map<string, DomainResult>>(new Map())
   const [searchFocused, setSearchFocused] = useState(false)
-  const [heroPassed, setHeroPassed] = useState(false)
+  const [_heroPassed, setHeroPassed] = useState(false)
   const [searchBarPassed, setSearchBarPassed] = useState(false)
   const heroRef = useRef<HTMLDivElement>(null)
   const searchBarRef = useRef<HTMLDivElement>(null)
