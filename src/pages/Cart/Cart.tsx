@@ -534,7 +534,7 @@ export default function Cart() {
           Cart Overview
         </Text.Body>
 
-        <Flex alignItems="flex-start" sx={{ gap: 12 }}>
+        <Flex alignItems="flex-start" sx={{ gap: 36 }}>
           {/* Left: domain list */}
           <Box sx={{ flex: '1 1 0', minWidth: 0 }}>
             <Flex alignItems="center" justifyContent="space-between" sx={{ mb: 3 }}>
