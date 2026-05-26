@@ -246,7 +246,7 @@ function DomainCard({
       </Box>
 
       {/* Content */}
-      <Box sx={{ flex: '1 0 0', minWidth: 0, px: 5, overflow: 'hidden' }}>
+      <Box sx={{ flex: '1 0 0', minWidth: 0, px: 5 }}>
         <Box sx={{ height: 20 }} />
 
         {/* Name + badge */}
@@ -534,7 +534,7 @@ export default function Cart() {
           Cart Overview
         </Text.Body>
 
-        <Flex alignItems="flex-start" sx={{ gap: 6 }}>
+        <Flex alignItems="flex-start" sx={{ gap: 12 }}>
           {/* Left: domain list */}
           <Box sx={{ flex: '1 1 0', minWidth: 0 }}>
             <Flex alignItems="center" justifyContent="space-between" sx={{ mb: 3 }}>
