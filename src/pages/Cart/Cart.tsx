@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useLocation, useNavigate, Navigate } from 'react-router-dom'
 import { Box, Flex, Text, Button } from '@sqs/rosetta-primitives'
 import {
@@ -7,6 +7,7 @@ import {
   Trash,
   ChevronSmallDown,
   ChevronSmallRight,
+  Checkmark,
 } from '@sqs/rosetta-icons'
 
 type DomainBadge = 'exact' | 'premium' | 'promoted'
@@ -21,6 +22,26 @@ interface DomainResult {
   available: boolean
 }
 
+// ── Pricing helpers ────────────────────────────────────────────────────────
+
+const MAX_YEARS = 10
+
+/** Price for a given term. First year gets the sale price if available. */
+function termPrice(item: DomainResult, years: number): number {
+  const firstYear = item.salePrice ?? item.originalPrice
+  return firstYear + item.originalPrice * (years - 1)
+}
+
+/** Full (non-discounted) price for a given term. */
+function termOriginalPrice(item: DomainResult, years: number): number {
+  return item.originalPrice * years
+}
+
+/** Discount for a given term (0 if no salePrice). */
+function termDiscount(item: DomainResult, years: number): number {
+  return termOriginalPrice(item, years) - termPrice(item, years)
+}
+
 // ── Breadcrumb ─────────────────────────────────────────────────────────────
 
 function Breadcrumb() {
@@ -31,13 +52,13 @@ function Breadcrumb() {
         borderBottom: '1px solid',
         borderColor: 'border.default',
         px: 6,
-        py: 0,
         height: 56,
         display: 'flex',
         alignItems: 'center',
+        background: '#fff',
       }}
     >
-      <Flex alignItems="center" gap={0} sx={{ flex: 1 }}>
+      <Flex alignItems="center" gap={0}>
         <LogoSquarespace sx={{ width: 28, height: 28, mr: 6, flexShrink: 0 }} />
         <Flex alignItems="center" gap={1}>
           {steps.map((step, i) => (
@@ -68,20 +89,123 @@ function Breadcrumb() {
   )
 }
 
+// ── Term dropdown ──────────────────────────────────────────────────────────
+
+function TermDropdown({
+  item,
+  selectedYears,
+  onSelect,
+  onClose,
+}: {
+  item: DomainResult
+  selectedYears: number
+  onSelect: (years: number) => void
+  onClose: () => void
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        onClose()
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [onClose])
+
+  return (
+    <Box
+      ref={ref}
+      sx={{
+        position: 'absolute',
+        top: '100%',
+        left: 0,
+        right: 0,
+        zIndex: 100,
+        background: '#fff',
+        boxShadow: '0px 0px 1px rgba(0,0,0,0.08), 0px 4px 16px rgba(0,0,0,0.12)',
+        py: '6px',
+      }}
+    >
+      {Array.from({ length: MAX_YEARS }, (_, i) => i + 1).map((years) => {
+        const orig = termOriginalPrice(item, years)
+        const sale = termPrice(item, years)
+        const hasDiscount = sale < orig
+        const isSelected = years === selectedYears
+        const label = years === 1 ? '1 year' : `${years} years`
+
+        return (
+          <Box
+            key={years}
+            as="button"
+            onClick={() => { onSelect(years); onClose() }}
+            sx={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              px: '11px',
+              py: '11px',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              textAlign: 'left',
+              '&:hover': { background: 'var(--colors-canvas-subtle, #f2f2f2)' },
+            }}
+          >
+            {/* Label */}
+            <Text.Body m={0} sx={{ fontSize: '14px', color: 'fg.default', flex: '1 0 0' }}>
+              {label}
+            </Text.Body>
+
+            {/* Prices + checkmark */}
+            <Flex alignItems="center" gap={2}>
+              {hasDiscount && (
+                <Text.Body
+                  m={0}
+                  sx={{ fontSize: '14px', color: '#878787', textDecoration: 'line-through' }}
+                >
+                  ${orig}
+                </Text.Body>
+              )}
+              <Text.Body m={0} sx={{ fontSize: '14px', color: 'fg.default' }}>
+                ${sale}
+              </Text.Body>
+              <Box sx={{ width: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {isSelected && <Checkmark sx={{ width: 14, height: 14, color: 'fg.default' }} />}
+              </Box>
+            </Flex>
+          </Box>
+        )
+      })}
+    </Box>
+  )
+}
+
 // ── Domain card ────────────────────────────────────────────────────────────
 
 function DomainCard({
   item,
+  selectedYears,
+  onTermChange,
   onRemove,
 }: {
   item: DomainResult
+  selectedYears: number
+  onTermChange: (id: string, years: number) => void
   onRemove: (id: string) => void
 }) {
-  const price = item.salePrice ?? item.originalPrice
+  const [dropdownOpen, setDropdownOpen] = useState(false)
+
+  const price = termPrice(item, selectedYears)
+  const orig = termOriginalPrice(item, selectedYears)
+  const hasDiscount = price < orig
   const discountPct =
     item.salePrice !== null
       ? Math.round((1 - item.salePrice / item.originalPrice) * 100)
       : null
+  const termLabel = selectedYears === 1 ? '1 year' : `${selectedYears} years`
 
   return (
     <Box
@@ -89,9 +213,10 @@ function DomainCard({
         border: '1px solid',
         borderColor: 'border.default',
         borderRadius: '4px',
-        overflow: 'hidden',
+        overflow: 'visible',
         display: 'flex',
         width: '100%',
+        background: '#fff',
       }}
     >
       {/* Thumbnail */}
@@ -105,6 +230,8 @@ function DomainCard({
           alignItems: 'center',
           justifyContent: 'center',
           position: 'relative',
+          borderRadius: '3px 0 0 3px',
+          overflow: 'hidden',
         }}
       >
         <Box
@@ -119,7 +246,7 @@ function DomainCard({
       </Box>
 
       {/* Content */}
-      <Box sx={{ flex: '1 0 0', minWidth: 0, px: 5, py: 0 }}>
+      <Box sx={{ flex: '1 0 0', minWidth: 0, px: 5, overflow: 'hidden' }}>
         <Box sx={{ height: 20 }} />
 
         {/* Name + badge */}
@@ -157,24 +284,47 @@ function DomainCard({
 
         <Box sx={{ height: 18 }} />
 
-        {/* Term dropdown */}
-        <Box sx={{ background: 'var(--colors-canvas-subtle, #f2f2f2)', px: '11px', py: '10px' }}>
-          <Flex alignItems="center" justifyContent="space-between">
-            <Text.Body m={0} sx={{ fontSize: '14px', color: 'fg.default' }}>
-              1 year
-            </Text.Body>
-            <Flex alignItems="center" gap={2}>
-              {item.salePrice !== null && (
-                <Text.Body m={0} sx={{ fontSize: '14px', color: 'fg.muted', textDecoration: 'line-through' }}>
-                  ${item.originalPrice}
-                </Text.Body>
-              )}
-              <Text.Body m={0} sx={{ fontSize: '14px', fontWeight: 500, color: 'fg.default' }}>
-                ${price}
+        {/* Term dropdown trigger */}
+        <Box sx={{ position: 'relative' }}>
+          <Box
+            as="button"
+            onClick={() => setDropdownOpen((o) => !o)}
+            sx={{
+              width: '100%',
+              background: 'var(--colors-canvas-subtle, #f2f2f2)',
+              border: 'none',
+              cursor: 'pointer',
+              px: '11px',
+              py: '10px',
+              textAlign: 'left',
+            }}
+          >
+            <Flex alignItems="center" justifyContent="space-between">
+              <Text.Body m={0} sx={{ fontSize: '14px', color: 'fg.default' }}>
+                {termLabel}
               </Text.Body>
-              <ChevronSmallDown sx={{ width: 20, height: 20, color: 'fg.default' }} />
+              <Flex alignItems="center" gap={2}>
+                {hasDiscount && (
+                  <Text.Body m={0} sx={{ fontSize: '14px', color: 'fg.muted', textDecoration: 'line-through' }}>
+                    ${orig}
+                  </Text.Body>
+                )}
+                <Text.Body m={0} sx={{ fontSize: '14px', fontWeight: 500, color: 'fg.default' }}>
+                  ${price}
+                </Text.Body>
+                <ChevronSmallDown sx={{ width: 20, height: 20, color: 'fg.default' }} />
+              </Flex>
             </Flex>
-          </Flex>
+          </Box>
+
+          {dropdownOpen && (
+            <TermDropdown
+              item={item}
+              selectedYears={selectedYears}
+              onSelect={(years) => onTermChange(item.id, years)}
+              onClose={() => setDropdownOpen(false)}
+            />
+          )}
         </Box>
 
         <Box sx={{ height: 14 }} />
@@ -216,19 +366,30 @@ function DomainCard({
 
 // ── Order Summary panel ────────────────────────────────────────────────────
 
-function OrderSummary({ items }: { items: DomainResult[] }) {
-  const subtotal = items.reduce((sum, r) => sum + r.originalPrice, 0)
-  const totalDiscounts = items.reduce(
-    (sum, r) => sum + (r.salePrice !== null ? r.originalPrice - r.salePrice : 0),
-    0,
-  )
+function OrderSummary({
+  items,
+  terms,
+}: {
+  items: DomainResult[]
+  terms: Record<string, number>
+}) {
+  const subtotal = items.reduce((sum, r) => sum + termOriginalPrice(r, terms[r.id] ?? 1), 0)
+  const totalDiscounts = items.reduce((sum, r) => sum + termDiscount(r, terms[r.id] ?? 1), 0)
   const estimatedTotal = subtotal - totalDiscounts
+
+  const today = new Date()
+  const endDate = (years: number) => {
+    const d = new Date(today)
+    d.setFullYear(d.getFullYear() + years)
+    return d
+  }
+  const fmt = (d: Date) =>
+    d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 
   return (
     <Box
       sx={{
-        border: '1px solid',
-        borderColor: 'border.default',
+        background: 'var(--colors-canvas-subtle, #f5f5f5)',
         borderRadius: '4px',
         p: 5,
         width: 300,
@@ -250,12 +411,8 @@ function OrderSummary({ items }: { items: DomainResult[] }) {
 
       {/* Per-domain rows */}
       {items.map((item) => {
-        const discount = item.salePrice !== null ? item.originalPrice - item.salePrice : 0
-        const today = new Date()
-        const nextYear = new Date(today)
-        nextYear.setFullYear(today.getFullYear() + 1)
-        const fmt = (d: Date) =>
-          d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+        const years = terms[item.id] ?? 1
+        const discount = termDiscount(item, years)
 
         return (
           <Box key={item.id} sx={{ mb: 3 }}>
@@ -264,11 +421,11 @@ function OrderSummary({ items }: { items: DomainResult[] }) {
                 {item.name}
               </Text.Body>
               <Text.Body m={0} sx={{ fontSize: '13px', color: 'fg.default', whiteSpace: 'nowrap' }}>
-                1x ${item.originalPrice}.00
+                {years}x ${item.originalPrice}.00
               </Text.Body>
             </Flex>
-            <Text.Body m={0} sx={{ fontSize: '11px', color: 'fg.muted', mb: discount > 0 ? '2px' : 0 }}>
-              {fmt(today)} – {fmt(nextYear)} (1 year)
+            <Text.Body m={0} sx={{ fontSize: '11px', color: 'fg.muted', mb: discount > 0 ? '3px' : 0 }}>
+              {fmt(today)} – {fmt(endDate(years))} ({years} {years === 1 ? 'year' : 'years'})
             </Text.Body>
             {discount > 0 && (
               <>
@@ -284,7 +441,7 @@ function OrderSummary({ items }: { items: DomainResult[] }) {
                   </Text.Body>
                 </Flex>
                 <Text.Body m={0} sx={{ fontSize: '11px', color: 'fg.muted' }}>
-                  {fmt(today)} – {fmt(nextYear)} (1 year)
+                  {fmt(today)} – {fmt(endDate(1))} (1 year)
                 </Text.Body>
               </>
             )}
@@ -313,7 +470,6 @@ function OrderSummary({ items }: { items: DomainResult[] }) {
         <Text.Body m={0} sx={{ fontSize: '13px', color: 'fg.muted' }}>—</Text.Body>
       </Flex>
 
-      {/* Divider */}
       <Box sx={{ borderTop: '1px solid', borderColor: 'border.default', my: 3 }} />
 
       <Flex justifyContent="space-between" sx={{ mb: 4 }}>
@@ -346,6 +502,9 @@ export default function Cart() {
   const initialItems: DomainResult[] = state?.items ?? []
 
   const [items, setItems] = useState<DomainResult[]>(initialItems)
+  const [terms, setTerms] = useState<Record<string, number>>(
+    () => Object.fromEntries(initialItems.map((i) => [i.id, 1])),
+  )
 
   if (initialItems.length === 0) {
     return <Navigate to="/domain-search" replace />
@@ -360,11 +519,16 @@ export default function Cart() {
     }
   }
 
+  const handleTermChange = (id: string, years: number) => {
+    setTerms((prev) => ({ ...prev, [id]: years }))
+  }
+
+  const subtotal = items.reduce((s, r) => s + (r.salePrice ?? r.originalPrice), 0)
+
   return (
-    <Box sx={{ minHeight: '100vh', background: 'canvas.default' }}>
+    <Box sx={{ minHeight: '100vh', background: '#fff' }}>
       <Breadcrumb />
 
-      {/* Page content */}
       <Box sx={{ maxWidth: 960, mx: 'auto', px: 6, pt: 7, pb: 8 }}>
         <Text.Body m={0} sx={{ fontSize: '28px', fontWeight: 500, lineHeight: '34px', mb: 5 }}>
           Cart Overview
@@ -373,24 +537,27 @@ export default function Cart() {
         <Flex alignItems="flex-start" sx={{ gap: 6 }}>
           {/* Left: domain list */}
           <Box sx={{ flex: '1 1 0', minWidth: 0 }}>
-            {/* Section header */}
             <Flex alignItems="center" justifyContent="space-between" sx={{ mb: 3 }}>
               <Text.Body m={0} sx={{ fontSize: '14px', color: 'fg.default' }}>
                 Domain ({items.length})
               </Text.Body>
               <Text.Body m={0} sx={{ fontSize: '14px', fontWeight: 500, color: 'fg.default' }}>
-                ${items.reduce((s, r) => s + (r.salePrice ?? r.originalPrice), 0)}.00
+                ${subtotal}.00
               </Text.Body>
             </Flex>
 
-            {/* Cards */}
             <Flex flexDirection="column" sx={{ gap: 3, mb: 5 }}>
               {items.map((item) => (
-                <DomainCard key={item.id} item={item} onRemove={removeItem} />
+                <DomainCard
+                  key={item.id}
+                  item={item}
+                  selectedYears={terms[item.id] ?? 1}
+                  onTermChange={handleTermChange}
+                  onRemove={removeItem}
+                />
               ))}
             </Flex>
 
-            {/* CTA */}
             <Button.Primary
               sx={{
                 width: '100%',
@@ -406,7 +573,7 @@ export default function Cart() {
           </Box>
 
           {/* Right: order summary */}
-          <OrderSummary items={items} />
+          <OrderSummary items={items} terms={terms} />
         </Flex>
       </Box>
     </Box>
