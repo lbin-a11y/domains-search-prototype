@@ -283,6 +283,7 @@ function CartSidebar({
   onRemove: (id: string) => void
   onAdd: (result: DomainResult) => void
 }) {
+  const navigate = useNavigate()
   const [matchingOpen, setMatchingOpen] = useState<Record<string, boolean>>({})
   const prevItemIdsRef = useRef<Set<string>>(new Set())
 
@@ -525,6 +526,7 @@ function CartSidebar({
         <Box px={5} pb={5}>
           <Box
             as="button"
+            onClick={() => navigate('/cart', { state: { items } })}
             sx={{
               width: '100%',
               background: 'var(--colors-fg-default)',
