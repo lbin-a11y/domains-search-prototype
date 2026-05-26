@@ -9,6 +9,7 @@ import {
   ChevronSmallRight,
   Checkmark,
 } from '@sqs/rosetta-icons'
+import { InfoCircleFilled } from '@sqs/rosetta-glyphs'
 
 type DomainBadge = 'exact' | 'premium' | 'promoted'
 
@@ -25,10 +26,15 @@ interface DomainResult {
 // ── Pricing helpers ────────────────────────────────────────────────────────
 
 const MAX_YEARS = 10
+/** Minimum term length (years) required to unlock the first-year discount. */
+const DISCOUNT_MIN_YEARS = 3
 
-/** Price for a given term. First year gets the sale price if available. */
+/** Price for a given term. First year gets the sale price only at DISCOUNT_MIN_YEARS+. */
 function termPrice(item: DomainResult, years: number): number {
-  const firstYear = item.salePrice ?? item.originalPrice
+  const firstYear =
+    item.salePrice !== null && years >= DISCOUNT_MIN_YEARS
+      ? item.salePrice
+      : item.originalPrice
   return firstYear + item.originalPrice * (years - 1)
 }
 
@@ -201,10 +207,11 @@ function DomainCard({
   const price = termPrice(item, selectedYears)
   const orig = termOriginalPrice(item, selectedYears)
   const hasDiscount = price < orig
-  const discountPct =
-    item.salePrice !== null
-      ? Math.round((1 - item.salePrice / item.originalPrice) * 100)
-      : null
+  const discountEligible = item.salePrice !== null && selectedYears >= DISCOUNT_MIN_YEARS
+  const discountPct = discountEligible
+    ? Math.round((1 - item.salePrice! / item.originalPrice) * 100)
+    : null
+  const showDiscountPrompt = item.salePrice !== null && selectedYears < DISCOUNT_MIN_YEARS
   const termLabel = selectedYears === 1 ? '1 year' : `${selectedYears} years`
 
   return (
@@ -327,7 +334,25 @@ function DomainCard({
           )}
         </Box>
 
-        <Box sx={{ height: 14 }} />
+        {showDiscountPrompt ? (
+          <Flex alignItems="flex-start" sx={{ gap: '6px', mt: 3, mb: 3 }}>
+            <InfoCircleFilled
+              sx={{ width: 16, height: 16, color: 'var(--colors-accent-fg, #0862d1)', flexShrink: 0, mt: '1px' }}
+            />
+            <Text.Body
+              m={0}
+              sx={{
+                fontSize: '12px',
+                lineHeight: '16px',
+                color: 'var(--colors-accent-fg, #0862d1)',
+              }}
+            >
+              Get a first-year discount when you subscribe for {DISCOUNT_MIN_YEARS} or more years.
+            </Text.Body>
+          </Flex>
+        ) : (
+          <Box sx={{ height: 14 }} />
+        )}
 
         {/* Renewal + trash */}
         <Flex alignItems="flex-start" justifyContent="space-between" sx={{ gap: 3 }}>
