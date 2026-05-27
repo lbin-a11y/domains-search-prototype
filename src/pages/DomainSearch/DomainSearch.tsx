@@ -279,20 +279,31 @@ function MobileUpsellCard({
   results,
   cart,
   onAdd,
+  isOpen,
+  variant,
 }: {
   result: DomainResult
   results: DomainResult[]
   cart: Set<string>
   onAdd: (r: DomainResult) => void
+  isOpen: boolean
+  variant: 'shadow' | 'border'
 }) {
   const [expanded, setExpanded] = useState(false)
+  const [mounted, setMounted] = useState(false)
   const [tipPos, setTipPos] = useState<{ left: number; bottom: number } | null>(null)
   const tipRef = useRef<HTMLElement>(null)
 
   useEffect(() => {
-    const id = requestAnimationFrame(() => setExpanded(true))
-    return () => cancelAnimationFrame(id)
-  }, [])
+    if (isOpen) {
+      setMounted(true)
+      requestAnimationFrame(() => setExpanded(true))
+    } else {
+      setExpanded(false)
+      const t = setTimeout(() => setMounted(false), 380)
+      return () => clearTimeout(t)
+    }
+  }, [isOpen])
 
   const handleTipShow = () => {
     if (tipRef.current) {
@@ -307,7 +318,7 @@ function MobileUpsellCard({
     .filter((r) => getSld(r.name) === sld && r.available && !cart.has(r.id) && r.id !== result.id)
     .slice(0, 4)
 
-  if (matching.length === 0) return null
+  if (!mounted) return null
 
   return (
     <Box
@@ -329,7 +340,9 @@ function MobileUpsellCard({
         <Box
           sx={{
             background: '#fff',
-            boxShadow: '0 0 1px 0 rgba(0,0,0,0.08), 0 2px 8px 0 rgba(0,0,0,0.12)',
+            ...(variant === 'shadow'
+              ? { boxShadow: '0 0 1px 0 rgba(0,0,0,0.08), 0 2px 8px 0 rgba(0,0,0,0.12)' }
+              : { border: '0.98px solid #DDD' }),
             borderRadius: '8px',
             p: 4,
           }}
@@ -1031,6 +1044,7 @@ export default function DomainSearch() {
   const [searchFocused, setSearchFocused] = useState(false)
   const [_heroPassed, setHeroPassed] = useState(false)
   const [lastAddedId, setLastAddedId] = useState<string | null>(null)
+  const [upsellVariant, setUpsellVariant] = useState<'shadow' | 'border'>('shadow')
   const [searchBarPassed, setSearchBarPassed] = useState(false)
   const heroRef = useRef<HTMLDivElement>(null)
   const searchBarRef = useRef<HTMLDivElement>(null)
@@ -1150,8 +1164,53 @@ export default function DomainSearch() {
   return (
     <Box sx={{ minHeight: '100vh', background: '#fff' }}>
 
+      {/* ── Prototype variant toggle ── */}
+      <Flex
+        alignItems="center"
+        justifyContent="center"
+        gap={1}
+        sx={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 9999,
+          background: 'rgba(255,255,255,0.92)',
+          backdropFilter: 'blur(8px)',
+          borderBottom: '1px solid #eee',
+          py: '6px',
+          px: 3,
+        }}
+      >
+        <Text.Caption m={0} sx={{ color: '#878787', mr: 2, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+          Upsell card
+        </Text.Caption>
+        {(['shadow', 'border'] as const).map((v) => (
+          <Box
+            key={v}
+            as="button"
+            onClick={() => setUpsellVariant(v)}
+            sx={{
+              background: upsellVariant === v ? '#000' : 'transparent',
+              color: upsellVariant === v ? '#fff' : '#4f4f4f',
+              border: '1px solid',
+              borderColor: upsellVariant === v ? '#000' : '#ddd',
+              borderRadius: '4px',
+              px: 3,
+              py: '4px',
+              fontSize: '12px',
+              cursor: 'pointer',
+              textTransform: 'capitalize',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            {v === 'shadow' ? 'Drop shadow' : 'Border'}
+          </Box>
+        ))}
+      </Flex>
+
       {/* ── Inline nav — scrolls with the page, not sticky ── */}
-      <Box sx={{ background: '#fff' }}>
+      <Box sx={{ background: '#fff', pt: '37px' }}>
         <Flex
           as="nav"
           alignItems="center"
@@ -1382,13 +1441,15 @@ export default function DomainSearch() {
                       onToggleCart={toggleCart}
                       isTop={i === 0}
                     />
-                    {r.id === lastAddedId && cart.has(r.id) && (
+                    {r.id === lastAddedId && (
                       <Box sx={{ '@media (min-width: 768px)': { display: 'none' } }}>
                         <MobileUpsellCard
                           result={r}
                           results={results}
                           cart={cart}
                           onAdd={addFromUpsell}
+                          isOpen={cart.has(r.id)}
+                          variant={upsellVariant}
                         />
                       </Box>
                     )}
