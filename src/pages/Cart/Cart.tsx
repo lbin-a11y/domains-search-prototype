@@ -66,7 +66,7 @@ function Breadcrumb() {
     >
       <Flex alignItems="center" gap={0}>
         <LogoSquarespace sx={{ width: 28, height: 28, mr: 6, flexShrink: 0 }} />
-        <Flex alignItems="center" gap={1}>
+        <Flex alignItems="center" gap={1} sx={{ '@media (max-width: 767px)': { display: 'none' } }}>
           {steps.map((step, i) => (
             <Flex key={step} alignItems="center" gap={1}>
               {i > 0 && (
@@ -420,27 +420,36 @@ function OrderSummary({
         width: 300,
         flexShrink: 0,
         alignSelf: 'flex-start',
+        '@media (max-width: 767px)': {
+          background: 'transparent',
+          width: '100%',
+          p: 0,
+          alignSelf: 'stretch',
+          borderTop: '1px solid',
+          borderColor: 'border.default',
+          pt: 5,
+        },
       }}
     >
-      <Text.Body m={0} sx={{ fontSize: '18px', fontWeight: 500, color: 'fg.default', mb: 4 }}>
+      <Text.Body m={0} sx={{ fontSize: '18px', fontWeight: 500, color: 'fg.default', mb: 4, '@media (max-width: 767px)': { display: 'none' } }}>
         Order Summary
       </Text.Body>
 
-      {/* Domain section label */}
-      <Flex alignItems="center" gap={2} sx={{ mb: 3 }}>
+      {/* Domain section label — desktop only */}
+      <Flex alignItems="center" gap={2} sx={{ mb: 3, '@media (max-width: 767px)': { display: 'none' } }}>
         <Global sx={{ width: 16, height: 16, color: 'fg.muted' }} />
         <Text.Body m={0} sx={{ fontSize: '13px', color: 'fg.muted' }}>
           Domain ({items.length})
         </Text.Body>
       </Flex>
 
-      {/* Per-domain rows */}
+      {/* Per-domain rows — desktop only */}
       {items.map((item) => {
         const years = terms[item.id] ?? 1
         const discount = termDiscount(item, years)
 
         return (
-          <Box key={item.id} sx={{ mb: 3 }}>
+          <Box key={item.id} sx={{ mb: 3, '@media (max-width: 767px)': { display: 'none' } }}>
             <Flex justifyContent="space-between" sx={{ mb: '3px' }}>
               <Text.Body m={0} sx={{ fontSize: '13px', fontWeight: 500, color: 'fg.default' }}>
                 {item.name}
@@ -469,8 +478,8 @@ function OrderSummary({
         )
       })}
 
-      {/* Divider */}
-      <Box sx={{ borderTop: '1px solid', borderColor: 'border.default', my: 4 }} />
+      {/* Divider — desktop only (mobile uses borderTop on the card itself) */}
+      <Box sx={{ borderTop: '1px solid', borderColor: 'border.default', my: 4, '@media (max-width: 767px)': { display: 'none' } }} />
 
       {/* Totals */}
       <Flex justifyContent="space-between" sx={{ mb: 2 }}>
@@ -549,12 +558,18 @@ export default function Cart() {
     <Box sx={{ minHeight: '100vh', background: '#fff' }}>
       <Breadcrumb />
 
-      <Box sx={{ maxWidth: 960, mx: 'auto', px: 6, pt: 7, pb: 8 }}>
+      <Box sx={{ maxWidth: 960, mx: 'auto', px: 6, pt: 7, pb: 8, '@media (max-width: 767px)': { px: 4, pt: 5, pb: 6 } }}>
         <Text.Body m={0} sx={{ fontSize: '28px', fontWeight: 500, lineHeight: '34px', mb: 5 }}>
           Cart Overview
         </Text.Body>
 
-        <Flex alignItems="flex-start" sx={{ gap: '64px' }}>
+        <Flex
+          alignItems="flex-start"
+          sx={{
+            gap: '64px',
+            '@media (max-width: 767px)': { flexDirection: 'column', gap: '24px', alignItems: 'stretch' },
+          }}
+        >
           {/* Left: domain list */}
           <Box sx={{ flex: '1 1 0', minWidth: 0 }}>
             <Flex alignItems="center" justifyContent="space-between" sx={{ mb: 3 }}>
@@ -578,6 +593,7 @@ export default function Cart() {
               ))}
             </Flex>
 
+            {/* Desktop CTA — hidden on mobile */}
             <Button.Primary
               sx={{
                 width: '100%',
@@ -586,6 +602,7 @@ export default function Cart() {
                 fontSize: '12px',
                 letterSpacing: '0.08em',
                 textTransform: 'uppercase',
+                '@media (max-width: 767px)': { display: 'none' },
               }}
             >
               Continue to checkout
@@ -594,6 +611,30 @@ export default function Cart() {
 
           {/* Right: order summary */}
           <OrderSummary items={items} terms={terms} />
+
+          {/* Mobile CTA — shown below order summary on mobile only */}
+          <Box
+            as="button"
+            onClick={() => {}}
+            sx={{
+              display: 'none',
+              '@media (max-width: 767px)': {
+                display: 'block',
+                width: '100%',
+                background: '#000',
+                color: '#fff',
+                border: 'none',
+                height: 52,
+                cursor: 'pointer',
+                fontSize: '12px',
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                fontWeight: 400,
+              },
+            }}
+          >
+            Continue to checkout
+          </Box>
         </Flex>
       </Box>
     </Box>

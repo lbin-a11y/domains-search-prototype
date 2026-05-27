@@ -217,7 +217,9 @@ function ResultRow({
 
       {/* Price */}
       <Flex alignItems="center" gap={2} sx={{ flexShrink: 0 }}>
-        {result.salePrice !== null ? (
+        {!result.available ? (
+          <Text.Body m={0} color="fg.disabled" sx={{ fontSize: '13px' }}>Unavailable</Text.Body>
+        ) : result.salePrice !== null ? (
           <>
             <Text.Caption m={0} color="fg.disabled" sx={{ textDecoration: 'line-through', fontSize: '13px' }}>
               ${result.originalPrice}
@@ -569,12 +571,20 @@ function MobileMiniCart({
   lastAddedId: string | null
 }) {
   const [expanded, setExpanded] = useState(false)
+  const [slideIn, setSlideIn] = useState(false)
   const subtotal = items.reduce((sum, r) => sum + (r.salePrice ?? r.originalPrice), 0)
   const cartIds = new Set(items.map((i) => i.id))
+  const hasItems = items.length > 0
 
   useEffect(() => {
-    if (items.length === 0) setExpanded(false)
-  }, [items.length])
+    if (hasItems) {
+      const id = requestAnimationFrame(() => setSlideIn(true))
+      return () => cancelAnimationFrame(id)
+    } else {
+      setSlideIn(false)
+      setExpanded(false)
+    }
+  }, [hasItems])
 
   function getMatching(sld: string): DomainResult[] {
     return results.filter((r) => getSld(r.name) === sld && r.available && !cartIds.has(r.id)).slice(0, 4)
@@ -594,15 +604,21 @@ function MobileMiniCart({
 
   return (
     <>
-      {/* Overlay */}
-      {expanded && (
-        <Box
-          onClick={() => setExpanded(false)}
-          sx={{ position: 'fixed', inset: 0, background: 'rgba(79,79,79,0.5)', zIndex: 299 }}
-        />
-      )}
+      {/* Overlay — fades in/out */}
+      <Box
+        onClick={() => setExpanded(false)}
+        sx={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(79,79,79,0.5)',
+          zIndex: 299,
+          opacity: expanded ? 1 : 0,
+          pointerEvents: expanded ? 'auto' : 'none',
+          transition: 'opacity 0.3s ease',
+        }}
+      />
 
-      {/* Panel */}
+      {/* Panel — slides up on first item add */}
       <Box
         sx={{
           position: 'fixed',
@@ -615,11 +631,20 @@ function MobileMiniCart({
           borderTopLeftRadius: expanded ? 6 : 0,
           borderTopRightRadius: expanded ? 6 : 0,
           boxShadow: '0px -1px 35px rgba(0,0,0,0.09), 0px 4px 19px rgba(0,0,0,0.1)',
+          transform: slideIn ? 'translateY(0)' : 'translateY(100%)',
+          transition: 'transform 0.3s cubic-bezier(0.4,0,0.2,1), border-radius 0.2s ease',
         }}
       >
-        {/* Expanded scrollable content */}
-        {expanded && (
-          <Box sx={{ maxHeight: 'calc(100vh - 160px)', overflowY: 'auto' }}>
+        {/* Expandable content — grid-template-rows trick for smooth height */}
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateRows: expanded ? '1fr' : '0fr',
+            transition: 'grid-template-rows 0.35s cubic-bezier(0.4,0,0.2,1)',
+          }}
+        >
+          <Box sx={{ minHeight: 0, overflow: 'hidden' }}>
+            <Box sx={{ maxHeight: '65vh', overflowY: 'auto' }}>
             {/* Header */}
             <Flex alignItems="center" justifyContent="space-between" px={4} pt={6} pb={3}>
               <Text.Body m={0} sx={{ fontSize: '18px', fontWeight: 500 }}>Cart Overview</Text.Body>
@@ -723,7 +748,8 @@ function MobileMiniCart({
               })}
             </Box>
           </Box>
-        )}
+        </Box>
+        </Box>
 
         {/* Footer — always visible */}
         <Box sx={{ px: 4, pt: 4, pb: '16px', borderTop: expanded ? '1px solid #ddd' : 'none' }}>
@@ -1007,7 +1033,7 @@ export default function DomainSearch() {
           pt: 80,
           pb: 24,
           transition: 'max-width 0.35s ease',
-          '@media (max-width: 767px)': { px: '16px', pt: '32px', pb: hasCart ? '160px' : '40px' },
+          '@media (max-width: 767px)': { px: '16px', pt: '32px', pb: cartItems.length > 0 ? '160px' : '40px' },
         }}
       >
         <Flex sx={{ gap: '100px', '@media (max-width: 767px)': { gap: 0 } }} alignItems="flex-start">
@@ -1149,10 +1175,9 @@ export default function DomainSearch() {
         </Flex>
       </Box>
 
-      {/* Mobile mini cart — hidden on desktop */}
-      {hasCart && (
-        <Box sx={{ display: 'none', '@media (max-width: 767px)': { display: 'block' } }}>
-          <MobileMiniCart
+      {/* Mobile mini cart — hidden on desktop, always rendered for slide-up animation */}
+      <Box sx={{ display: 'none', '@media (max-width: 767px)': { display: 'block' } }}>
+        <MobileMiniCart
             items={cartItems}
             results={results}
             onRemove={removeFromCart}
@@ -1161,7 +1186,6 @@ export default function DomainSearch() {
             lastAddedId={lastAddedId}
           />
         </Box>
-      )}
     </Box>
   )
 }
