@@ -372,7 +372,7 @@ function MobileUpsellCard({
                   boxShadow: '0px 2px 8px rgba(0,0,0,0.2)',
                 }}
               >
-                Other extensions of your domain name may still be available. Registering them prevents competitors from using your brand name.
+                Secure similar domain names to ensure you're the only one using your brand across the web.
               </Box>
             )}
           </Flex>
