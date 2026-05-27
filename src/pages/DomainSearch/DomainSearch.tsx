@@ -307,13 +307,17 @@ function MobileUpsellCard({
         transition: 'grid-template-rows 0.35s cubic-bezier(0.4,0,0.2,1)',
         overflow: 'hidden',
         mb: '4px',
+        /* padding gives shadow room to render within the clipping boundary */
+        px: '4px',
+        pb: '12px',
+        mx: '-4px',
       }}
     >
       <Box sx={{ minHeight: 0 }}>
         <Box
           sx={{
             background: '#fff',
-            boxShadow: '0px 0px 0.5px rgba(0,0,0,0.08), 0px 2px 4px rgba(0,0,0,0.12)',
+            boxShadow: '0px 0px 1px rgba(0,0,0,0.08), 0px 2px 8px rgba(0,0,0,0.12)',
             borderRadius: '8px',
             p: 4,
           }}
