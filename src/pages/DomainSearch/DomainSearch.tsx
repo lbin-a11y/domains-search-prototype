@@ -312,6 +312,20 @@ function MobileUpsellCard({
     }
   }, [isOpen])
 
+  // Close with animation when all alternatives have been added to cart
+  useEffect(() => {
+    if (!mounted) return
+    const sld = getSld(result.name)
+    const remaining = results.filter(
+      (r) => getSld(r.name) === sld && r.available && !cart.has(r.id) && r.id !== result.id
+    ).length
+    if (remaining === 0) {
+      setExpanded(false)
+      const t = setTimeout(() => setMounted(false), 400)
+      return () => clearTimeout(t)
+    }
+  }, [cart, mounted]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleTipShow = () => {
     if (tipRef.current) {
       const rect = tipRef.current.getBoundingClientRect()
