@@ -297,10 +297,17 @@ function MobileUpsellCard({
   useEffect(() => {
     if (isOpen) {
       setMounted(true)
-      requestAnimationFrame(() => setExpanded(true))
+      // Double RAF: outer fires after React commits mounted=true to DOM,
+      // inner fires after browser paints the 0fr state — gives CSS transition
+      // a real starting frame to animate from.
+      let id1: number, id2: number
+      id1 = requestAnimationFrame(() => {
+        id2 = requestAnimationFrame(() => setExpanded(true))
+      })
+      return () => { cancelAnimationFrame(id1); cancelAnimationFrame(id2) }
     } else {
       setExpanded(false)
-      const t = setTimeout(() => setMounted(false), 380)
+      const t = setTimeout(() => setMounted(false), 400)
       return () => clearTimeout(t)
     }
   }, [isOpen])
