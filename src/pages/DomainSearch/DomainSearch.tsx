@@ -266,13 +266,117 @@ function ResultRow({
   )
 }
 
-// ── Cart sidebar ──────────────────────────────────────────────────────────────
+// ── Mobile inline TLD upsell card ────────────────────────────────────────────
 
 /** Extract the SLD (everything before the last TLD segment) */
 function getSld(name: string): string {
   const dot = name.lastIndexOf('.')
   return dot > 0 ? name.slice(0, dot) : name
 }
+
+function MobileUpsellCard({
+  result,
+  results,
+  cart,
+  onAdd,
+}: {
+  result: DomainResult
+  results: DomainResult[]
+  cart: Set<string>
+  onAdd: (r: DomainResult) => void
+}) {
+  const [expanded, setExpanded] = useState(false)
+
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setExpanded(true))
+    return () => cancelAnimationFrame(id)
+  }, [])
+
+  const sld = getSld(result.name)
+  const matching = results
+    .filter((r) => getSld(r.name) === sld && r.available && !cart.has(r.id) && r.id !== result.id)
+    .slice(0, 4)
+
+  if (matching.length === 0) return null
+
+  return (
+    <Box
+      sx={{
+        display: 'grid',
+        gridTemplateRows: expanded ? '1fr' : '0fr',
+        transition: 'grid-template-rows 0.35s cubic-bezier(0.4,0,0.2,1)',
+        overflow: 'hidden',
+        mb: '4px',
+      }}
+    >
+      <Box sx={{ minHeight: 0 }}>
+        <Box
+          sx={{
+            background: '#fff',
+            boxShadow: '0px 0px 0.5px rgba(0,0,0,0.08), 0px 2px 4px rgba(0,0,0,0.12)',
+            borderRadius: '8px',
+            p: 4,
+          }}
+        >
+          {/* Header */}
+          <Flex alignItems="center" gap={1} mb={3}>
+            <Text.Caption m={0} sx={{ color: '#4f4f4f' }}>Protect your brand name</Text.Caption>
+            <InfoCircle sx={{ width: 16, height: 16, color: '#4f4f4f', flexShrink: 0 }} />
+          </Flex>
+
+          {/* TLD rows */}
+          <Flex flexDirection="column" sx={{ gap: '4px' }}>
+            {matching.map((m) => {
+              const price = m.salePrice ?? m.originalPrice
+              return (
+                <Flex
+                  key={m.id}
+                  alignItems="center"
+                  justifyContent="space-between"
+                  sx={{
+                    background: '#f9f9f9',
+                    borderRadius: '4px',
+                    pl: 3,
+                    pr: 4,
+                    py: '10px',
+                  }}
+                >
+                  <Text.Body m={0} sx={{ fontSize: '14px', letterSpacing: '-0.014px' }}>
+                    <Box as="span" sx={{ color: '#4f4f4f' }}>{sld}</Box>
+                    <Box as="span" sx={{ fontWeight: 500 }}>{m.tld}</Box>
+                  </Text.Body>
+                  <Flex alignItems="baseline" gap={2}>
+                    <Text.Body m={0} sx={{ fontSize: '14px', color: 'fg.default' }}>${price}</Text.Body>
+                    <Box
+                      as="button"
+                      onClick={() => onAdd(m)}
+                      sx={{
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        p: 0,
+                        fontSize: '14px',
+                        fontWeight: 500,
+                        letterSpacing: '0.06em',
+                        textTransform: 'uppercase',
+                        color: 'fg.default',
+                        lineHeight: 1,
+                      }}
+                    >
+                      ADD
+                    </Box>
+                  </Flex>
+                </Flex>
+              )
+            })}
+          </Flex>
+        </Box>
+      </Box>
+    </Box>
+  )
+}
+
+// ── Cart sidebar ──────────────────────────────────────────────────────────────
 
 function CartSidebar({
   items,
@@ -1160,13 +1264,24 @@ export default function DomainSearch() {
             {!isLoading && results.length > 0 && (
               <Box>
                 {results.map((r, i) => (
-                  <ResultRow
-                    key={r.id}
-                    result={r}
-                    inCart={cart.has(r.id)}
-                    onToggleCart={toggleCart}
-                    isTop={i === 0}
-                  />
+                  <Box key={r.id}>
+                    <ResultRow
+                      result={r}
+                      inCart={cart.has(r.id)}
+                      onToggleCart={toggleCart}
+                      isTop={i === 0}
+                    />
+                    {r.id === lastAddedId && cart.has(r.id) && (
+                      <Box sx={{ '@media (min-width: 768px)': { display: 'none' } }}>
+                        <MobileUpsellCard
+                          result={r}
+                          results={results}
+                          cart={cart}
+                          onAdd={toggleCart}
+                        />
+                      </Box>
+                    )}
+                  </Box>
                 ))}
               </Box>
             )}
