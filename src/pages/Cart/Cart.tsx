@@ -192,10 +192,12 @@ function TermDropdown({
 // ── Term bottom sheet (mobile) ────────────────────────────────────────────
 
 function TermBottomSheet({
+  item,
   selectedYears,
   onSelect,
   onClose,
 }: {
+  item: DomainResult
   selectedYears: number
   onSelect: (years: number) => void
   onClose: () => void
@@ -259,6 +261,9 @@ function TermBottomSheet({
         {/* Options */}
         {Array.from({ length: MAX_YEARS }, (_, i) => i + 1).map((years) => {
           const label = years === 1 ? '1 year' : `${years} years`
+          const orig = termOriginalPrice(item, years)
+          const sale = termPrice(item, years)
+          const hasDiscount = sale < orig
           const isSelected = years === selectedYears
           return (
             <Box
@@ -279,10 +284,20 @@ function TermBottomSheet({
                 textAlign: 'left',
               }}
             >
-              <Text.Body m={0} sx={{ fontSize: '16px', color: 'fg.default' }}>{label}</Text.Body>
-              <Box sx={{ width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {isSelected && <Checkmark sx={{ width: 16, height: 16, color: 'fg.default' }} />}
-              </Box>
+              <Text.Body m={0} sx={{ fontSize: '16px', color: 'fg.default', flex: '1 0 0' }}>{label}</Text.Body>
+              <Flex alignItems="center" gap={2}>
+                {hasDiscount && (
+                  <Text.Body m={0} sx={{ fontSize: '16px', color: '#878787', textDecoration: 'line-through' }}>
+                    ${orig}
+                  </Text.Body>
+                )}
+                <Text.Body m={0} sx={{ fontSize: '16px', color: 'fg.default' }}>
+                  ${sale}
+                </Text.Body>
+                <Box sx={{ width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {isSelected && <Checkmark sx={{ width: 16, height: 16, color: 'fg.default' }} />}
+                </Box>
+              </Flex>
             </Box>
           )
         })}
@@ -443,6 +458,7 @@ function DomainCard({
           <Box sx={{ '@media (min-width: 768px)': { display: 'none' } }}>
             {dropdownOpen && (
               <TermBottomSheet
+                item={item}
                 selectedYears={selectedYears}
                 onSelect={(years) => onTermChange(item.id, years)}
                 onClose={() => setDropdownOpen(false)}
@@ -645,12 +661,16 @@ export default function Cart() {
   const location = useLocation()
   const navigate = useNavigate()
   const state = location.state as { items?: DomainResult[] } | null
-  const initialItems: DomainResult[] = state?.items ?? []
+  const initialItems: DomainResult[] = state?.items ?? (() => {
+    try { return JSON.parse(localStorage.getItem('domains-cart-items') ?? '[]') } catch { return [] }
+  })()
 
   const [items, setItems] = useState<DomainResult[]>(initialItems)
-  const [terms, setTerms] = useState<Record<string, number>>(
-    () => Object.fromEntries(initialItems.map((i) => [i.id, DISCOUNT_MIN_YEARS])),
-  )
+  const [terms, setTerms] = useState<Record<string, number>>(() => {
+    let saved: Record<string, number> = {}
+    try { saved = JSON.parse(localStorage.getItem('domains-cart-terms') ?? '{}') } catch {}
+    return Object.fromEntries(initialItems.map((i) => [i.id, saved[i.id] ?? DISCOUNT_MIN_YEARS]))
+  })
 
   if (initialItems.length === 0) {
     return <Navigate to="/domain-search" replace />
@@ -658,15 +678,25 @@ export default function Cart() {
 
   const removeItem = (id: string) => {
     const next = items.filter((i) => i.id !== id)
+    localStorage.setItem('domains-cart-items', JSON.stringify(next))
     if (next.length === 0) {
       navigate('/domain-search', { replace: true })
     } else {
       setItems(next)
+      setTerms((prev) => {
+        const { [id]: _, ...rest } = prev
+        localStorage.setItem('domains-cart-terms', JSON.stringify(rest))
+        return rest
+      })
     }
   }
 
   const handleTermChange = (id: string, years: number) => {
-    setTerms((prev) => ({ ...prev, [id]: years }))
+    setTerms((prev) => {
+      const next = { ...prev, [id]: years }
+      localStorage.setItem('domains-cart-terms', JSON.stringify(next))
+      return next
+    })
   }
 
   const subtotal = items.reduce((s, r) => s + (r.salePrice ?? r.originalPrice), 0)

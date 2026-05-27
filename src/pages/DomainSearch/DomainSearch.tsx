@@ -811,8 +811,20 @@ export default function DomainSearch() {
   const [inputValue, setInputValue] = useState(q)
   const [results, setResults] = useState<DomainResult[]>([])
   const [isLoading, setIsLoading] = useState(false)
-  const [cart, setCart] = useState<Set<string>>(new Set())
-  const [cartDomains, setCartDomains] = useState<Map<string, DomainResult>>(new Map())
+  const [cart, setCart] = useState<Set<string>>(() => {
+    try {
+      const raw = localStorage.getItem('domains-cart-items')
+      if (raw) return new Set((JSON.parse(raw) as DomainResult[]).map((d) => d.id))
+    } catch {}
+    return new Set()
+  })
+  const [cartDomains, setCartDomains] = useState<Map<string, DomainResult>>(() => {
+    try {
+      const raw = localStorage.getItem('domains-cart-items')
+      if (raw) return new Map((JSON.parse(raw) as DomainResult[]).map((d) => [d.id, d]))
+    } catch {}
+    return new Map()
+  })
   const [searchFocused, setSearchFocused] = useState(false)
   const [_heroPassed, setHeroPassed] = useState(false)
   const [lastAddedId, setLastAddedId] = useState<string | null>(null)
@@ -896,6 +908,7 @@ export default function DomainSearch() {
     setCartDomains((prev) => {
       const next = new Map(prev)
       next.has(id) ? next.delete(id) : next.set(id, result)
+      localStorage.setItem('domains-cart-items', JSON.stringify(Array.from(next.values())))
       return next
     })
     if (isAdding) setLastAddedId(id)
@@ -910,6 +923,7 @@ export default function DomainSearch() {
     setCartDomains((prev) => {
       const next = new Map(prev)
       next.delete(id)
+      localStorage.setItem('domains-cart-items', JSON.stringify(Array.from(next.values())))
       return next
     })
   }
