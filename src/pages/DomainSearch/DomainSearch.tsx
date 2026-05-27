@@ -551,6 +551,230 @@ function CartSidebar({
   )
 }
 
+// ── Mobile mini cart ─────────────────────────────────────────────────────────
+
+function MobileMiniCart({
+  items,
+  results,
+  onRemove,
+  onAdd,
+  onCheckout,
+  lastAddedId,
+}: {
+  items: DomainResult[]
+  results: DomainResult[]
+  onRemove: (id: string) => void
+  onAdd: (result: DomainResult) => void
+  onCheckout: () => void
+  lastAddedId: string | null
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const subtotal = items.reduce((sum, r) => sum + (r.salePrice ?? r.originalPrice), 0)
+  const cartIds = new Set(items.map((i) => i.id))
+
+  useEffect(() => {
+    if (items.length === 0) setExpanded(false)
+  }, [items.length])
+
+  function getMatching(sld: string): DomainResult[] {
+    return results.filter((r) => getSld(r.name) === sld && r.available && !cartIds.has(r.id)).slice(0, 4)
+  }
+
+  const sldOrder: string[] = []
+  const groups: Record<string, DomainResult[]> = {}
+  for (const item of items) {
+    const sld = getSld(item.name)
+    if (!groups[sld]) { groups[sld] = []; sldOrder.push(sld) }
+    groups[sld].push(item)
+  }
+
+  const lastAddedSld = lastAddedId
+    ? getSld(items.find((i) => i.id === lastAddedId)?.name ?? '')
+    : null
+
+  return (
+    <>
+      {/* Overlay */}
+      {expanded && (
+        <Box
+          onClick={() => setExpanded(false)}
+          sx={{ position: 'fixed', inset: 0, background: 'rgba(79,79,79,0.5)', zIndex: 299 }}
+        />
+      )}
+
+      {/* Panel */}
+      <Box
+        sx={{
+          position: 'fixed',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          zIndex: 300,
+          background: '#fff',
+          borderTop: '1px solid #ddd',
+          borderTopLeftRadius: expanded ? 6 : 0,
+          borderTopRightRadius: expanded ? 6 : 0,
+          boxShadow: '0px -1px 35px rgba(0,0,0,0.09), 0px 4px 19px rgba(0,0,0,0.1)',
+        }}
+      >
+        {/* Expanded scrollable content */}
+        {expanded && (
+          <Box sx={{ maxHeight: 'calc(100vh - 160px)', overflowY: 'auto' }}>
+            {/* Header */}
+            <Flex alignItems="center" justifyContent="space-between" px={4} pt={6} pb={3}>
+              <Text.Body m={0} sx={{ fontSize: '18px', fontWeight: 500 }}>Cart Overview</Text.Body>
+              <Box
+                as="button"
+                onClick={() => setExpanded(false)}
+                sx={{ background: 'none', border: 'none', cursor: 'pointer', p: 0, display: 'flex', alignItems: 'center' }}
+              >
+                <ChevronSmallDown sx={{ width: 20, height: 20, color: 'fg.default' }} />
+              </Box>
+            </Flex>
+
+            {/* Domain count */}
+            <Text.Caption m={0} sx={{ display: 'block', px: 4, pb: 3, fontSize: '12px', color: '#4f4f4f' }}>
+              Domain ({items.length})
+            </Text.Caption>
+
+            {/* Domain cards */}
+            <Box px={4} pb={4} sx={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {sldOrder.map((sld) => {
+                const groupItems = groups[sld]
+                const matching = getMatching(sld)
+                const showTlds = sld === lastAddedSld && matching.length > 0
+
+                return (
+                  <Box
+                    key={sld}
+                    sx={{ border: '1px solid #ddd', borderRadius: 4, background: '#fff', overflow: 'hidden' }}
+                  >
+                    {/* Domain row */}
+                    {groupItems.map((item) => {
+                      const price = item.salePrice ?? item.originalPrice
+                      return (
+                        <Flex
+                          key={item.id}
+                          alignItems="center"
+                          justifyContent="space-between"
+                          sx={{ px: 4, py: 3 }}
+                        >
+                          <Text.Body
+                            m={0}
+                            sx={{ fontSize: '15px', fontWeight: 500, flex: '1 1 0', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                          >
+                            {item.name}
+                          </Text.Body>
+                          <Flex alignItems="center" gap={2} sx={{ flexShrink: 0, ml: 2 }}>
+                            <Text.Body m={0} sx={{ fontSize: '14px' }}>${price}</Text.Body>
+                            <Box
+                              as="button"
+                              onClick={() => onRemove(item.id)}
+                              aria-label={`Remove ${item.name}`}
+                              sx={{ background: 'none', border: 'none', cursor: 'pointer', p: '2px', color: 'fg.muted', display: 'flex', alignItems: 'center' }}
+                            >
+                              <Trash sx={{ width: 14, height: 14 }} />
+                            </Box>
+                          </Flex>
+                        </Flex>
+                      )
+                    })}
+
+                    {/* TLD upsells — expanded only for most recently added domain */}
+                    {showTlds && (
+                      <Box sx={{ borderTop: '1px solid #ddd', px: 4, pt: 3, pb: 4 }}>
+                        <Text.Caption m={0} sx={{ fontSize: '12px', color: '#4f4f4f', display: 'block', mb: 3 }}>
+                          Purchase additional TLDs
+                        </Text.Caption>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          {matching.map((m) => {
+                            const stem = getSld(m.name)
+                            const ext = m.name.slice(stem.length + 1)
+                            const price = m.salePrice ?? m.originalPrice
+                            return (
+                              <Flex
+                                key={m.id}
+                                alignItems="center"
+                                justifyContent="space-between"
+                                sx={{ px: 3, py: '10px', background: '#f9f9f9', borderRadius: 4 }}
+                              >
+                                <Box sx={{ flex: '1 1 0', minWidth: 0 }}>
+                                  <Text.Body as="span" m={0} sx={{ fontSize: '14px', color: '#4f4f4f' }}>{stem}.</Text.Body>
+                                  <Text.Body as="span" m={0} sx={{ fontSize: '14px', fontWeight: 500 }}>{ext}</Text.Body>
+                                </Box>
+                                <Flex alignItems="baseline" gap={2} sx={{ flexShrink: 0 }}>
+                                  <Text.Body m={0} sx={{ fontSize: '14px' }}>${price}</Text.Body>
+                                  <Box
+                                    as="button"
+                                    onClick={() => onAdd(m)}
+                                    sx={{ background: 'none', border: 'none', cursor: 'pointer', p: 0, fontSize: '14px', fontWeight: 500, letterSpacing: '0.04em', color: 'fg.default' }}
+                                  >
+                                    ADD
+                                  </Box>
+                                </Flex>
+                              </Flex>
+                            )
+                          })}
+                        </Box>
+                      </Box>
+                    )}
+                  </Box>
+                )
+              })}
+            </Box>
+          </Box>
+        )}
+
+        {/* Footer — always visible */}
+        <Box sx={{ px: 4, pt: 4, pb: '16px', borderTop: expanded ? '1px solid #ddd' : 'none' }}>
+          {expanded ? (
+            <Flex alignItems="center" justifyContent="space-between" sx={{ mb: 4 }}>
+              <Text.Body m={0} sx={{ fontSize: '15px' }}>Estimated total</Text.Body>
+              <Text.Body m={0} sx={{ fontSize: '15px' }}>${subtotal}</Text.Body>
+            </Flex>
+          ) : (
+            <Flex alignItems="center" justifyContent="space-between" sx={{ mb: 4 }}>
+              <Flex alignItems="center" gap={2}>
+                <ShoppingBag sx={{ width: 16, height: 16, color: '#4f4f4f' }} />
+                <Text.Body m={0} sx={{ fontSize: '15px', color: '#4f4f4f' }}>
+                  {items.length} item{items.length !== 1 ? 's' : ''}
+                </Text.Body>
+                <Text.Body m={0} sx={{ fontSize: '15px', color: '#ddd' }}>•</Text.Body>
+                <Text.Body m={0} sx={{ fontSize: '15px' }}>${subtotal}</Text.Body>
+              </Flex>
+              <Box
+                as="button"
+                onClick={() => setExpanded(true)}
+                sx={{ background: 'none', border: 'none', cursor: 'pointer', p: 0 }}
+              >
+                <Text.Body m={0} sx={{ fontSize: '15px', fontWeight: 500 }}>View Details</Text.Body>
+              </Box>
+            </Flex>
+          )}
+          <Box
+            as="button"
+            onClick={onCheckout}
+            sx={{
+              width: '100%',
+              background: '#000',
+              color: '#fff',
+              border: 'none',
+              height: 56,
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: 500,
+              letterSpacing: '0.06em',
+              textTransform: 'uppercase',
+            }}
+          >
+            Checkout
+          </Box>
+        </Box>
+      </Box>
+    </>
+  )
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function DomainSearch() {
@@ -565,6 +789,7 @@ export default function DomainSearch() {
   const [cartDomains, setCartDomains] = useState<Map<string, DomainResult>>(new Map())
   const [searchFocused, setSearchFocused] = useState(false)
   const [_heroPassed, setHeroPassed] = useState(false)
+  const [lastAddedId, setLastAddedId] = useState<string | null>(null)
   const [searchBarPassed, setSearchBarPassed] = useState(false)
   const heroRef = useRef<HTMLDivElement>(null)
   const searchBarRef = useRef<HTMLDivElement>(null)
@@ -636,6 +861,7 @@ export default function DomainSearch() {
 
   function toggleCart(result: DomainResult) {
     const { id } = result
+    const isAdding = !cart.has(id)
     setCart((prev) => {
       const next = new Set(prev)
       next.has(id) ? next.delete(id) : next.add(id)
@@ -646,6 +872,7 @@ export default function DomainSearch() {
       next.has(id) ? next.delete(id) : next.set(id, result)
       return next
     })
+    if (isAdding) setLastAddedId(id)
   }
 
   function removeFromCart(id: string) {
@@ -780,7 +1007,7 @@ export default function DomainSearch() {
           pt: 80,
           pb: 24,
           transition: 'max-width 0.35s ease',
-          '@media (max-width: 767px)': { px: '16px', pt: '32px', pb: '40px' },
+          '@media (max-width: 767px)': { px: '16px', pt: '32px', pb: hasCart ? '160px' : '40px' },
         }}
       >
         <Flex sx={{ gap: '100px', '@media (max-width: 767px)': { gap: 0 } }} alignItems="flex-start">
@@ -921,6 +1148,20 @@ export default function DomainSearch() {
 
         </Flex>
       </Box>
+
+      {/* Mobile mini cart — hidden on desktop */}
+      {hasCart && (
+        <Box sx={{ display: 'none', '@media (max-width: 767px)': { display: 'block' } }}>
+          <MobileMiniCart
+            items={cartItems}
+            results={results}
+            onRemove={removeFromCart}
+            onAdd={toggleCart}
+            onCheckout={() => navigate('/cart', { state: { items: cartItems } })}
+            lastAddedId={lastAddedId}
+          />
+        </Box>
+      )}
     </Box>
   )
 }

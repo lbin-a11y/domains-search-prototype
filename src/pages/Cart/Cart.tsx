@@ -449,27 +449,22 @@ function OrderSummary({
                 {years}x ${item.originalPrice}.00
               </Text.Body>
             </Flex>
-            <Text.Body m={0} sx={{ fontSize: '11px', color: 'fg.muted', mb: discount > 0 ? '3px' : 0 }}>
+            {discount > 0 && (
+              <Flex justifyContent="space-between" sx={{ mb: '3px' }}>
+                <Text.Body m={0} sx={{ fontSize: '12px', color: 'fg.muted' }}>
+                  First-year discount
+                </Text.Body>
+                <Text.Body
+                  m={0}
+                  sx={{ fontSize: '12px', color: 'var(--colors-accent-fg, #0862d1)', whiteSpace: 'nowrap' }}
+                >
+                  -${discount}.00
+                </Text.Body>
+              </Flex>
+            )}
+            <Text.Body m={0} sx={{ fontSize: '11px', color: 'fg.muted' }}>
               {fmt(today)} – {fmt(endDate(years))} ({years} {years === 1 ? 'year' : 'years'})
             </Text.Body>
-            {discount > 0 && (
-              <>
-                <Flex justifyContent="space-between">
-                  <Text.Body m={0} sx={{ fontSize: '12px', color: 'fg.muted' }}>
-                    First-year discount
-                  </Text.Body>
-                  <Text.Body
-                    m={0}
-                    sx={{ fontSize: '12px', color: 'var(--colors-accent-fg, #0862d1)', whiteSpace: 'nowrap' }}
-                  >
-                    -${discount}.00
-                  </Text.Body>
-                </Flex>
-                <Text.Body m={0} sx={{ fontSize: '11px', color: 'fg.muted' }}>
-                  {fmt(today)} – {fmt(endDate(1))} (1 year)
-                </Text.Body>
-              </>
-            )}
           </Box>
         )
       })}
@@ -528,7 +523,7 @@ export default function Cart() {
 
   const [items, setItems] = useState<DomainResult[]>(initialItems)
   const [terms, setTerms] = useState<Record<string, number>>(
-    () => Object.fromEntries(initialItems.map((i) => [i.id, 1])),
+    () => Object.fromEntries(initialItems.map((i) => [i.id, DISCOUNT_MIN_YEARS])),
   )
 
   if (initialItems.length === 0) {
