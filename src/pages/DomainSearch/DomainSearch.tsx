@@ -729,6 +729,8 @@ function MobileMiniCart({
 }) {
   const [expanded, setExpanded] = useState(false)
   const [slideIn, setSlideIn] = useState(false)
+  const [tldTipPos, setTldTipPos] = useState<{ left: number; bottom: number } | null>(null)
+  const tldTipRef = useRef<HTMLElement>(null)
   const subtotal = items.reduce((sum, r) => sum + (r.salePrice ?? r.originalPrice), 0)
   const cartIds = new Set(items.map((i) => i.id))
   const hasItems = items.length > 0
@@ -865,9 +867,53 @@ function MobileMiniCart({
                     {/* TLD upsells — expanded only for most recently added domain */}
                     {showTlds && (
                       <Box sx={{ borderTop: '1px solid #ddd', px: 4, pt: 3, pb: 4 }}>
-                        <Text.Caption m={0} sx={{ fontSize: '12px', color: '#4f4f4f', display: 'block', mb: 3 }}>
-                          Purchase additional TLDs
-                        </Text.Caption>
+                        <Flex alignItems="center" gap={1} sx={{ mb: 3 }}>
+                          <Text.Caption m={0} sx={{ color: '#4f4f4f' }}>Protect your brand name</Text.Caption>
+                          <Box
+                            as="button"
+                            ref={tldTipRef as React.Ref<HTMLElement>}
+                            onMouseEnter={() => {
+                              const rect = tldTipRef.current?.getBoundingClientRect()
+                              if (rect) setTldTipPos({ left: rect.left + rect.width / 2, bottom: window.innerHeight - rect.top + 6 })
+                            }}
+                            onMouseLeave={() => setTldTipPos(null)}
+                            onFocus={() => {
+                              const rect = tldTipRef.current?.getBoundingClientRect()
+                              if (rect) setTldTipPos({ left: rect.left + rect.width / 2, bottom: window.innerHeight - rect.top + 6 })
+                            }}
+                            onBlur={() => setTldTipPos(null)}
+                            aria-describedby="minicart-upsell-tooltip"
+                            sx={{ background: 'none', border: 'none', cursor: 'pointer', p: 0, display: 'flex', alignItems: 'center' }}
+                          >
+                            <InfoCircle sx={{ width: 16, height: 16, color: '#4f4f4f', flexShrink: 0 }} />
+                          </Box>
+                          {tldTipPos && (
+                            <Box
+                              role="tooltip"
+                              id="minicart-upsell-tooltip"
+                              sx={{
+                                position: 'fixed',
+                                bottom: tldTipPos.bottom,
+                                left: tldTipPos.left,
+                                transform: 'translateX(-50%)',
+                                textAlign: 'left',
+                                background: '#1a1a1a',
+                                color: '#fff',
+                                fontSize: '12px',
+                                lineHeight: 1.4,
+                                borderRadius: '6px',
+                                px: 3,
+                                py: 2,
+                                width: '220px',
+                                pointerEvents: 'none',
+                                zIndex: 9999,
+                                boxShadow: '0px 2px 8px rgba(0,0,0,0.2)',
+                              }}
+                            >
+                              Secure similar domain names to ensure you're the only one using your brand across the web.
+                            </Box>
+                          )}
+                        </Flex>
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                           {matching.map((m) => {
                             const stem = getSld(m.name)
