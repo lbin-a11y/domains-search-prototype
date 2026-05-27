@@ -325,7 +325,7 @@ function MobileUpsellCard({
       sx={{
         display: 'grid',
         gridTemplateRows: expanded ? '1fr' : '0fr',
-        transition: 'grid-template-rows 0.35s cubic-bezier(0.4,0,0.2,1)',
+        transition: 'grid-template-rows 0.3s cubic-bezier(0.4,0,0.2,1)',
         overflow: 'hidden',
         mt: '6px',
         mb: '4px',
@@ -336,7 +336,14 @@ function MobileUpsellCard({
         mx: '-4px',
       }}
     >
-      <Box sx={{ minHeight: 0 }}>
+      <Box
+        sx={{
+          minHeight: 0,
+          opacity: expanded ? 1 : 0,
+          transform: expanded ? 'translateY(0)' : 'translateY(-6px)',
+          transition: 'opacity 0.25s ease, transform 0.25s ease',
+        }}
+      >
         <Box
           sx={{
             background: '#fff',
