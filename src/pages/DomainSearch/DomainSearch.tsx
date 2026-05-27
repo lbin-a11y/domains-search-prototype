@@ -1,4 +1,4 @@
-import { useState, useEffect, useId, useRef } from 'react'
+import React, { useState, useEffect, useId, useRef } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { Box, Flex, Text, Field } from '@sqs/rosetta-primitives'
 import { ActivityIndicator, TextInput } from '@sqs/rosetta-elements'
@@ -286,12 +286,21 @@ function MobileUpsellCard({
   onAdd: (r: DomainResult) => void
 }) {
   const [expanded, setExpanded] = useState(false)
-  const [showTip, setShowTip] = useState(false)
+  const [tipPos, setTipPos] = useState<{ left: number; bottom: number } | null>(null)
+  const tipRef = useRef<HTMLElement>(null)
 
   useEffect(() => {
     const id = requestAnimationFrame(() => setExpanded(true))
     return () => cancelAnimationFrame(id)
   }, [])
+
+  const handleTipShow = () => {
+    if (tipRef.current) {
+      const rect = tipRef.current.getBoundingClientRect()
+      setTipPos({ left: rect.left + rect.width / 2, bottom: window.innerHeight - rect.top + 6 })
+    }
+  }
+  const handleTipHide = () => setTipPos(null)
 
   const sld = getSld(result.name)
   const matching = results
@@ -307,6 +316,7 @@ function MobileUpsellCard({
         gridTemplateRows: expanded ? '1fr' : '0fr',
         transition: 'grid-template-rows 0.35s cubic-bezier(0.4,0,0.2,1)',
         overflow: 'hidden',
+        mt: '6px',
         mb: '4px',
         /* padding gives shadow room to render within the clipping boundary */
         px: '4px',
@@ -319,7 +329,7 @@ function MobileUpsellCard({
         <Box
           sx={{
             background: '#fff',
-            boxShadow: '0px 0px 1px rgba(0,0,0,0.08), 0px 2px 8px rgba(0,0,0,0.12), 0px -2px 8px rgba(0,0,0,0.08)',
+            boxShadow: '0px 0px 1px rgba(0,0,0,0.08), 0px 2px 8px rgba(0,0,0,0.12), 0px -2px 8px rgba(0,0,0,0.04)',
             borderRadius: '8px',
             p: 4,
           }}
@@ -329,40 +339,42 @@ function MobileUpsellCard({
             <Text.Caption m={0} sx={{ color: '#4f4f4f' }}>Protect your brand name</Text.Caption>
             <Box
               as="button"
-              onMouseEnter={() => setShowTip(true)}
-              onMouseLeave={() => setShowTip(false)}
-              onFocus={() => setShowTip(true)}
-              onBlur={() => setShowTip(false)}
+              ref={tipRef as React.Ref<HTMLElement>}
+              onMouseEnter={handleTipShow}
+              onMouseLeave={handleTipHide}
+              onFocus={handleTipShow}
+              onBlur={handleTipHide}
               aria-describedby="upsell-tooltip"
-              sx={{ position: 'relative', background: 'none', border: 'none', cursor: 'pointer', p: 0, display: 'flex', alignItems: 'center' }}
+              sx={{ background: 'none', border: 'none', cursor: 'pointer', p: 0, display: 'flex', alignItems: 'center' }}
             >
               <InfoCircle sx={{ width: 16, height: 16, color: '#4f4f4f', flexShrink: 0 }} />
-              {showTip && (
-                <Box
-                  role="tooltip"
-                  id="upsell-tooltip"
-                  sx={{
-                    position: 'absolute',
-                    bottom: 'calc(100% + 6px)',
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    background: '#1a1a1a',
-                    color: '#fff',
-                    fontSize: '12px',
-                    lineHeight: 1.4,
-                    borderRadius: '6px',
-                    px: 3,
-                    py: 2,
-                    width: '220px',
-                    pointerEvents: 'none',
-                    zIndex: 200,
-                    boxShadow: '0px 2px 8px rgba(0,0,0,0.2)',
-                  }}
-                >
-                  Other extensions of your domain name may still be available. Registering them prevents competitors from using your brand name.
-                </Box>
-              )}
             </Box>
+            {tipPos && (
+              <Box
+                role="tooltip"
+                id="upsell-tooltip"
+                sx={{
+                  position: 'fixed',
+                  bottom: tipPos.bottom,
+                  left: tipPos.left,
+                  transform: 'translateX(-50%)',
+                  textAlign: 'left',
+                  background: '#1a1a1a',
+                  color: '#fff',
+                  fontSize: '12px',
+                  lineHeight: 1.4,
+                  borderRadius: '6px',
+                  px: 3,
+                  py: 2,
+                  width: '220px',
+                  pointerEvents: 'none',
+                  zIndex: 9999,
+                  boxShadow: '0px 2px 8px rgba(0,0,0,0.2)',
+                }}
+              >
+                Other extensions of your domain name may still be available. Registering them prevents competitors from using your brand name.
+              </Box>
+            )}
           </Flex>
 
           {/* TLD rows */}
@@ -1073,6 +1085,18 @@ export default function DomainSearch() {
     })
   }
 
+  /** Add to cart from upsell card — does NOT update lastAddedId so no upsell opens for the added TLD */
+  function addFromUpsell(result: DomainResult) {
+    const { id } = result
+    setCart((prev) => { const next = new Set(prev); next.add(id); return next })
+    setCartDomains((prev) => {
+      const next = new Map(prev)
+      next.set(id, result)
+      localStorage.setItem('domains-cart-items', JSON.stringify(Array.from(next.values())))
+      return next
+    })
+  }
+
   const cartItems = Array.from(cartDomains.values())
   const cartCount = cart.size
   const hasCart = cartCount > 0
@@ -1318,7 +1342,7 @@ export default function DomainSearch() {
                           result={r}
                           results={results}
                           cart={cart}
-                          onAdd={toggleCart}
+                          onAdd={addFromUpsell}
                         />
                       </Box>
                     )}
