@@ -329,7 +329,7 @@ function MobileUpsellCard({
         <Box
           sx={{
             background: '#fff',
-            boxShadow: '0px 0px 1px rgba(0,0,0,0.08), 0px 2px 8px rgba(0,0,0,0.12), 0px -2px 8px rgba(0,0,0,0.04)',
+            boxShadow: '0 0 1px 0 rgba(0,0,0,0.08), 0 2px 8px 0 rgba(0,0,0,0.12)',
             borderRadius: '8px',
             p: 4,
           }}
