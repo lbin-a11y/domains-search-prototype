@@ -286,6 +286,7 @@ function MobileUpsellCard({
   onAdd: (r: DomainResult) => void
 }) {
   const [expanded, setExpanded] = useState(false)
+  const [showTip, setShowTip] = useState(false)
 
   useEffect(() => {
     const id = requestAnimationFrame(() => setExpanded(true))
@@ -309,6 +310,7 @@ function MobileUpsellCard({
         mb: '4px',
         /* padding gives shadow room to render within the clipping boundary */
         px: '4px',
+        pt: '4px',
         pb: '12px',
         mx: '-4px',
       }}
@@ -317,7 +319,7 @@ function MobileUpsellCard({
         <Box
           sx={{
             background: '#fff',
-            boxShadow: '0px 0px 1px rgba(0,0,0,0.08), 0px 2px 8px rgba(0,0,0,0.12)',
+            boxShadow: '0px 0px 1px rgba(0,0,0,0.08), 0px 2px 8px rgba(0,0,0,0.12), 0px -2px 8px rgba(0,0,0,0.08)',
             borderRadius: '8px',
             p: 4,
           }}
@@ -325,7 +327,42 @@ function MobileUpsellCard({
           {/* Header */}
           <Flex alignItems="center" gap={1} mb={3}>
             <Text.Caption m={0} sx={{ color: '#4f4f4f' }}>Protect your brand name</Text.Caption>
-            <InfoCircle sx={{ width: 16, height: 16, color: '#4f4f4f', flexShrink: 0 }} />
+            <Box
+              as="button"
+              onMouseEnter={() => setShowTip(true)}
+              onMouseLeave={() => setShowTip(false)}
+              onFocus={() => setShowTip(true)}
+              onBlur={() => setShowTip(false)}
+              aria-describedby="upsell-tooltip"
+              sx={{ position: 'relative', background: 'none', border: 'none', cursor: 'pointer', p: 0, display: 'flex', alignItems: 'center' }}
+            >
+              <InfoCircle sx={{ width: 16, height: 16, color: '#4f4f4f', flexShrink: 0 }} />
+              {showTip && (
+                <Box
+                  role="tooltip"
+                  id="upsell-tooltip"
+                  sx={{
+                    position: 'absolute',
+                    bottom: 'calc(100% + 6px)',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    background: '#1a1a1a',
+                    color: '#fff',
+                    fontSize: '12px',
+                    lineHeight: 1.4,
+                    borderRadius: '6px',
+                    px: 3,
+                    py: 2,
+                    width: '220px',
+                    pointerEvents: 'none',
+                    zIndex: 200,
+                    boxShadow: '0px 2px 8px rgba(0,0,0,0.2)',
+                  }}
+                >
+                  Other extensions of your domain name may still be available. Registering them prevents competitors from using your brand name.
+                </Box>
+              )}
+            </Box>
           </Flex>
 
           {/* TLD rows */}
