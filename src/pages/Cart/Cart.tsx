@@ -189,6 +189,108 @@ function TermDropdown({
   )
 }
 
+// ── Term bottom sheet (mobile) ────────────────────────────────────────────
+
+function TermBottomSheet({
+  selectedYears,
+  onSelect,
+  onClose,
+}: {
+  selectedYears: number
+  onSelect: (years: number) => void
+  onClose: () => void
+}) {
+  const [visible, setVisible] = useState(false)
+
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setVisible(true))
+    return () => cancelAnimationFrame(id)
+  }, [])
+
+  return (
+    <>
+      {/* Overlay */}
+      <Box
+        onClick={onClose}
+        sx={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.4)',
+          zIndex: 400,
+          opacity: visible ? 1 : 0,
+          transition: 'opacity 0.25s ease',
+        }}
+      />
+
+      {/* Sheet */}
+      <Box
+        sx={{
+          position: 'fixed',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          zIndex: 401,
+          background: '#fff',
+          borderTopLeftRadius: 12,
+          borderTopRightRadius: 12,
+          transform: visible ? 'translateY(0)' : 'translateY(100%)',
+          transition: 'transform 0.3s cubic-bezier(0.4,0,0.2,1)',
+        }}
+      >
+        {/* Header */}
+        <Flex
+          alignItems="center"
+          justifyContent="space-between"
+          px={4}
+          sx={{ height: 56, borderBottom: '1px solid #eee' }}
+        >
+          <Text.Body m={0} sx={{ fontSize: '16px', fontWeight: 600 }}>Select Term Length</Text.Body>
+          <Box
+            as="button"
+            onClick={onClose}
+            sx={{ background: 'none', border: 'none', cursor: 'pointer', p: 0 }}
+          >
+            <Text.Body m={0} sx={{ fontSize: '13px', fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+              Done
+            </Text.Body>
+          </Box>
+        </Flex>
+
+        {/* Options */}
+        {Array.from({ length: MAX_YEARS }, (_, i) => i + 1).map((years) => {
+          const label = years === 1 ? '1 year' : `${years} years`
+          const isSelected = years === selectedYears
+          return (
+            <Box
+              key={years}
+              as="button"
+              onClick={() => { onSelect(years); onClose() }}
+              sx={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                px: 4,
+                py: '14px',
+                background: 'none',
+                border: 'none',
+                borderBottom: '1px solid #eee',
+                cursor: 'pointer',
+                textAlign: 'left',
+              }}
+            >
+              <Text.Body m={0} sx={{ fontSize: '16px', color: 'fg.default' }}>{label}</Text.Body>
+              <Box sx={{ width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {isSelected && <Checkmark sx={{ width: 16, height: 16, color: 'fg.default' }} />}
+              </Box>
+            </Box>
+          )
+        })}
+      </Box>
+    </>
+  )
+}
+
 // ── Domain card ────────────────────────────────────────────────────────────
 
 function DomainCard({
@@ -226,7 +328,7 @@ function DomainCard({
         background: '#fff',
       }}
     >
-      {/* Thumbnail */}
+      {/* Thumbnail — hidden on mobile */}
       <Box
         sx={{
           width: 117,
@@ -239,6 +341,7 @@ function DomainCard({
           position: 'relative',
           borderRadius: '3px 0 0 3px',
           overflow: 'hidden',
+          '@media (max-width: 767px)': { display: 'none' },
         }}
       >
         <Box
@@ -253,7 +356,7 @@ function DomainCard({
       </Box>
 
       {/* Content */}
-      <Box sx={{ flex: '1 0 0', minWidth: 0, px: 5 }}>
+      <Box sx={{ flex: '1 0 0', minWidth: 0, px: 5, '@media (max-width: 767px)': { px: 4 } }}>
         <Box sx={{ height: 20 }} />
 
         {/* Name + badge */}
@@ -324,14 +427,28 @@ function DomainCard({
             </Flex>
           </Box>
 
-          {dropdownOpen && (
-            <TermDropdown
-              item={item}
-              selectedYears={selectedYears}
-              onSelect={(years) => onTermChange(item.id, years)}
-              onClose={() => setDropdownOpen(false)}
-            />
-          )}
+          {/* Desktop dropdown */}
+          <Box sx={{ '@media (max-width: 767px)': { display: 'none' } }}>
+            {dropdownOpen && (
+              <TermDropdown
+                item={item}
+                selectedYears={selectedYears}
+                onSelect={(years) => onTermChange(item.id, years)}
+                onClose={() => setDropdownOpen(false)}
+              />
+            )}
+          </Box>
+
+          {/* Mobile bottom sheet */}
+          <Box sx={{ '@media (min-width: 768px)': { display: 'none' } }}>
+            {dropdownOpen && (
+              <TermBottomSheet
+                selectedYears={selectedYears}
+                onSelect={(years) => onTermChange(item.id, years)}
+                onClose={() => setDropdownOpen(false)}
+              />
+            )}
+          </Box>
         </Box>
 
         {showDiscountPrompt ? (
