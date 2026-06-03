@@ -167,11 +167,13 @@ function ResultRow({
   inCart,
   onToggleCart,
   isTop,
+  exactMatchVariant,
 }: {
   result: DomainResult
   inCart: boolean
   onToggleCart: (result: DomainResult) => void
   isTop: boolean
+  exactMatchVariant: 'border' | 'highlight'
 }) {
   return (
     <Flex
@@ -188,6 +190,7 @@ function ResultRow({
           borderColor: 'border.default',
           borderRadius: 8,
           mb: 2,
+          background: exactMatchVariant === 'highlight' ? '#f0faf4' : undefined,
         } : {}),
         ...(result.available ? {
           transition: 'background 0.15s ease, transform 0.15s ease, border-radius 0.15s ease',
@@ -1073,6 +1076,7 @@ export default function DomainSearch() {
   const [_heroPassed, setHeroPassed] = useState(false)
   const [lastAddedId, setLastAddedId] = useState<string | null>(null)
   const [upsellVariant, setUpsellVariant] = useState<'shadow' | 'border'>('shadow')
+  const [exactMatchVariant, setExactMatchVariant] = useState<'border' | 'highlight'>('border')
   const [searchBarPassed, setSearchBarPassed] = useState(false)
   const heroRef = useRef<HTMLDivElement>(null)
   const searchBarRef = useRef<HTMLDivElement>(null)
@@ -1233,6 +1237,36 @@ export default function DomainSearch() {
             }}
           >
             {v === 'shadow' ? 'Drop shadow' : 'Border'}
+          </Box>
+        ))}
+
+        {/* Divider */}
+        <Box sx={{ width: '1px', height: 16, background: '#ddd', mx: 1 }} />
+
+        {/* Exact match group */}
+        <Text.Caption m={0} sx={{ color: '#878787', mr: 2, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+          Exact match
+        </Text.Caption>
+        {(['border', 'highlight'] as const).map((v) => (
+          <Box
+            key={v}
+            as="button"
+            onClick={() => setExactMatchVariant(v)}
+            sx={{
+              background: exactMatchVariant === v ? '#000' : 'transparent',
+              color: exactMatchVariant === v ? '#fff' : '#4f4f4f',
+              border: '1px solid',
+              borderColor: exactMatchVariant === v ? '#000' : '#ddd',
+              borderRadius: '4px',
+              px: 3,
+              py: '4px',
+              fontSize: '12px',
+              cursor: 'pointer',
+              textTransform: 'capitalize',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            {v === 'border' ? 'Border' : 'Highlight'}
           </Box>
         ))}
       </Flex>
@@ -1468,6 +1502,7 @@ export default function DomainSearch() {
                       inCart={cart.has(r.id)}
                       onToggleCart={toggleCart}
                       isTop={i === 0}
+                      exactMatchVariant={exactMatchVariant}
                     />
                     {r.id === lastAddedId && (
                       <Box sx={{ '@media (min-width: 768px)': { display: 'none' } }}>
