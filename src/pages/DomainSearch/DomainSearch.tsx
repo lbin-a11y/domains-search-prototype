@@ -190,7 +190,7 @@ function ResultRow({
           borderColor: exactMatchVariant === 'highlight' ? '#CDEDDB' : 'border.default',
           borderRadius: 8,
           mb: 2,
-          background: exactMatchVariant === 'highlight' ? '#f0faf4' : undefined,
+          background: exactMatchVariant === 'highlight' ? '#EDF8F2' : undefined,
         } : {}),
         ...(result.available ? {
           transition: 'background 0.15s ease, transform 0.15s ease, border-radius 0.15s ease',
@@ -203,20 +203,41 @@ function ResultRow({
       }}
     >
       {/* Domain name + badges */}
-      <Flex alignItems="center" gap={2} sx={{ flex: '1 1 0', minWidth: 0, flexWrap: 'wrap' }}>
-        <Text.Body
-          m={0}
-          fontWeight={result.badges.includes('exact') ? 'semibold' : 'book'}
-          sx={{ color: result.available ? 'fg.default' : 'fg.disabled', flexShrink: 0 }}
-        >
-          {result.name}
-        </Text.Body>
-        {result.badges.length > 0 && (
-          <Flex gap={1} alignItems="center">
-            {result.badges.map((b) => <Badge key={b} kind={b} />)}
+      {isTop && exactMatchVariant === 'highlight' ? (
+        /* Highlight variant: "Exact match" label above domain name, no exact badge */
+        <Flex flexDirection="column" sx={{ flex: '1 1 0', minWidth: 0, gap: '6px' }}>
+          <Flex alignItems="center" sx={{ gap: '6px' }}>
+            <Checkmark sx={{ width: 15, height: 15, color: '#1B754F', flexShrink: 0 }} />
+            <Text.Caption m={0} sx={{ color: '#1B754F', fontSize: '12px', fontWeight: 500, lineHeight: '16px', whiteSpace: 'nowrap' }}>
+              Exact match
+            </Text.Caption>
           </Flex>
-        )}
-      </Flex>
+          <Text.Body m={0} fontWeight="book" sx={{ color: result.available ? 'fg.default' : 'fg.disabled' }}>
+            {result.name}
+          </Text.Body>
+          {result.badges.filter((b) => b !== 'exact').length > 0 && (
+            <Flex gap={1} alignItems="center">
+              {result.badges.filter((b) => b !== 'exact').map((b) => <Badge key={b} kind={b} />)}
+            </Flex>
+          )}
+        </Flex>
+      ) : (
+        /* Border variant (default): badges inline */
+        <Flex alignItems="center" gap={2} sx={{ flex: '1 1 0', minWidth: 0, flexWrap: 'wrap' }}>
+          <Text.Body
+            m={0}
+            fontWeight={result.badges.includes('exact') ? 'semibold' : 'book'}
+            sx={{ color: result.available ? 'fg.default' : 'fg.disabled', flexShrink: 0 }}
+          >
+            {result.name}
+          </Text.Body>
+          {result.badges.length > 0 && (
+            <Flex gap={1} alignItems="center">
+              {result.badges.map((b) => <Badge key={b} kind={b} />)}
+            </Flex>
+          )}
+        </Flex>
+      )}
 
       {/* Price */}
       <Flex alignItems="center" gap={2} sx={{ flexShrink: 0 }}>
