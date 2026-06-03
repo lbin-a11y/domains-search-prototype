@@ -187,7 +187,7 @@ function ResultRow({
         cursor: result.available ? 'pointer' : 'default',
         ...(isTop ? {
           border: '1px solid',
-          borderColor: 'border.default',
+          borderColor: exactMatchVariant === 'highlight' ? '#CDEDDB' : 'border.default',
           borderRadius: 8,
           mb: 2,
           background: exactMatchVariant === 'highlight' ? '#f0faf4' : undefined,
@@ -195,7 +195,7 @@ function ResultRow({
         ...(result.available ? {
           transition: 'background 0.15s ease, transform 0.15s ease, border-radius 0.15s ease',
           '&:hover': {
-            background: 'var(--colors-bg-default)',
+            background: isTop && exactMatchVariant === 'highlight' ? '#CDEDDB' : 'var(--colors-bg-default)',
             transform: 'translateX(4px)',
             borderRadius: 8,
           },
