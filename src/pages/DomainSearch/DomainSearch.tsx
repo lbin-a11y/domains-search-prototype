@@ -302,14 +302,12 @@ function MobileUpsellCard({
   cart,
   onAdd,
   isOpen,
-  variant,
 }: {
   result: DomainResult
   results: DomainResult[]
   cart: Set<string>
   onAdd: (r: DomainResult) => void
   isOpen: boolean
-  variant: 'shadow' | 'border'
 }) {
   const [expanded, setExpanded] = useState(false)
   const [mounted, setMounted] = useState(false)
@@ -390,9 +388,7 @@ function MobileUpsellCard({
         <Box
           sx={{
             background: '#fff',
-            ...(variant === 'shadow'
-              ? { boxShadow: '0 0 1px 0 rgba(0,0,0,0.08), 0 2px 8px 0 rgba(0,0,0,0.12)' }
-              : { border: '0.98px solid #DDD' }),
+            border: '0.98px solid #DDD',
             borderRadius: '8px',
             p: 4,
           }}
@@ -488,6 +484,116 @@ function MobileUpsellCard({
           </Flex>
         </Box>
       </Box>
+    </Box>
+  )
+}
+
+// ── Cart sidebar ──────────────────────────────────────────────────────────────
+
+// ── TLD toast (mobile, "toast" form variant) ─────────────────────────────────
+
+function TldToast({
+  result,
+  results,
+  cart,
+  onAdd,
+  onDismiss,
+}: {
+  result: DomainResult
+  results: DomainResult[]
+  cart: Set<string>
+  onAdd: (r: DomainResult) => void
+  onDismiss: () => void
+}) {
+  const [visible, setVisible] = useState(false)
+
+  useEffect(() => {
+    let id1: number, id2: number
+    id1 = requestAnimationFrame(() => { id2 = requestAnimationFrame(() => setVisible(true)) })
+    return () => { cancelAnimationFrame(id1); cancelAnimationFrame(id2) }
+  }, [])
+
+  const sld = getSld(result.name)
+  const matching = results
+    .filter((r) => getSld(r.name) === sld && r.available && !cart.has(r.id) && r.id !== result.id)
+    .slice(0, 4)
+
+  // Auto-dismiss when all alternatives added
+  useEffect(() => {
+    if (matching.length === 0 && visible) {
+      setVisible(false)
+      const t = setTimeout(onDismiss, 320)
+      return () => clearTimeout(t)
+    }
+  }, [cart]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const dismiss = () => {
+    setVisible(false)
+    setTimeout(onDismiss, 320)
+  }
+
+  if (matching.length === 0 && !visible) return null
+
+  return (
+    <Box
+      sx={{
+        position: 'fixed',
+        bottom: visible ? '148px' : '112px',
+        left: '16px',
+        right: '16px',
+        zIndex: 500,
+        background: '#fff',
+        border: '1px solid #E7E7E7',
+        borderRadius: '8px',
+        boxShadow: '0 0 0.5px rgba(0,0,0,0.08), 0 6px 12px rgba(0,0,0,0.12)',
+        p: 4,
+        opacity: visible ? 1 : 0,
+        transform: visible ? 'translateY(0)' : 'translateY(16px)',
+        transition: 'opacity 0.3s ease, transform 0.3s cubic-bezier(0.4,0,0.2,1), bottom 0.3s ease',
+        '@media (min-width: 768px)': { display: 'none' },
+      }}
+    >
+      {/* Header */}
+      <Flex justifyContent="space-between" alignItems="center" mb={2}>
+        <Text.Caption m={0} sx={{ color: '#4f4f4f', fontSize: '12px' }}>Protect your brand name</Text.Caption>
+        <Box
+          as="button"
+          onClick={dismiss}
+          sx={{ background: 'none', border: 'none', cursor: 'pointer', p: 0, display: 'flex', alignItems: 'center' }}
+        >
+          <CrossSmall sx={{ width: 16, height: 16, color: 'fg.muted' }} />
+        </Box>
+      </Flex>
+
+      {/* TLD rows */}
+      <Flex flexDirection="column" sx={{ gap: '4px' }}>
+        {matching.map((m) => {
+          const price = m.salePrice ?? m.originalPrice
+          return (
+            <Flex
+              key={m.id}
+              alignItems="center"
+              justifyContent="space-between"
+              sx={{ background: '#f9f9f9', borderRadius: '4px', pl: 3, pr: 4, py: '10px' }}
+            >
+              <Text.Body m={0} sx={{ fontSize: '14px', letterSpacing: '-0.014px' }}>
+                <Box as="span" sx={{ color: '#4f4f4f' }}>{sld}</Box>
+                <Box as="span" sx={{ fontWeight: 500 }}>{m.tld}</Box>
+              </Text.Body>
+              <Flex alignItems="baseline" gap={2}>
+                <Text.Body m={0} sx={{ fontSize: '14px', color: 'fg.default' }}>${price}</Text.Body>
+                <Box
+                  as="button"
+                  onClick={() => onAdd(m)}
+                  sx={{ background: 'none', border: 'none', cursor: 'pointer', p: 0, fontSize: '14px', fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'fg.default', lineHeight: 1 }}
+                >
+                  ADD
+                </Box>
+              </Flex>
+            </Flex>
+          )
+        })}
+      </Flex>
     </Box>
   )
 }
@@ -782,6 +888,7 @@ function MobileMiniCart({
   onAdd,
   onCheckout,
   lastAddedId,
+  formVariant,
 }: {
   items: DomainResult[]
   results: DomainResult[]
@@ -789,6 +896,7 @@ function MobileMiniCart({
   onAdd: (result: DomainResult) => void
   onCheckout: () => void
   lastAddedId: string | null
+  formVariant: 'inline' | 'cart' | 'toast'
 }) {
   const [expanded, setExpanded] = useState(false)
   const [slideIn, setSlideIn] = useState(false)
@@ -797,6 +905,15 @@ function MobileMiniCart({
   const subtotal = items.reduce((sum, r) => sum + (r.salePrice ?? r.originalPrice), 0)
   const cartIds = new Set(items.map((i) => i.id))
   const hasItems = items.length > 0
+
+  // Auto-expand when "cart" form variant and the added domain has TLD alternatives
+  useEffect(() => {
+    if (formVariant === 'cart' && lastAddedId) {
+      const sld = getSld(items.find((i) => i.id === lastAddedId)?.name ?? '')
+      const hasMatches = results.some((r) => getSld(r.name) === sld && r.available && !cartIds.has(r.id))
+      if (hasMatches) setExpanded(true)
+    }
+  }, [lastAddedId, formVariant]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (hasItems) {
@@ -1094,7 +1211,8 @@ export default function DomainSearch() {
   const [searchFocused, setSearchFocused] = useState(false)
   const [_heroPassed, setHeroPassed] = useState(false)
   const [lastAddedId, setLastAddedId] = useState<string | null>(null)
-  const [upsellVariant, setUpsellVariant] = useState<'shadow' | 'border'>('shadow')
+  const [formVariant, setFormVariant] = useState<'inline' | 'cart' | 'toast'>('inline')
+  const [toastDismissedFor, setToastDismissedFor] = useState<string | null>(null)
   const [exactMatchVariant, setExactMatchVariant] = useState<'border' | 'highlight'>('border')
   const [searchBarPassed, setSearchBarPassed] = useState(false)
   const heroRef = useRef<HTMLDivElement>(null)
@@ -1234,18 +1352,18 @@ export default function DomainSearch() {
         }}
       >
         <Text.Caption m={0} sx={{ color: '#878787', mr: 2, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-          Upsell card
+          Form
         </Text.Caption>
-        {(['shadow', 'border'] as const).map((v) => (
+        {(['inline', 'cart', 'toast'] as const).map((v) => (
           <Box
             key={v}
             as="button"
-            onClick={() => setUpsellVariant(v)}
+            onClick={() => setFormVariant(v)}
             sx={{
-              background: upsellVariant === v ? '#000' : 'transparent',
-              color: upsellVariant === v ? '#fff' : '#4f4f4f',
+              background: formVariant === v ? '#000' : 'transparent',
+              color: formVariant === v ? '#fff' : '#4f4f4f',
               border: '1px solid',
-              borderColor: upsellVariant === v ? '#000' : '#ddd',
+              borderColor: formVariant === v ? '#000' : '#ddd',
               borderRadius: '4px',
               px: 3,
               py: '4px',
@@ -1255,7 +1373,7 @@ export default function DomainSearch() {
               transition: 'all 0.15s ease',
             }}
           >
-            {v === 'shadow' ? 'Drop shadow' : 'Border'}
+            {v === 'inline' ? 'In-line' : v === 'cart' ? 'Cart' : 'Toast'}
           </Box>
         ))}
 
@@ -1523,7 +1641,7 @@ export default function DomainSearch() {
                       isTop={i === 0}
                       exactMatchVariant={exactMatchVariant}
                     />
-                    {r.id === lastAddedId && (
+                    {formVariant === 'inline' && r.id === lastAddedId && (
                       <Box sx={{ '@media (min-width: 768px)': { display: 'none' } }}>
                         <MobileUpsellCard
                           result={r}
@@ -1531,7 +1649,6 @@ export default function DomainSearch() {
                           cart={cart}
                           onAdd={addFromUpsell}
                           isOpen={cart.has(r.id)}
-                          variant={upsellVariant}
                         />
                       </Box>
                     )}
@@ -1558,6 +1675,20 @@ export default function DomainSearch() {
         </Flex>
       </Box>
 
+      {/* Toast form variant */}
+      {formVariant === 'toast' && lastAddedId && cart.has(lastAddedId) && toastDismissedFor !== lastAddedId && (() => {
+        const r = results.find((r) => r.id === lastAddedId)
+        return r ? (
+          <TldToast
+            result={r}
+            results={results}
+            cart={cart}
+            onAdd={addFromUpsell}
+            onDismiss={() => setToastDismissedFor(lastAddedId)}
+          />
+        ) : null
+      })()}
+
       {/* Mobile mini cart — hidden on desktop, always rendered for slide-up animation */}
       <Box sx={{ display: 'none', '@media (max-width: 767px)': { display: 'block' } }}>
         <MobileMiniCart
@@ -1567,6 +1698,7 @@ export default function DomainSearch() {
             onAdd={toggleCart}
             onCheckout={() => navigate('/cart', { state: { items: cartItems } })}
             lastAddedId={lastAddedId}
+            formVariant={formVariant}
           />
         </Box>
     </Box>
