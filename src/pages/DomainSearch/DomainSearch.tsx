@@ -212,14 +212,12 @@ function ResultRow({
               Exact match
             </Text.Caption>
           </Flex>
-          <Text.Body m={0} fontWeight="book" sx={{ color: result.available ? 'fg.default' : 'fg.disabled' }}>
-            {result.name}
-          </Text.Body>
-          {result.badges.filter((b) => b !== 'exact').length > 0 && (
-            <Flex gap={1} alignItems="center">
-              {result.badges.filter((b) => b !== 'exact').map((b) => <Badge key={b} kind={b} />)}
-            </Flex>
-          )}
+          <Flex alignItems="center" gap={2} sx={{ flexWrap: 'wrap' }}>
+            <Text.Body m={0} fontWeight="book" sx={{ color: result.available ? 'fg.default' : 'fg.disabled', flexShrink: 0 }}>
+              {result.name}
+            </Text.Body>
+            {result.badges.filter((b) => b !== 'exact').map((b) => <Badge key={b} kind={b} />)}
+          </Flex>
         </Flex>
       ) : (
         /* Border variant (default): badges inline */
