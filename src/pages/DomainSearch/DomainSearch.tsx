@@ -19,6 +19,14 @@ import {
 // ── Types ────────────────────────────────────────────────────────────────────
 
 type DomainBadge = 'exact' | 'premium' | 'promoted'
+type MyrVariant = 'divider' | 'label' | 'subtext'
+
+interface MyrDiscount {
+  type: 'flat' | 'incremental'
+  minYears: number      // discount starts from this term length
+  startPercent: number  // % off first year at minYears
+  step?: number         // incremental: extra % per additional year
+}
 
 interface DomainResult {
   id: string
@@ -29,6 +37,7 @@ interface DomainResult {
   salePrice: number | null
   available: boolean
 }
+
 
 // ── Mock data ────────────────────────────────────────────────────────────────
 
@@ -44,21 +53,61 @@ const TLD_CATALOG: Array<{
   sale: number | null
   promoted?: boolean
   premium?: boolean
+  myrDiscount?: MyrDiscount
 }> = [
-  { tld: '.com',    base: 20, sale: 14 },
-  { tld: '.net',    base: 20, sale: 14 },
-  { tld: '.org',    base: 20, sale: 9 },
-  { tld: '.co',     base: 36, sale: 26 },
-  { tld: '.io',     base: 60, sale: 48 },
-  { tld: '.me',     base: 26, sale: 18 },
-  { tld: '.live',   base: 20, sale: 10, promoted: true },
-  { tld: '.store',  base: 20, sale: 12, promoted: true },
-  { tld: '.studio', base: 28, sale: 22 },
-  { tld: '.art',    base: 24, sale: 18 },
-  { tld: '.shop',   base: 30, sale: 20 },
-  { tld: '.online', base: 20, sale: 8,  promoted: true },
+  {
+    tld: '.com', base: 20, sale: 14,
+    myrDiscount: { type: 'incremental', minYears: 3, startPercent: 30, step: 10 },
+  },
+  {
+    tld: '.net', base: 20, sale: 14,
+    myrDiscount: { type: 'flat', minYears: 2, startPercent: 30 },
+  },
+  {
+    tld: '.org', base: 20, sale: 9,
+    myrDiscount: { type: 'flat', minYears: 2, startPercent: 25 },
+  },
+  {
+    tld: '.co', base: 36, sale: 26,
+    myrDiscount: { type: 'incremental', minYears: 2, startPercent: 20, step: 10 },
+  },
+  {
+    tld: '.io', base: 60, sale: 48,
+    myrDiscount: { type: 'flat', minYears: 3, startPercent: 30 },
+  },
+  {
+    tld: '.me', base: 26, sale: 18,
+    myrDiscount: { type: 'incremental', minYears: 2, startPercent: 15, step: 10 },
+  },
+  {
+    tld: '.live', base: 20, sale: 10, promoted: true,
+    myrDiscount: { type: 'flat', minYears: 2, startPercent: 30 },
+  },
+  {
+    tld: '.store', base: 20, sale: 12, promoted: true,
+    myrDiscount: { type: 'flat', minYears: 2, startPercent: 40 },
+  },
+  {
+    tld: '.studio', base: 28, sale: 22,
+    myrDiscount: { type: 'incremental', minYears: 3, startPercent: 30, step: 10 },
+  },
+  {
+    tld: '.art', base: 24, sale: 18,
+    myrDiscount: { type: 'flat', minYears: 2, startPercent: 20 },
+  },
+  {
+    tld: '.shop', base: 30, sale: 20,
+    myrDiscount: { type: 'flat', minYears: 3, startPercent: 30 },
+  },
+  {
+    tld: '.online', base: 20, sale: 8, promoted: true,
+    myrDiscount: { type: 'flat', minYears: 2, startPercent: 40 },
+  },
   { tld: '.photos', base: 30, sale: null, premium: true },
-  { tld: '.design', base: 34, sale: 28 },
+  {
+    tld: '.design', base: 34, sale: 28,
+    myrDiscount: { type: 'incremental', minYears: 2, startPercent: 25, step: 10 },
+  },
   { tld: '.agency', base: 28, sale: null },
 ]
 
@@ -158,6 +207,96 @@ function Badge({ kind }: { kind: DomainBadge }) {
     )
   }
   return null
+}
+
+// ── Variant nav ───────────────────────────────────────────────────────────────
+
+const VARIANT_LABELS: Record<MyrVariant, string> = {
+  divider: 'Divider',
+  label: 'Label',
+  subtext: 'Subtext',
+}
+
+const VARIANT_FIGMA: Record<MyrVariant, string> = {
+  divider: 'https://www.figma.com/design/LRN00J69dEcl5X5BHvhQJ6/Multi-year-term-discount?node-id=196-11538',
+  label: 'https://www.figma.com/design/LRN00J69dEcl5X5BHvhQJ6/Multi-year-term-discount?node-id=196-10572',
+  subtext: 'https://www.figma.com/design/LRN00J69dEcl5X5BHvhQJ6/Multi-year-term-discount?node-id=200-14480',
+}
+
+const VARIANT_KEY = 'myr-variant'
+
+function VariantNav({ variant, onChange }: { variant: MyrVariant; onChange: (v: MyrVariant) => void }) {
+  return (
+    <Box
+      sx={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 400,
+        background: '#f5f5f5',
+        borderBottom: '1px solid #e2e2e2',
+        height: 44,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '6px',
+        px: 4,
+      }}
+    >
+      <Text.Caption m={0} color="fg.muted" sx={{ fontSize: '11px', letterSpacing: '0.06em', textTransform: 'uppercase', mr: 2, flexShrink: 0 }}>
+        Dropdown variant
+      </Text.Caption>
+      {(['divider', 'label', 'subtext'] as MyrVariant[]).map((v) => {
+        const active = variant === v
+        return (
+          <Flex key={v} alignItems="center" gap={1}>
+            <Box
+              as="button"
+              onClick={() => { onChange(v); try { localStorage.setItem(VARIANT_KEY, v) } catch {} }}
+              sx={{
+                px: '12px',
+                py: '5px',
+                borderRadius: 20,
+                border: '1px solid',
+                borderColor: active ? 'fg.default' : '#d0d0d0',
+                background: active ? 'var(--colors-fg-default)' : '#fff',
+                color: active ? '#fff' : 'var(--colors-fg-muted)',
+                cursor: 'pointer',
+                fontSize: '12px',
+                fontWeight: active ? 600 : 400,
+                letterSpacing: '0.02em',
+                transition: 'all 0.15s ease',
+                '&:hover': {
+                  borderColor: 'fg.default',
+                  background: active ? 'var(--colors-fg-default)' : '#f0f0f0',
+                },
+              }}
+            >
+              {VARIANT_LABELS[v]}
+            </Box>
+            <Box
+              as="a"
+              href={VARIANT_FIGMA[v]}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Figma reference"
+              sx={{
+                color: '#aaa',
+                fontSize: '10px',
+                textDecoration: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                '&:hover': { color: '#0862d1' },
+              }}
+            >
+              ↗
+            </Box>
+          </Flex>
+        )
+      })}
+    </Box>
+  )
 }
 
 // ── Result row ────────────────────────────────────────────────────────────────
@@ -268,7 +407,6 @@ function ResultRow({
 
 // ── Cart sidebar ──────────────────────────────────────────────────────────────
 
-/** Extract the SLD (everything before the last TLD segment) */
 function getSld(name: string): string {
   const dot = name.lastIndexOf('.')
   return dot > 0 ? name.slice(0, dot) : name
@@ -292,7 +430,6 @@ function CartSidebar({
   const subtotal = items.reduce((sum, r) => sum + (r.salePrice ?? r.originalPrice), 0)
   const cartIds = new Set(items.map((i) => i.id))
 
-  // Auto-open the matching domains section whenever a new SLD enters the cart
   useEffect(() => {
     const currentIds = new Set(items.map((i) => i.id))
     const newItems = items.filter((i) => !prevItemIdsRef.current.has(i.id))
@@ -312,7 +449,6 @@ function CartSidebar({
     prevItemIdsRef.current = currentIds
   }, [items, results])
 
-  // Group cart items by SLD — preserving insertion order of first-seen SLD
   const sldOrder: string[] = []
   const groups: Record<string, DomainResult[]> = {}
   for (const item of items) {
@@ -321,7 +457,6 @@ function CartSidebar({
     groups[sld].push(item)
   }
 
-  // For each SLD find other available results not in cart with same stem
   function getMatching(sld: string): DomainResult[] {
     return results.filter((r) => getSld(r.name) === sld && r.available && !cartIds.has(r.id)).slice(0, 4)
   }
@@ -338,7 +473,6 @@ function CartSidebar({
         overflow: 'hidden',
       }}
     >
-      {/* ── Header ── */}
       <Box px={6} pt={6} pb={3}>
         <Text.Body m={0} fontWeight="semibold" sx={{ fontSize: '18px', letterSpacing: '-0.01em' }}>
           Cart Overview
@@ -348,7 +482,6 @@ function CartSidebar({
         </Text.Caption>
       </Box>
 
-      {/* ── Scrollable items area ── */}
       <Box sx={{ flex: '1 1 0', overflowY: 'auto', px: 5, pb: 4 }}>
         {sldOrder.map((sld) => {
           const groupItems = groups[sld]
@@ -366,7 +499,6 @@ function CartSidebar({
                 overflow: 'hidden',
               }}
             >
-              {/* Items in this SLD group */}
               {groupItems.map((item, idx) => {
                 const price = item.salePrice ?? item.originalPrice
                 const isLast = idx === groupItems.length - 1
@@ -416,10 +548,8 @@ function CartSidebar({
                 )
               })}
 
-              {/* Add matching domains section */}
               {matching.length > 0 && (
                 <Box>
-                  {/* Toggle row — NO borderTop here; the last cart item's borderBottom is the divider */}
                   <Box
                     as="button"
                     onClick={() => setMatchingOpen((prev) => ({ ...prev, [sld]: !isOpen }))}
@@ -435,7 +565,6 @@ function CartSidebar({
                       textAlign: 'left',
                     }}
                   >
-                    {/* Label + info icon grouped together */}
                     <Flex alignItems="center" gap={1} sx={{ flex: 1 }}>
                       <Text.Caption m={0} color="fg.muted" sx={{ fontSize: '12px', lineHeight: 1 }}>
                         Add matching domains
@@ -448,12 +577,11 @@ function CartSidebar({
                     }
                   </Box>
 
-                  {/* Matching items — each in its own rounded gray card with white gutters */}
                   {isOpen && (
                     <Box px="8px" pb="8px" sx={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       {matching.map((m) => {
                         const stem = getSld(m.name)
-                        const ext = m.name.slice(stem.length + 1) // "studio" (no dot)
+                        const ext = m.name.slice(stem.length + 1)
                         const price = m.salePrice ?? m.originalPrice
                         return (
                           <Flex
@@ -467,7 +595,6 @@ function CartSidebar({
                               background: '#f5f5f5',
                             }}
                           >
-                            {/* Domain: stem normal + .ext bold */}
                             <Box sx={{ flex: '1 1 0', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               <Text.Body as="span" m={0} sx={{ fontSize: '14px' }}>{stem}.</Text.Body>
                               <Text.Body as="span" m={0} fontWeight="semibold" sx={{ fontSize: '14px' }}>{ext}</Text.Body>
@@ -506,7 +633,6 @@ function CartSidebar({
         })}
       </Box>
 
-      {/* ── Footer ── */}
       <Box
         sx={{
           borderTop: '1px solid',
@@ -604,7 +730,6 @@ function MobileMiniCart({
 
   return (
     <>
-      {/* Overlay — fades in/out */}
       <Box
         onClick={() => setExpanded(false)}
         sx={{
@@ -618,7 +743,6 @@ function MobileMiniCart({
         }}
       />
 
-      {/* Panel — slides up on first item add */}
       <Box
         sx={{
           position: 'fixed',
@@ -635,7 +759,6 @@ function MobileMiniCart({
           transition: 'transform 0.3s cubic-bezier(0.4,0,0.2,1), border-radius 0.2s ease',
         }}
       >
-        {/* Expandable content — grid-template-rows trick for smooth height */}
         <Box
           sx={{
             display: 'grid',
@@ -645,113 +768,107 @@ function MobileMiniCart({
         >
           <Box sx={{ minHeight: 0, overflow: 'hidden' }}>
             <Box sx={{ maxHeight: '65vh', overflowY: 'auto' }}>
-            {/* Header */}
-            <Flex alignItems="center" justifyContent="space-between" px={4} pt={6} pb={3}>
-              <Text.Body m={0} sx={{ fontSize: '18px', fontWeight: 500 }}>Cart Overview</Text.Body>
-              <Box
-                as="button"
-                onClick={() => setExpanded(false)}
-                sx={{ background: 'none', border: 'none', cursor: 'pointer', p: 0, display: 'flex', alignItems: 'center' }}
-              >
-                <ChevronSmallDown sx={{ width: 20, height: 20, color: 'fg.default' }} />
-              </Box>
-            </Flex>
+              <Flex alignItems="center" justifyContent="space-between" px={4} pt={6} pb={3}>
+                <Text.Body m={0} sx={{ fontSize: '18px', fontWeight: 500 }}>Cart Overview</Text.Body>
+                <Box
+                  as="button"
+                  onClick={() => setExpanded(false)}
+                  sx={{ background: 'none', border: 'none', cursor: 'pointer', p: 0, display: 'flex', alignItems: 'center' }}
+                >
+                  <ChevronSmallDown sx={{ width: 20, height: 20, color: 'fg.default' }} />
+                </Box>
+              </Flex>
 
-            {/* Domain count */}
-            <Text.Caption m={0} sx={{ display: 'block', px: 4, pb: 3, fontSize: '12px', color: '#4f4f4f' }}>
-              Domain ({items.length})
-            </Text.Caption>
+              <Text.Caption m={0} sx={{ display: 'block', px: 4, pb: 3, fontSize: '12px', color: '#4f4f4f' }}>
+                Domain ({items.length})
+              </Text.Caption>
 
-            {/* Domain cards */}
-            <Box px={4} pb={4} sx={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {sldOrder.map((sld) => {
-                const groupItems = groups[sld]
-                const matching = getMatching(sld)
-                const showTlds = sld === lastAddedSld && matching.length > 0
+              <Box px={4} pb={4} sx={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {sldOrder.map((sld) => {
+                  const groupItems = groups[sld]
+                  const matching = getMatching(sld)
+                  const showTlds = sld === lastAddedSld && matching.length > 0
 
-                return (
-                  <Box
-                    key={sld}
-                    sx={{ border: '1px solid #ddd', borderRadius: 4, background: '#fff', overflow: 'hidden' }}
-                  >
-                    {/* Domain row */}
-                    {groupItems.map((item) => {
-                      const price = item.salePrice ?? item.originalPrice
-                      return (
-                        <Flex
-                          key={item.id}
-                          alignItems="center"
-                          justifyContent="space-between"
-                          sx={{ px: 4, py: 3 }}
-                        >
-                          <Text.Body
-                            m={0}
-                            sx={{ fontSize: '15px', fontWeight: 500, flex: '1 1 0', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                  return (
+                    <Box
+                      key={sld}
+                      sx={{ border: '1px solid #ddd', borderRadius: 4, background: '#fff', overflow: 'hidden' }}
+                    >
+                      {groupItems.map((item) => {
+                        const price = item.salePrice ?? item.originalPrice
+                        return (
+                          <Flex
+                            key={item.id}
+                            alignItems="center"
+                            justifyContent="space-between"
+                            sx={{ px: 4, py: 3 }}
                           >
-                            {item.name}
-                          </Text.Body>
-                          <Flex alignItems="center" gap={2} sx={{ flexShrink: 0, ml: 2 }}>
-                            <Text.Body m={0} sx={{ fontSize: '14px' }}>${price}</Text.Body>
-                            <Box
-                              as="button"
-                              onClick={() => onRemove(item.id)}
-                              aria-label={`Remove ${item.name}`}
-                              sx={{ background: 'none', border: 'none', cursor: 'pointer', p: '2px', color: 'fg.muted', display: 'flex', alignItems: 'center' }}
+                            <Text.Body
+                              m={0}
+                              sx={{ fontSize: '15px', fontWeight: 500, flex: '1 1 0', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
                             >
-                              <Trash sx={{ width: 14, height: 14 }} />
-                            </Box>
-                          </Flex>
-                        </Flex>
-                      )
-                    })}
-
-                    {/* TLD upsells — expanded only for most recently added domain */}
-                    {showTlds && (
-                      <Box sx={{ borderTop: '1px solid #ddd', px: 4, pt: 3, pb: 4 }}>
-                        <Text.Caption m={0} sx={{ fontSize: '12px', color: '#4f4f4f', display: 'block', mb: 3 }}>
-                          Purchase additional TLDs
-                        </Text.Caption>
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          {matching.map((m) => {
-                            const stem = getSld(m.name)
-                            const ext = m.name.slice(stem.length + 1)
-                            const price = m.salePrice ?? m.originalPrice
-                            return (
-                              <Flex
-                                key={m.id}
-                                alignItems="center"
-                                justifyContent="space-between"
-                                sx={{ px: 3, py: '10px', background: '#f9f9f9', borderRadius: 4 }}
+                              {item.name}
+                            </Text.Body>
+                            <Flex alignItems="center" gap={2} sx={{ flexShrink: 0, ml: 2 }}>
+                              <Text.Body m={0} sx={{ fontSize: '14px' }}>${price}</Text.Body>
+                              <Box
+                                as="button"
+                                onClick={() => onRemove(item.id)}
+                                aria-label={`Remove ${item.name}`}
+                                sx={{ background: 'none', border: 'none', cursor: 'pointer', p: '2px', color: 'fg.muted', display: 'flex', alignItems: 'center' }}
                               >
-                                <Box sx={{ flex: '1 1 0', minWidth: 0 }}>
-                                  <Text.Body as="span" m={0} sx={{ fontSize: '14px', color: '#4f4f4f' }}>{stem}.</Text.Body>
-                                  <Text.Body as="span" m={0} sx={{ fontSize: '14px', fontWeight: 500 }}>{ext}</Text.Body>
-                                </Box>
-                                <Flex alignItems="baseline" gap={2} sx={{ flexShrink: 0 }}>
-                                  <Text.Body m={0} sx={{ fontSize: '14px' }}>${price}</Text.Body>
-                                  <Box
-                                    as="button"
-                                    onClick={() => onAdd(m)}
-                                    sx={{ background: 'none', border: 'none', cursor: 'pointer', p: 0, fontSize: '14px', fontWeight: 500, letterSpacing: '0.04em', color: 'fg.default' }}
-                                  >
-                                    ADD
+                                <Trash sx={{ width: 14, height: 14 }} />
+                              </Box>
+                            </Flex>
+                          </Flex>
+                        )
+                      })}
+
+                      {showTlds && (
+                        <Box sx={{ borderTop: '1px solid #ddd', px: 4, pt: 3, pb: 4 }}>
+                          <Text.Caption m={0} sx={{ fontSize: '12px', color: '#4f4f4f', display: 'block', mb: 3 }}>
+                            Purchase additional TLDs
+                          </Text.Caption>
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            {matching.map((m) => {
+                              const stem = getSld(m.name)
+                              const ext = m.name.slice(stem.length + 1)
+                              const price = m.salePrice ?? m.originalPrice
+                              return (
+                                <Flex
+                                  key={m.id}
+                                  alignItems="center"
+                                  justifyContent="space-between"
+                                  sx={{ px: 3, py: '10px', background: '#f9f9f9', borderRadius: 4 }}
+                                >
+                                  <Box sx={{ flex: '1 1 0', minWidth: 0 }}>
+                                    <Text.Body as="span" m={0} sx={{ fontSize: '14px', color: '#4f4f4f' }}>{stem}.</Text.Body>
+                                    <Text.Body as="span" m={0} sx={{ fontSize: '14px', fontWeight: 500 }}>{ext}</Text.Body>
                                   </Box>
+                                  <Flex alignItems="baseline" gap={2} sx={{ flexShrink: 0 }}>
+                                    <Text.Body m={0} sx={{ fontSize: '14px' }}>${price}</Text.Body>
+                                    <Box
+                                      as="button"
+                                      onClick={() => onAdd(m)}
+                                      sx={{ background: 'none', border: 'none', cursor: 'pointer', p: 0, fontSize: '14px', fontWeight: 500, letterSpacing: '0.04em', color: 'fg.default' }}
+                                    >
+                                      ADD
+                                    </Box>
+                                  </Flex>
                                 </Flex>
-                              </Flex>
-                            )
-                          })}
+                              )
+                            })}
+                          </Box>
                         </Box>
-                      </Box>
-                    )}
-                  </Box>
-                )
-              })}
+                      )}
+                    </Box>
+                  )
+                })}
+              </Box>
             </Box>
           </Box>
         </Box>
-        </Box>
 
-        {/* Footer — always visible */}
         <Box sx={{ px: 4, pt: 4, pb: '16px', borderTop: expanded ? '1px solid #ddd' : 'none' }}>
           {expanded ? (
             <Flex alignItems="center" justifyContent="space-between" sx={{ mb: 4 }}>
@@ -803,11 +920,20 @@ function MobileMiniCart({
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
+const VARIANT_NAV_HEIGHT = 44
+
 export default function DomainSearch() {
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const q = searchParams.get('q') ?? ''
 
+  const [variant, setVariant] = useState<MyrVariant>(() => {
+    try {
+      const v = localStorage.getItem(VARIANT_KEY)
+      if (v === 'divider' || v === 'label' || v === 'subtext') return v
+    } catch {}
+    return 'divider'
+  })
   const [inputValue, setInputValue] = useState(q)
   const [results, setResults] = useState<DomainResult[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -933,9 +1059,12 @@ export default function DomainSearch() {
   const hasCart = cartCount > 0
 
   return (
-    <Box sx={{ minHeight: '100vh', background: '#fff' }}>
+    <Box sx={{ minHeight: '100vh', background: '#fff', pt: `${VARIANT_NAV_HEIGHT}px` }}>
 
-      {/* ── Inline nav — scrolls with the page, not sticky ── */}
+      {/* ── Variant nav ── */}
+      <VariantNav variant={variant} onChange={setVariant} />
+
+      {/* ── Inline nav — scrolls with the page ── */}
       <Box sx={{ background: '#fff' }}>
         <Flex
           as="nav"
@@ -969,11 +1098,11 @@ export default function DomainSearch() {
         </Flex>
       </Box>
 
-      {/* ── Sticky nav — fixed, slides in once user scrolls past the search bar ── */}
+      {/* ── Sticky nav ── */}
       <Box
         sx={{
           position: 'fixed',
-          top: 0,
+          top: VARIANT_NAV_HEIGHT,
           left: 0,
           right: 0,
           zIndex: 200,
@@ -990,7 +1119,6 @@ export default function DomainSearch() {
           px={6}
           sx={{ height: 60, maxWidth: 1440, mx: 'auto' }}
         >
-          {/* Logo — hidden on mobile */}
           <Box
             as="button"
             onClick={() => navigate('/')}
@@ -1003,7 +1131,6 @@ export default function DomainSearch() {
             </Flex>
           </Box>
 
-          {/* Compact search bar — mobile only, shown after page search bar scrolls out */}
           <Flex
             alignItems="center"
             gap={2}
@@ -1023,7 +1150,6 @@ export default function DomainSearch() {
             />
           </Flex>
 
-          {/* Right: log in + cart */}
           <Flex alignItems="center" gap={5} sx={{ flexShrink: 0, '@media (max-width: 767px)': { display: 'none' } }}>
             <Text.Body m={0} color="fg.muted" sx={{ cursor: 'pointer', fontSize: '12px', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 500, '&:hover': { color: 'fg.default' } }}>Log In</Text.Body>
             <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center', opacity: hasCart ? 1 : 0, pointerEvents: hasCart ? 'auto' : 'none', transition: 'opacity 0.3s ease' }}>
@@ -1052,10 +1178,9 @@ export default function DomainSearch() {
       >
         <Flex sx={{ gap: '100px', '@media (max-width: 767px)': { gap: 0 } }} alignItems="flex-start">
 
-          {/* ── Left: search + results (3/5) ── */}
+          {/* ── Left: search + results ── */}
           <Box sx={{ flex: 3, minWidth: 0 }}>
 
-            {/* Heading — observed by IntersectionObserver to trigger nav transition */}
             <Box ref={heroRef} mb={6} px={4}>
               <Box
                 as="div"
@@ -1149,14 +1274,12 @@ export default function DomainSearch() {
               )}
             </Flex>
 
-            {/* Loading */}
             {isLoading && (
               <Flex justifyContent="center" alignItems="center" sx={{ minHeight: 300 }}>
                 <ActivityIndicator />
               </Flex>
             )}
 
-            {/* Results */}
             {!isLoading && results.length > 0 && (
               <Box>
                 {results.map((r, i) => (
@@ -1171,7 +1294,6 @@ export default function DomainSearch() {
               </Box>
             )}
 
-            {/* Empty state */}
             {!isLoading && !q && (
               <Flex justifyContent="center" alignItems="center" sx={{ minHeight: 200 }}>
                 <Text.Body m={0} color="fg.muted">Enter a domain name to search.</Text.Body>
@@ -1179,9 +1301,9 @@ export default function DomainSearch() {
             )}
           </Box>
 
-          {/* ── Right: cart sidebar (2/5) — hidden on mobile ── */}
+          {/* ── Right: cart sidebar ── */}
           {hasCart && (
-            <Box sx={{ flex: 2, minWidth: 0, alignSelf: 'flex-start', position: 'sticky', top: 80, '@media (max-width: 767px)': { display: 'none' } }}>
+            <Box sx={{ flex: 2, minWidth: 0, alignSelf: 'flex-start', position: 'sticky', top: VARIANT_NAV_HEIGHT + 80, '@media (max-width: 767px)': { display: 'none' } }}>
               <CartSidebar items={cartItems} results={results} onRemove={removeFromCart} onAdd={toggleCart} />
             </Box>
           )}
@@ -1189,17 +1311,17 @@ export default function DomainSearch() {
         </Flex>
       </Box>
 
-      {/* Mobile mini cart — hidden on desktop, always rendered for slide-up animation */}
+      {/* Mobile mini cart */}
       <Box sx={{ display: 'none', '@media (max-width: 767px)': { display: 'block' } }}>
         <MobileMiniCart
-            items={cartItems}
-            results={results}
-            onRemove={removeFromCart}
-            onAdd={toggleCart}
-            onCheckout={() => navigate('/cart', { state: { items: cartItems } })}
-            lastAddedId={lastAddedId}
-          />
-        </Box>
+          items={cartItems}
+          results={results}
+          onRemove={removeFromCart}
+          onAdd={toggleCart}
+          onCheckout={() => navigate('/cart', { state: { items: cartItems } })}
+          lastAddedId={lastAddedId}
+        />
+      </Box>
     </Box>
   )
 }
