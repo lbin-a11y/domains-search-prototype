@@ -8,7 +8,6 @@ import {
   ShoppingBag,
   Star,
   Checkmark,
-  Tag,
   CrossSmall,
   Trash,
   ChevronSmallUp,
