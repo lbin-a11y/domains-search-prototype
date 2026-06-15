@@ -14,11 +14,15 @@ import {
   ChevronSmallUp,
   ChevronSmallDown,
   InfoCircle,
+  Flash,
+  CheckmarkShield,
+  LineChart,
+  Tag,
 } from '@sqs/rosetta-icons'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-type DomainBadge = 'exact' | 'premium' | 'promoted'
+type DomainBadge = 'exact' | 'premium' | 'promoted' | 'rtb'
 
 interface DomainResult {
   id: string
@@ -44,22 +48,46 @@ const TLD_CATALOG: Array<{
   sale: number | null
   promoted?: boolean
   premium?: boolean
+  rtb?: boolean
 }> = [
   { tld: '.com',    base: 20, sale: 14 },
   { tld: '.net',    base: 20, sale: 14 },
   { tld: '.org',    base: 20, sale: 9 },
   { tld: '.co',     base: 36, sale: 26 },
-  { tld: '.io',     base: 60, sale: 48 },
+  { tld: '.io',     base: 60, sale: 48,  rtb: true },
   { tld: '.me',     base: 26, sale: 18 },
   { tld: '.live',   base: 20, sale: 10, promoted: true },
   { tld: '.store',  base: 20, sale: 12, promoted: true },
-  { tld: '.studio', base: 28, sale: 22 },
+  { tld: '.studio', base: 28, sale: 22, rtb: true },
   { tld: '.art',    base: 24, sale: 18 },
   { tld: '.shop',   base: 30, sale: 20 },
-  { tld: '.online', base: 20, sale: 8,  promoted: true },
+  { tld: '.online', base: 20, sale: 8,  promoted: true, rtb: true },
   { tld: '.photos', base: 30, sale: null, premium: true },
   { tld: '.design', base: 34, sale: 28 },
   { tld: '.agency', base: 28, sale: null },
+]
+
+const LIFETIME_PHOTOGRAPHY_RESULTS: DomainResult[] = [
+  { id: 'lifetime.photography',          name: 'lifetime.photography',          tld: '.photography', badges: ['exact', 'premium'], originalPrice: 600, salePrice: null, available: true },
+  { id: 'lifetimephotography.net',        name: 'lifetimephotography.net',        tld: '.net',         badges: [],                   originalPrice: 20,  salePrice: 14,   available: true },
+  { id: 'lifetime-photo.com',             name: 'lifetime-photo.com',             tld: '.com',         badges: [],                   originalPrice: 20,  salePrice: 8,    available: true },
+  { id: 'lifetimephotographs.com',        name: 'lifetimephotographs.com',        tld: '.com',         badges: [],                   originalPrice: 20,  salePrice: 8,    available: true },
+  { id: 'lifetime-images.com',            name: 'lifetime-images.com',            tld: '.com',         badges: [],                   originalPrice: 20,  salePrice: 8,    available: true },
+  { id: 'lifetimephotography.live',       name: 'lifetimephotography.live',       tld: '.live',        badges: ['promoted'],          originalPrice: 20,  salePrice: 10,   available: true },
+  { id: 'lifetimephotography.studio',     name: 'lifetimephotography.studio',     tld: '.studio',      badges: ['promoted'],          originalPrice: 40,  salePrice: 10,   available: true },
+  { id: 'lifetimephotography.company',    name: 'lifetimephotography.company',    tld: '.company',     badges: [],                   originalPrice: 30,  salePrice: 10,   available: true },
+  { id: 'lifetimephotographies.com',      name: 'lifetimephotographies.com',      tld: '.com',         badges: [],                   originalPrice: 20,  salePrice: 8,    available: true },
+  { id: 'yourlifetimephotography.com',    name: 'yourlifetimephotography.com',    tld: '.com',         badges: [],                   originalPrice: 20,  salePrice: 8,    available: true },
+  { id: 'lifetimephotography.services',   name: 'lifetimephotography.services',   tld: '.services',    badges: [],                   originalPrice: 55,  salePrice: null, available: true },
+  { id: 'lifetimephotography.work',       name: 'lifetimephotography.work',       tld: '.work',        badges: [],                   originalPrice: 25,  salePrice: null, available: true },
+  { id: 'lifetimephotography.pro',        name: 'lifetimephotography.pro',        tld: '.pro',         badges: [],                   originalPrice: 30,  salePrice: 10,   available: true },
+  { id: 'lifetimephotography.photography',name: 'lifetimephotography.photography',tld: '.photography', badges: [],                   originalPrice: 20,  salePrice: 10,   available: true },
+  { id: 'lifetimephotography.info',       name: 'lifetimephotography.info',       tld: '.info',        badges: [],                   originalPrice: 20,  salePrice: 10,   available: true },
+  { id: 'lifetimephotography.design',     name: 'lifetimephotography.design',     tld: '.design',      badges: [],                   originalPrice: 75,  salePrice: null, available: true },
+  { id: 'lifetimephotography.life',       name: 'lifetimephotography.life',       tld: '.life',        badges: [],                   originalPrice: 35,  salePrice: null, available: true },
+  { id: 'lifetimephotography.tips',       name: 'lifetimephotography.tips',       tld: '.tips',        badges: [],                   originalPrice: 35,  salePrice: null, available: true },
+  { id: 'lifetimephotography.support',    name: 'lifetimephotography.support',    tld: '.support',     badges: [],                   originalPrice: 35,  salePrice: null, available: true },
+  { id: 'lifetimephotography.agency',     name: 'lifetimephotography.agency',     tld: '.agency',      badges: [],                   originalPrice: 45,  salePrice: null, available: true },
 ]
 
 function relatedNames(stem: string): string[] {
@@ -76,6 +104,9 @@ function relatedNames(stem: string): string[] {
 }
 
 function generateResults(rawQuery: string): DomainResult[] {
+  const normalized = rawQuery.trim().toLowerCase().replace(/\s+/g, '')
+  if (normalized === 'lifetimephotography') return LIFETIME_PHOTOGRAPHY_RESULTS
+
   const stem = rawQuery.trim().toLowerCase().replace(/\s+/g, '').replace(/^\./, '').replace(/\.[a-z]+$/, '')
   const results: DomainResult[] = []
 
@@ -93,8 +124,9 @@ function generateResults(rawQuery: string): DomainResult[] {
 
   for (const cat of TLD_CATALOG) {
     if (cat.tld === exactTld) continue
-    const available = hashStr(stem + cat.tld) % 4 !== 0
+    const available = cat.rtb ? true : hashStr(stem + cat.tld) % 4 !== 0
     const badges: DomainBadge[] = []
+    if (cat.rtb) badges.push('rtb')
     if (cat.promoted) badges.push('promoted')
     if (cat.premium) badges.push('premium')
     results.push({
@@ -124,39 +156,181 @@ function generateResults(rawQuery: string): DomainResult[] {
   return results
 }
 
-// ── Tooltip ───────────────────────────────────────────────────────────────────
+// ── Badge priority ─────────────────────────────────────────────────────────────
 
-function Tooltip({ text, children }: { text: string; children: React.ReactNode }) {
-  const [visible, setVisible] = useState(false)
+const BADGE_PRIORITY: DomainBadge[] = ['exact', 'rtb', 'promoted', 'premium']
+
+function prioritizeBadges(badges: DomainBadge[]): DomainBadge[] {
+  return BADGE_PRIORITY.filter((p) => badges.includes(p)).slice(0, 2)
+}
+
+const RTB_LABELS = ['For your industry', 'Memorable', 'High trust', 'Trending', 'Popular TLD']
+
+function getRtbLabel(name: string): string {
+  return RTB_LABELS[hashStr(name) % RTB_LABELS.length]
+}
+
+// ── RTB Tooltip ───────────────────────────────────────────────────────────────
+
+function RtbTooltip() {
   return (
     <Box
-      sx={{ position: 'relative', display: 'inline-flex' }}
-      onMouseEnter={() => setVisible(true)}
-      onMouseLeave={() => setVisible(false)}
+      sx={{
+        position: 'absolute',
+        bottom: 'calc(100% + 10px)',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        background: '#000',
+        borderRadius: 4,
+        px: '16px',
+        py: '11px',
+        width: 280,
+        zIndex: 400,
+        boxShadow: '0 0 1px rgba(0,0,0,0.08), 0 8px 16px rgba(0,0,0,0.12)',
+        pointerEvents: 'none',
+        // Arrow pointing down
+        '&::after': {
+          content: '""',
+          position: 'absolute',
+          top: '100%',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          borderWidth: '6px',
+          borderStyle: 'solid',
+          borderColor: '#000 transparent transparent transparent',
+        },
+      }}
+    >
+      <Text.Body m={0} mb={2} sx={{ fontSize: '14px', color: '#fff', lineHeight: '22px' }}>
+        This domain is recommended because:
+      </Text.Body>
+      <Flex alignItems="center" gap={2} mb={1}>
+        <CheckmarkShield sx={{ width: 16, height: 16, color: '#fff', flexShrink: 0 }} />
+        <Text.Body m={0} sx={{ fontSize: '14px', color: '#fff', lineHeight: '22px' }}>
+          The TLD is certified.
+        </Text.Body>
+      </Flex>
+      <Flex alignItems="center" gap={2}>
+        <LineChart sx={{ width: 16, height: 16, color: '#fff', flexShrink: 0 }} />
+        <Text.Body m={0} sx={{ fontSize: '14px', color: '#fff', lineHeight: '22px' }}>
+          400+ users have purchased it today.
+        </Text.Body>
+      </Flex>
+    </Box>
+  )
+}
+
+// ── RTB Badge ─────────────────────────────────────────────────────────────────
+
+function RtbBadge({ label }: { label?: string }) {
+  const [hovered, setHovered] = useState(false)
+  return (
+    <Box
+      sx={{ position: 'relative', flexShrink: 0 }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      <Flex
+        alignItems="center"
+        gap={label ? 1 : 0}
+        justifyContent="center"
+        px={label ? 2 : 0}
+        sx={{
+          width: label ? 'auto' : 28,
+          height: 28,
+          borderRadius: label ? 20 : '50%',
+          background: '#d8e8fe',
+          cursor: 'default',
+        }}
+      >
+        <Flash sx={{ width: 14, height: 14, color: '#0862d1', flexShrink: 0 }} />
+        {label && (
+          <Text.Caption m={0} sx={{ fontSize: '11px', fontWeight: 600, color: '#0862d1', lineHeight: 1, whiteSpace: 'nowrap' }}>
+            {label}
+          </Text.Caption>
+        )}
+      </Flex>
+      {hovered && <RtbTooltip />}
+    </Box>
+  )
+}
+
+// ── Tooltip base ─────────────────────────────────────────────────────────────
+
+function BadgeTooltip({ children }: { children: React.ReactNode }) {
+  return (
+    <Box
+      sx={{
+        position: 'absolute',
+        bottom: 'calc(100% + 10px)',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        background: '#000',
+        borderRadius: 4,
+        px: '16px',
+        py: '11px',
+        width: 260,
+        zIndex: 400,
+        boxShadow: '0 0 1px rgba(0,0,0,0.08), 0 8px 16px rgba(0,0,0,0.12)',
+        pointerEvents: 'none',
+        '&::after': {
+          content: '""',
+          position: 'absolute',
+          top: '100%',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          borderWidth: '6px',
+          borderStyle: 'solid',
+          borderColor: '#000 transparent transparent transparent',
+        },
+      }}
     >
       {children}
-      {visible && (
-        <Box
-          sx={{
-            position: 'absolute',
-            bottom: 'calc(100% + 6px)',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            background: '#1a1a1a',
-            color: '#fff',
-            fontSize: '12px',
-            lineHeight: 1.4,
-            borderRadius: 6,
-            px: '10px',
-            py: '8px',
-            width: 220,
-            pointerEvents: 'none',
-            zIndex: 500,
-            boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
-          }}
-        >
-          {text}
-        </Box>
+    </Box>
+  )
+}
+
+// ── Promoted Badge ────────────────────────────────────────────────────────────
+
+function PromotedBadge() {
+  const [hovered, setHovered] = useState(false)
+  return (
+    <Box sx={{ position: 'relative', flexShrink: 0 }} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
+      <Flex alignItems="center" gap={1} px={2} py={1} sx={{ borderRadius: 20, background: '#e8f0fe', cursor: 'default' }}>
+        <Tag sx={{ width: 11, height: 11, color: '#0862d1' }} />
+        <Text.Caption m={0} sx={{ fontSize: '11px', fontWeight: 600, color: '#0862d1', lineHeight: 1 }}>
+          Promoted
+        </Text.Caption>
+      </Flex>
+      {hovered && (
+        <BadgeTooltip>
+          <Text.Body m={0} sx={{ fontSize: '14px', color: '#fff', lineHeight: '22px' }}>
+            This TLD (the domain ending) is available at a promotional price for a limited time.
+          </Text.Body>
+        </BadgeTooltip>
+      )}
+    </Box>
+  )
+}
+
+// ── Premium Badge ─────────────────────────────────────────────────────────────
+
+function PremiumBadge() {
+  const [hovered, setHovered] = useState(false)
+  return (
+    <Box sx={{ position: 'relative', flexShrink: 0 }} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
+      <Flex alignItems="center" gap={1} px={2} py={1} sx={{ borderRadius: 20, background: '#e8f0fe', cursor: 'default' }}>
+        <Star sx={{ width: 11, height: 11, color: '#0862d1' }} />
+        <Text.Caption m={0} sx={{ fontSize: '11px', fontWeight: 600, color: '#0862d1', lineHeight: 1 }}>
+          Premium
+        </Text.Caption>
+      </Flex>
+      {hovered && (
+        <BadgeTooltip>
+          <Text.Body m={0} sx={{ fontSize: '14px', color: '#fff', lineHeight: '22px' }}>
+            Premium domains are short, memorable, and often include common or highly searched words that may have strong brand value.
+          </Text.Body>
+        </BadgeTooltip>
       )}
     </Box>
   )
@@ -164,7 +338,10 @@ function Tooltip({ text, children }: { text: string; children: React.ReactNode }
 
 // ── Badge ─────────────────────────────────────────────────────────────────────
 
-function Badge({ kind }: { kind: DomainBadge }) {
+function Badge({ kind, rtbLabel }: { kind: DomainBadge; rtbLabel?: string }) {
+  if (kind === 'rtb') {
+    return <RtbBadge label={rtbLabel} />
+  }
   if (kind === 'exact') {
     return (
       <Flex alignItems="center" gap={1} px={2} py={1} sx={{ borderRadius: 20, background: '#e6f4ea', flexShrink: 0 }}>
@@ -176,28 +353,10 @@ function Badge({ kind }: { kind: DomainBadge }) {
     )
   }
   if (kind === 'premium') {
-    return (
-      <Tooltip text="Premium domains are short, memorable, and often include common or highly searched words that may have strong brand value.">
-        <Flex alignItems="center" gap={1} px={2} py={1} sx={{ borderRadius: 20, background: '#e8f0fe', flexShrink: 0, cursor: 'default' }}>
-          <Star sx={{ width: 11, height: 11, color: '#0862d1' }} />
-          <Text.Caption m={0} sx={{ fontSize: '11px', fontWeight: 600, color: '#0862d1', lineHeight: 1 }}>
-            Premium
-          </Text.Caption>
-        </Flex>
-      </Tooltip>
-    )
+    return <PremiumBadge />
   }
   if (kind === 'promoted') {
-    return (
-      <Tooltip text="This TLD (the domain ending) is available at a promotional price for a limited time.">
-        <Flex alignItems="center" gap={1} px={2} py={1} sx={{ borderRadius: 20, background: '#e8f0fe', flexShrink: 0, cursor: 'default' }}>
-          <Tag sx={{ width: 11, height: 11, color: '#0862d1' }} />
-          <Text.Caption m={0} sx={{ fontSize: '11px', fontWeight: 600, color: '#0862d1', lineHeight: 1 }}>
-            Promoted
-          </Text.Caption>
-        </Flex>
-      </Tooltip>
-    )
+    return <PromotedBadge />
   }
   return null
 }
@@ -209,11 +368,13 @@ function ResultRow({
   inCart,
   onToggleCart,
   isTop,
+  variant,
 }: {
   result: DomainResult
   inCart: boolean
   onToggleCart: (result: DomainResult) => void
   isTop: boolean
+  variant?: 'chips' | 'chips-label' | 'cards' | 'sections'
 }) {
   return (
     <Flex
@@ -246,14 +407,22 @@ function ResultRow({
       <Flex alignItems="center" gap={2} sx={{ flex: '1 1 0', minWidth: 0, flexWrap: 'wrap' }}>
         <Text.Body
           m={0}
-          fontWeight={result.badges.includes('exact') ? 400 : 'book'}
+          fontWeight="book"
           sx={{ color: result.available ? 'fg.default' : 'fg.disabled', flexShrink: 0 }}
         >
           {result.name}
         </Text.Body>
         {result.badges.length > 0 && (
           <Flex gap={1} alignItems="center" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
-            {result.badges.map((b) => <Badge key={b} kind={b} />)}
+            {prioritizeBadges(
+              result.available ? result.badges : result.badges.filter((b) => b !== 'rtb')
+            ).map((b) => (
+              <Badge
+                key={b}
+                kind={b}
+                rtbLabel={variant === 'chips-label' ? getRtbLabel(result.name) : undefined}
+              />
+            ))}
           </Flex>
         )}
       </Flex>
@@ -293,6 +462,220 @@ function ResultRow({
         }
       </Box>
     </Flex>
+  )
+}
+
+// ── Cart button (shared) ──────────────────────────────────────────────────────
+
+function CartButton({ result, inCart, onToggleCart }: { result: DomainResult; inCart: boolean; onToggleCart: (r: DomainResult) => void }) {
+  return (
+    <Box
+      as="button"
+      onClick={() => onToggleCart(result)}
+      aria-label={inCart ? 'Remove from cart' : 'Add to cart'}
+      sx={{
+        border: 'none',
+        cursor: 'pointer',
+        width: 36,
+        height: 36,
+        borderRadius: 8,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+        background: inCart ? 'var(--colors-fg-default)' : 'transparent',
+        transition: 'background 0.2s ease',
+        '&:hover': { background: inCart ? '#333' : 'var(--colors-bg-default)' },
+      }}
+    >
+      {inCart
+        ? <Checkmark sx={{ width: 16, height: 16, color: '#ffffff' }} />
+        : <ShoppingBag sx={{ width: 18, height: 18, color: 'var(--colors-fg-muted)' }} />
+      }
+    </Box>
+  )
+}
+
+// ── Price display (shared) ────────────────────────────────────────────────────
+
+function PriceDisplay({ result }: { result: DomainResult }) {
+  if (!result.available) return <Text.Body m={0} color="fg.disabled" sx={{ fontSize: '13px' }}>Unavailable</Text.Body>
+  if (result.salePrice !== null) return (
+    <Flex alignItems="center" gap={2}>
+      <Text.Caption m={0} color="fg.disabled" sx={{ textDecoration: 'line-through', fontSize: '13px' }}>${result.originalPrice}</Text.Caption>
+      <Text.Body m={0}>${result.salePrice}</Text.Body>
+    </Flex>
+  )
+  return <Text.Body m={0}>${result.originalPrice}</Text.Body>
+}
+
+// ── Cards view ────────────────────────────────────────────────────────────────
+
+function CardsView({
+  results,
+  cart,
+  onToggleCart,
+}: {
+  results: DomainResult[]
+  cart: Set<string>
+  onToggleCart: (r: DomainResult) => void
+}) {
+  const exactResult = results.find((r) => r.badges.includes('exact'))
+  const firstRtb = results.find((r) => r.badges.includes('rtb') && !r.badges.includes('exact'))
+  const featuredIds = new Set([exactResult?.id, firstRtb?.id].filter(Boolean) as string[])
+  const cards = [exactResult, firstRtb].filter(Boolean) as DomainResult[]
+  const rest = results.filter((r) => !featuredIds.has(r.id))
+
+  return (
+    <Box>
+      {cards.length > 0 && (
+        <Flex gap={3} mb={2} sx={{ flexWrap: 'wrap' }}>
+          {cards.map((r) => {
+            const inCart = cart.has(r.id)
+            const isExact = r.badges.includes('exact')
+            const visibleBadges = isExact ? (['exact'] as DomainBadge[]) : prioritizeBadges(r.badges)
+            return (
+              <Box
+                key={r.id}
+                sx={{
+                  flex: '1 1 0',
+                  minWidth: 200,
+                  border: isExact ? '2px solid #aedcc2' : '1px solid #e7e7e7',
+                  borderRadius: 11,
+                  p: 3,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '11px',
+                  ...(isExact ? { boxShadow: '0 0 0.5px rgba(0,0,0,0.08), 0 4px 8px rgba(0,0,0,0.12)' } : {}),
+                }}
+              >
+                <Flex gap={1} alignItems="center">
+                  {visibleBadges.map((b) => (
+                    <Badge key={b} kind={b} />
+                  ))}
+                </Flex>
+                <Text.Body m={0} sx={{ fontSize: '16px', lineHeight: '22px' }}>
+                  {r.name}
+                </Text.Body>
+                <Flex alignItems="center" justifyContent="space-between">
+                  <PriceDisplay result={r} />
+                  <CartButton result={r} inCart={inCart} onToggleCart={onToggleCart} />
+                </Flex>
+              </Box>
+            )
+          })}
+        </Flex>
+      )}
+      {rest.map((r, i) => (
+        <ResultRow
+          key={r.id}
+          result={r}
+          inCart={cart.has(r.id)}
+          onToggleCart={onToggleCart}
+          isTop={cards.length === 0 && i === 0}
+          variant="cards"
+        />
+      ))}
+    </Box>
+  )
+}
+
+// ── Sections view ─────────────────────────────────────────────────────────────
+
+function SectionsView({
+  results,
+  cart,
+  onToggleCart,
+}: {
+  results: DomainResult[]
+  cart: Set<string>
+  onToggleCart: (r: DomainResult) => void
+}) {
+  const exactResults = results.filter((r) => r.badges.includes('exact'))
+  const recommended = results.filter((r) => r.badges.includes('rtb') && !r.badges.includes('exact'))
+  const rest = results.filter((r) => !r.badges.includes('exact') && !r.badges.includes('rtb'))
+
+  return (
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: '40px' }}>
+      {/* Claim it today */}
+      {exactResults.length > 0 && (
+        <Box
+          sx={{
+            background: '#edf8f2',
+            borderRadius: 11,
+            p: '22px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px',
+            boxShadow: '0 0 0.5px rgba(0,0,0,0.08), 0 4px 8px rgba(0,0,0,0.12)',
+          }}
+        >
+          <Text.Body m={0} sx={{ fontSize: '18px', lineHeight: '1.2', letterSpacing: '-0.018px' }}>
+            Claim it today
+          </Text.Body>
+          {exactResults.map((r) => {
+            const inCart = cart.has(r.id)
+            const visibleBadges = prioritizeBadges(r.badges)
+            return (
+              <Box
+                key={r.id}
+                sx={{
+                  background: '#fff',
+                  border: '1px solid #aedcc2',
+                  borderRadius: 11,
+                  pl: 3,
+                  pr: '11px',
+                  py: 3,
+                }}
+              >
+                <Flex alignItems="center" gap="11px">
+                  <Flex flex="1 1 0" alignItems="center" gap={2} sx={{ minWidth: 0, flexWrap: 'wrap' }}>
+                    <Text.Body m={0} sx={{ fontSize: '15px', letterSpacing: '-0.015px', flexShrink: 0 }}>
+                      {r.name}
+                    </Text.Body>
+                    <Flex gap={1} alignItems="center" sx={{ flexShrink: 0 }}>
+                      {visibleBadges.map((b) => <Badge key={b} kind={b} />)}
+                    </Flex>
+                  </Flex>
+                  <Flex alignItems="center" gap="11px" sx={{ flexShrink: 0 }}>
+                    <PriceDisplay result={r} />
+                    <CartButton result={r} inCart={inCart} onToggleCart={onToggleCart} />
+                  </Flex>
+                </Flex>
+              </Box>
+            )
+          })}
+        </Box>
+      )}
+
+      {/* Recommended */}
+      {recommended.length > 0 && (
+        <Box>
+          <Text.Body m={0} mb={3} sx={{ fontSize: '18px', lineHeight: '1.2', letterSpacing: '-0.018px' }}>
+            Recommended
+          </Text.Body>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            {recommended.map((r) => (
+              <ResultRow key={r.id} result={r} inCart={cart.has(r.id)} onToggleCart={onToggleCart} isTop={false} variant="sections" />
+            ))}
+          </Box>
+        </Box>
+      )}
+
+      {/* More results */}
+      {rest.length > 0 && (
+        <Box>
+          <Text.Body m={0} mb={3} sx={{ fontSize: '18px', lineHeight: '1.2', letterSpacing: '-0.018px' }}>
+            {rest.length}+ more results
+          </Text.Body>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            {rest.map((r) => (
+              <ResultRow key={r.id} result={r} inCart={cart.has(r.id)} onToggleCart={onToggleCart} isTop={false} variant="sections" />
+            ))}
+          </Box>
+        </Box>
+      )}
+    </Box>
   )
 }
 
@@ -962,14 +1345,99 @@ export default function DomainSearch() {
     })
   }
 
+  const [variant, setVariant] = useState<'chips' | 'chips-label' | 'cards' | 'sections'>('chips')
+
   const cartItems = Array.from(cartDomains.values())
   const cartCount = cart.size
   const hasCart = cartCount > 0
 
+  const VARIANTS: { id: typeof variant; label: string }[] = [
+    { id: 'chips', label: 'Chips' },
+    { id: 'chips-label', label: 'Chips w/ label' },
+    { id: 'cards', label: 'Cards' },
+    { id: 'sections', label: 'Sections' },
+  ]
+
   return (
     <Box sx={{ minHeight: '100vh', background: '#fff' }}>
 
-      {/* ── Nav ── */}
+      {/* ── Variant selector ── */}
+      <Box sx={{ borderBottom: '1px solid', borderColor: 'border.default', background: '#fff', py: '10px' }}>
+        <Flex
+          alignItems="center"
+          justifyContent="center"
+          gap={1}
+          sx={{ maxWidth: 1440, mx: 'auto', px: '16px' }}
+        >
+          {VARIANTS.map(({ id, label }) => {
+            const isActive = variant === id
+            return (
+              <Box
+                key={id}
+                as="button"
+                onClick={() => setVariant(id)}
+                sx={{
+                  background: isActive ? 'var(--colors-fg-default)' : 'transparent',
+                  border: '1px solid',
+                  borderColor: isActive ? 'fg.default' : 'border.default',
+                  borderRadius: 4,
+                  px: 3,
+                  py: '6px',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  fontWeight: isActive ? 600 : 400,
+                  color: isActive ? '#fff' : 'fg.muted',
+                  letterSpacing: '0.01em',
+                  whiteSpace: 'nowrap',
+                  transition: 'background 0.12s, color 0.12s, border-color 0.12s',
+                  '&:hover': {
+                    borderColor: 'fg.default',
+                    color: isActive ? '#fff' : 'fg.default',
+                  },
+                }}
+              >
+                {label}
+              </Box>
+            )
+          })}
+        </Flex>
+      </Box>
+
+      {/* ── Inline nav — scrolls with the page, not sticky ── */}
+      <Box sx={{ background: '#fff' }}>
+        <Flex
+          as="nav"
+          alignItems="center"
+          justifyContent="space-between"
+          px={6}
+          sx={{ height: 66, maxWidth: 1440, mx: 'auto' }}
+        >
+          <Box
+            as="button"
+            onClick={() => navigate('/')}
+            sx={{ background: 'none', border: 'none', cursor: 'pointer', p: 0, display: 'flex', alignItems: 'center', gap: 2 }}
+          >
+            <LogoSquarespace color="fg.default" />
+            <Flex alignItems="baseline" gap={1} sx={{ '@media (max-width: 767px)': { display: 'none' } }}>
+              <Text.Body m={0} sx={{ fontWeight: 600, fontSize: '13px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Squarespace</Text.Body>
+              <Text.Body m={0} color="fg.muted" sx={{ fontSize: '13px' }}>Domains</Text.Body>
+            </Flex>
+          </Box>
+          <Flex gap={6} alignItems="center" sx={{ '@media (max-width: 767px)': { display: 'none' } }}>
+            {['Transfer a domain', 'Build a website'].map((link) => (
+              <Text.Body key={link} m={0} color="fg.muted" sx={{ cursor: 'pointer', fontSize: '12px', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 500, '&:hover': { color: 'fg.default' } }}>{link}</Text.Body>
+            ))}
+          </Flex>
+          <Flex alignItems="center" gap={5}>
+            <Text.Body m={0} color="fg.muted" sx={{ cursor: 'pointer', fontSize: '12px', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 500, '&:hover': { color: 'fg.default' }, '@media (max-width: 767px)': { display: 'none' } }}>Log In</Text.Body>
+            <Box as="button" aria-label="Open menu" sx={{ display: 'none', '@media (max-width: 767px)': { display: 'flex' }, flexDirection: 'column', justifyContent: 'center', gap: '5px', background: 'none', border: 'none', cursor: 'pointer', p: 1 }}>
+              {[0, 1, 2].map((i) => <Box key={i} sx={{ width: 22, height: 2, borderRadius: 1, background: 'var(--colors-fg-default)' }} />)}
+            </Box>
+          </Flex>
+        </Flex>
+      </Box>
+
+      {/* ── Sticky nav — fixed, slides in once user scrolls past the search bar ── */}
       <Box
         sx={{
           position: 'fixed',
@@ -1154,17 +1622,53 @@ export default function DomainSearch() {
             )}
 
             {/* Results */}
+            {!isLoading && results.length > 0 && (() => {
+              const available = results.filter((r) => r.available)
+              if (variant === 'cards') {
+                return <CardsView results={available} cart={cart} onToggleCart={toggleCart} />
+              }
+              if (variant === 'sections') {
+                return <SectionsView results={available} cart={cart} onToggleCart={toggleCart} />
+              }
+              return (
+                <Box>
+                  {available.map((r, i) => (
+                    <ResultRow
+                      key={r.id}
+                      result={r}
+                      inCart={cart.has(r.id)}
+                      onToggleCart={toggleCart}
+                      isTop={i === 0}
+                      variant={variant}
+                    />
+                  ))}
+                </Box>
+              )
+            })()}
+
+            {/* Load more */}
             {!isLoading && results.length > 0 && (
-              <Box>
-                {results.filter((r) => r.available).map((r, i) => (
-                  <ResultRow
-                    key={r.id}
-                    result={r}
-                    inCart={cart.has(r.id)}
-                    onToggleCart={toggleCart}
-                    isTop={i === 0}
-                  />
-                ))}
+              <Box
+                as="button"
+                sx={{
+                  width: '100%',
+                  mt: 4,
+                  py: 4,
+                  border: '1px solid',
+                  borderColor: 'border.default',
+                  borderRadius: 0,
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  color: 'fg.default',
+                  transition: 'background 0.12s',
+                  '&:hover': { background: 'var(--colors-bg-default)' },
+                }}
+              >
+                Load more
               </Box>
             )}
 
