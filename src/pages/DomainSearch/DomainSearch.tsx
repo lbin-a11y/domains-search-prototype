@@ -325,7 +325,7 @@ function PromotedBadge() {
   const [hovered, setHovered] = useState(false)
   return (
     <Box sx={{ position: 'relative', flexShrink: 0 }} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
-      <Flex alignItems="center" gap={1} px={2} py={1} sx={{ borderRadius: 20, background: '#e8f0fe', cursor: 'default' }}>
+      <Flex alignItems="center" gap={1} px={2} py={1} sx={{ borderRadius: 20, background: '#d8e8fe', cursor: 'default' }}>
         <Tag sx={{ width: 11, height: 11, color: '#0862d1' }} />
         <Text.Caption m={0} sx={{ fontSize: '11px', fontWeight: 600, color: '#0862d1', lineHeight: 1 }}>
           Promoted
@@ -348,7 +348,7 @@ function PremiumBadge() {
   const [hovered, setHovered] = useState(false)
   return (
     <Box sx={{ position: 'relative', flexShrink: 0 }} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
-      <Flex alignItems="center" gap={1} px={2} py={1} sx={{ borderRadius: 20, background: '#e8f0fe', cursor: 'default' }}>
+      <Flex alignItems="center" gap={1} px={2} py={1} sx={{ borderRadius: 20, background: '#d8e8fe', cursor: 'default' }}>
         <Star sx={{ width: 11, height: 11, color: '#0862d1' }} />
         <Text.Caption m={0} sx={{ fontSize: '11px', fontWeight: 600, color: '#0862d1', lineHeight: 1 }}>
           Premium
@@ -641,11 +641,11 @@ function SectionsView({
           }}
         >
           <Text.Body m={0} sx={{ fontSize: '18px', lineHeight: '1.2', letterSpacing: '-0.018px' }}>
-            Claim it today
+            Your domain is available
           </Text.Body>
           {exactResults.map((r) => {
             const inCart = cart.has(r.id)
-            const visibleBadges = prioritizeBadges(r.badges)
+            const visibleBadges = prioritizeBadges(r.badges).filter((b) => b !== 'exact')
             return (
               <Box
                 key={r.id}
