@@ -13,10 +13,10 @@ import {
   ChevronSmallUp,
   ChevronSmallDown,
   InfoCircle,
-  Flash,
   CheckmarkShield,
   LineChart,
   Tag,
+  Sparkles,
 } from '@sqs/rosetta-icons'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -31,6 +31,7 @@ interface DomainResult {
   originalPrice: number
   salePrice: number | null
   available: boolean
+  rtbTooltip?: { sentence1: string; sentence2: string }
 }
 
 // ── Mock data ────────────────────────────────────────────────────────────────
@@ -64,6 +65,33 @@ const TLD_CATALOG: Array<{
   { tld: '.photos', base: 30, sale: null, premium: true },
   { tld: '.design', base: 34, sale: 28 },
   { tld: '.agency', base: 28, sale: null },
+]
+
+const AUSTIN_CERAMICS_RESULTS: DomainResult[] = [
+  { id: 'austinceramics.com',       name: 'austinceramics.com',       tld: '.com',       badges: ['exact'],              originalPrice: 20,  salePrice: 8,    available: true },
+  { id: 'austinceramics.org',       name: 'austinceramics.org',       tld: '.org',       badges: [],                     originalPrice: 20,  salePrice: 9,    available: true },
+  { id: 'austin-ceramics.com',      name: 'austin-ceramics.com',      tld: '.com',       badges: [],                     originalPrice: 20,  salePrice: 8,    available: true },
+  { id: 'austinartworks.com',       name: 'austinartworks.com',       tld: '.com',       badges: ['rtb'],                originalPrice: 20,  salePrice: 8,    available: true,
+    rtbTooltip: { sentence1: "'Artworks' communicates your craft before a customer even visits your site.", sentence2: '73% of Squarespace ceramic businesses use an art-related word in their domain.' } },
+  { id: 'austin-ceramics.net',      name: 'austin-ceramics.net',      tld: '.net',       badges: [],                     originalPrice: 20,  salePrice: 14,   available: true },
+  { id: 'austinceramics.studio',    name: 'austinceramics.studio',    tld: '.studio',    badges: ['rtb', 'promoted'],    originalPrice: 40,  salePrice: 10,   available: true,
+    rtbTooltip: { sentence1: '.studio sets a professional, creative tone.', sentence2: '84% of creative businesses on Squarespace this month use .studio.' } },
+  { id: 'austinceramics.live',      name: 'austinceramics.live',      tld: '.live',      badges: ['promoted'],           originalPrice: 20,  salePrice: 10,   available: true },
+  { id: 'austinceramic.com',        name: 'austinceramic.com',        tld: '.com',       badges: ['rtb'],                originalPrice: 20,  salePrice: 8,    available: true,
+    rtbTooltip: { sentence1: "'Ceramic', a real word that defines your business at a glance.", sentence2: 'Dictionary-word, short domain names are remembered nearly 2x more than invented ones.' } },
+  { id: 'austinceramicscompany.com',name: 'austinceramicscompany.com',tld: '.com',       badges: [],                     originalPrice: 20,  salePrice: 8,    available: true },
+  { id: 'southaustinceramics.com',  name: 'southaustinceramics.com',  tld: '.com',       badges: [],                     originalPrice: 20,  salePrice: 8,    available: true },
+  { id: 'austinceramicsllc.com',    name: 'austinceramicsllc.com',    tld: '.com',       badges: [],                     originalPrice: 20,  salePrice: 8,    available: true },
+  { id: 'austinceramics.tours',     name: 'austinceramics.tours',     tld: '.tours',     badges: [],                     originalPrice: 75,  salePrice: null, available: true },
+  { id: 'austinceramics.center',    name: 'austinceramics.center',    tld: '.center',    badges: [],                     originalPrice: 35,  salePrice: null, available: true },
+  { id: 'austinceramics.events',    name: 'austinceramics.events',    tld: '.events',    badges: [],                     originalPrice: 50,  salePrice: 10,   available: true },
+  { id: 'austinceramics.life',      name: 'austinceramics.life',      tld: '.life',      badges: [],                     originalPrice: 35,  salePrice: null, available: true },
+  { id: 'austinceramics.community', name: 'austinceramics.community', tld: '.community', badges: [],                     originalPrice: 50,  salePrice: 10,   available: true },
+  { id: 'austinceramics.camp',      name: 'austinceramics.camp',      tld: '.camp',      badges: [],                     originalPrice: 50,  salePrice: 10,   available: true },
+  { id: 'austinceramics.club',      name: 'austinceramics.club',      tld: '.club',      badges: [],                     originalPrice: 25,  salePrice: null, available: true },
+  { id: 'austinceramics.group',     name: 'austinceramics.group',     tld: '.group',     badges: [],                     originalPrice: 30,  salePrice: 10,   available: true },
+  { id: 'austinceramics.bar',       name: 'austinceramics.bar',       tld: '.bar',       badges: [],                     originalPrice: 70,  salePrice: null, available: true },
+  { id: 'austinceramics.town',      name: 'austinceramics.town',      tld: '.town',      badges: [],                     originalPrice: 55,  salePrice: null, available: true },
 ]
 
 const LIFETIME_PHOTOGRAPHY_RESULTS: DomainResult[] = [
@@ -105,6 +133,7 @@ function relatedNames(stem: string): string[] {
 function generateResults(rawQuery: string): DomainResult[] {
   const normalized = rawQuery.trim().toLowerCase().replace(/\s+/g, '')
   if (normalized === 'lifetimephotography') return LIFETIME_PHOTOGRAPHY_RESULTS
+  if (normalized === 'austinceramics') return AUSTIN_CERAMICS_RESULTS
 
   const stem = rawQuery.trim().toLowerCase().replace(/\s+/g, '').replace(/^\./, '').replace(/\.[a-z]+$/, '')
   const results: DomainResult[] = []
@@ -171,7 +200,9 @@ function getRtbLabel(name: string): string {
 
 // ── RTB Tooltip ───────────────────────────────────────────────────────────────
 
-function RtbTooltip() {
+function RtbTooltip({ sentence1, sentence2 }: { sentence1?: string; sentence2?: string }) {
+  const s1 = sentence1 ?? 'The TLD is certified.'
+  const s2 = sentence2 ?? '400+ users have purchased it today.'
   return (
     <Box
       sx={{
@@ -187,7 +218,6 @@ function RtbTooltip() {
         zIndex: 400,
         boxShadow: '0 0 1px rgba(0,0,0,0.08), 0 8px 16px rgba(0,0,0,0.12)',
         pointerEvents: 'none',
-        // Arrow pointing down
         '&::after': {
           content: '""',
           position: 'absolute',
@@ -206,13 +236,13 @@ function RtbTooltip() {
       <Flex alignItems="center" gap={2} mb={1}>
         <CheckmarkShield sx={{ width: 16, height: 16, color: '#fff', flexShrink: 0 }} />
         <Text.Body m={0} sx={{ fontSize: '14px', color: '#fff', lineHeight: '22px' }}>
-          The TLD is certified.
+          {s1}
         </Text.Body>
       </Flex>
       <Flex alignItems="center" gap={2}>
         <LineChart sx={{ width: 16, height: 16, color: '#fff', flexShrink: 0 }} />
         <Text.Body m={0} sx={{ fontSize: '14px', color: '#fff', lineHeight: '22px' }}>
-          400+ users have purchased it today.
+          {s2}
         </Text.Body>
       </Flex>
     </Box>
@@ -221,7 +251,7 @@ function RtbTooltip() {
 
 // ── RTB Badge ─────────────────────────────────────────────────────────────────
 
-function RtbBadge({ label }: { label?: string }) {
+function RtbBadge({ label, sentence1, sentence2 }: { label?: string; sentence1?: string; sentence2?: string }) {
   const [hovered, setHovered] = useState(false)
   return (
     <Box
@@ -242,14 +272,14 @@ function RtbBadge({ label }: { label?: string }) {
           cursor: 'default',
         }}
       >
-        <Flash sx={{ width: 14, height: 14, color: '#0862d1', flexShrink: 0 }} />
+        <Sparkles sx={{ width: 14, height: 14, color: '#0862d1', flexShrink: 0 }} />
         {label && (
           <Text.Caption m={0} sx={{ fontSize: '11px', fontWeight: 600, color: '#0862d1', lineHeight: 1, whiteSpace: 'nowrap' }}>
             {label}
           </Text.Caption>
         )}
       </Flex>
-      {hovered && <RtbTooltip />}
+      {hovered && <RtbTooltip sentence1={sentence1} sentence2={sentence2} />}
     </Box>
   )
 }
@@ -337,9 +367,9 @@ function PremiumBadge() {
 
 // ── Badge ─────────────────────────────────────────────────────────────────────
 
-function Badge({ kind, rtbLabel }: { kind: DomainBadge; rtbLabel?: string }) {
+function Badge({ kind, rtbLabel, rtbTooltip }: { kind: DomainBadge; rtbLabel?: string; rtbTooltip?: { sentence1: string; sentence2: string } }) {
   if (kind === 'rtb') {
-    return <RtbBadge label={rtbLabel} />
+    return <RtbBadge label={rtbLabel} sentence1={rtbTooltip?.sentence1} sentence2={rtbTooltip?.sentence2} />
   }
   if (kind === 'exact') {
     return (
@@ -420,6 +450,7 @@ function ResultRow({
                 key={b}
                 kind={b}
                 rtbLabel={variant === 'chips-label' ? getRtbLabel(result.name) : undefined}
+                rtbTooltip={result.rtbTooltip}
               />
             ))}
           </Flex>
@@ -550,7 +581,7 @@ function CardsView({
               >
                 <Flex gap={1} alignItems="center">
                   {visibleBadges.map((b) => (
-                    <Badge key={b} kind={b} />
+                    <Badge key={b} kind={b} rtbTooltip={r.rtbTooltip} />
                   ))}
                 </Flex>
                 <Text.Body m={0} sx={{ fontSize: '16px', lineHeight: '22px' }}>
@@ -633,7 +664,7 @@ function SectionsView({
                       {r.name}
                     </Text.Body>
                     <Flex gap={1} alignItems="center" sx={{ flexShrink: 0 }}>
-                      {visibleBadges.map((b) => <Badge key={b} kind={b} />)}
+                      {visibleBadges.map((b) => <Badge key={b} kind={b} rtbTooltip={r.rtbTooltip} />)}
                     </Flex>
                   </Flex>
                   <Flex alignItems="center" gap="11px" sx={{ flexShrink: 0 }}>
