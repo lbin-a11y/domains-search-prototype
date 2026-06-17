@@ -13,6 +13,8 @@ import {
   Trash,
   ChevronSmallUp,
   ChevronSmallDown,
+  ChevronLargeUp,
+  ChevronLargeDown,
   InfoCircle,
 } from '@sqs/rosetta-icons'
 
@@ -122,6 +124,41 @@ function generateResults(rawQuery: string): DomainResult[] {
   }
 
   return results
+}
+
+// ── Animated list hook ───────────────────────────────────────────────────────
+// Keeps exiting items in the DOM for `duration` ms so CSS can animate them out.
+function useAnimatedList<T extends { id: string }>(items: T[], duration = 250) {
+  const [displayed, setDisplayed] = useState<(T & { exiting: boolean })[]>(
+    items.map((i) => ({ ...i, exiting: false }))
+  )
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    const currentIds = new Set(items.map((i) => i.id))
+    const displayedIds = new Set(displayed.filter((i) => !i.exiting).map((i) => i.id))
+
+    const entering = items.filter((i) => !displayedIds.has(i.id))
+    const exiting = displayed.filter((i) => !currentIds.has(i.id) && !i.exiting)
+
+    if (entering.length === 0 && exiting.length === 0) return
+
+    const exitingIds = new Set(exiting.map((i) => i.id))
+    setDisplayed((prev) => {
+      const next = prev.map((i) => exitingIds.has(i.id) ? { ...i, exiting: true } : i)
+      entering.forEach((i) => next.push({ ...i, exiting: false }))
+      return next
+    })
+
+    if (exiting.length > 0) {
+      if (timerRef.current) clearTimeout(timerRef.current)
+      timerRef.current = setTimeout(() => {
+        setDisplayed(items.map((i) => ({ ...i, exiting: false })))
+      }, duration)
+    }
+  }, [items]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  return displayed
 }
 
 // ── Badge ─────────────────────────────────────────────────────────────────────
@@ -311,8 +348,7 @@ function MobileUpsellCard({
 }) {
   const [expanded, setExpanded] = useState(false)
   const [mounted, setMounted] = useState(false)
-  const [tipPos, setTipPos] = useState<{ left: number; bottom: number } | null>(null)
-  const tipRef = useRef<HTMLElement>(null)
+  const [listCollapsed, setListCollapsed] = useState(false)
 
   useEffect(() => {
     if (isOpen) {
@@ -346,18 +382,11 @@ function MobileUpsellCard({
     }
   }, [cart, mounted]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleTipShow = () => {
-    if (tipRef.current) {
-      const rect = tipRef.current.getBoundingClientRect()
-      setTipPos({ left: rect.left + rect.width / 2, bottom: window.innerHeight - rect.top + 6 })
-    }
-  }
-  const handleTipHide = () => setTipPos(null)
-
   const sld = getSld(result.name)
   const matching = results
     .filter((r) => getSld(r.name) === sld && r.available && !cart.has(r.id) && r.id !== result.id)
-    .slice(0, 4)
+    .slice(0, 3)
+  const animatedMatching = useAnimatedList(matching)
 
   if (!mounted) return null
 
@@ -394,94 +423,71 @@ function MobileUpsellCard({
           }}
         >
           {/* Header */}
-          <Flex alignItems="center" gap={1} mb={3}>
-            <Text.Caption m={0} sx={{ color: '#4f4f4f' }}>Protect your brand name</Text.Caption>
-            <Box
-              as="button"
-              ref={tipRef as React.Ref<HTMLElement>}
-              onMouseEnter={handleTipShow}
-              onMouseLeave={handleTipHide}
-              onFocus={handleTipShow}
-              onBlur={handleTipHide}
-              aria-describedby="upsell-tooltip"
-              sx={{ background: 'none', border: 'none', cursor: 'pointer', p: 0, display: 'flex', alignItems: 'center' }}
-            >
-              <InfoCircle sx={{ width: 16, height: 16, color: '#4f4f4f', flexShrink: 0 }} />
-            </Box>
-            {tipPos && (
-              <Box
-                role="tooltip"
-                id="upsell-tooltip"
-                sx={{
-                  position: 'fixed',
-                  bottom: tipPos.bottom,
-                  left: tipPos.left,
-                  transform: 'translateX(-50%)',
-                  textAlign: 'left',
-                  background: '#1a1a1a',
-                  color: '#fff',
-                  fontSize: '12px',
-                  lineHeight: 1.4,
-                  borderRadius: '6px',
-                  px: 3,
-                  py: 2,
-                  width: '220px',
-                  pointerEvents: 'none',
-                  zIndex: 9999,
-                  boxShadow: '0px 2px 8px rgba(0,0,0,0.2)',
-                }}
-              >
-                Secure similar domain names to ensure you're the only one using your brand across the web.
-              </Box>
-            )}
+          <Flex
+            as="button"
+            alignItems="center"
+            justifyContent="space-between"
+            onClick={() => setListCollapsed(c => !c)}
+            sx={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', p: 0, mb: listCollapsed ? 0 : 3, transition: 'margin-bottom 0.25s ease' }}
+          >
+            <Text.Caption m={0} sx={{ color: '#4f4f4f' }}>Add matching domains to secure your brand</Text.Caption>
+            {listCollapsed
+              ? <ChevronLargeDown sx={{ width: 16, height: 16, color: '#4f4f4f', flexShrink: 0 }} />
+              : <ChevronLargeUp sx={{ width: 16, height: 16, color: '#4f4f4f', flexShrink: 0 }} />
+            }
           </Flex>
 
-          {/* TLD rows */}
-          <Flex flexDirection="column" sx={{ gap: '4px' }}>
-            {matching.map((m) => {
-              const price = m.salePrice ?? m.originalPrice
-              return (
-                <Flex
-                  key={m.id}
-                  alignItems="center"
-                  justifyContent="space-between"
-                  sx={{
-                    background: '#f9f9f9',
-                    borderRadius: '4px',
-                    pl: 3,
-                    pr: 4,
-                    py: '10px',
-                  }}
-                >
-                  <Text.Body m={0} sx={{ fontSize: '14px', letterSpacing: '-0.014px' }}>
-                    <Box as="span" sx={{ color: '#4f4f4f' }}>{sld}</Box>
-                    <Box as="span" sx={{ fontWeight: 500 }}>{m.tld}</Box>
-                  </Text.Body>
-                  <Flex alignItems="baseline" gap={2}>
-                    <Text.Body m={0} sx={{ fontSize: '14px', color: 'fg.default' }}>${price}</Text.Body>
-                    <Box
-                      as="button"
-                      onClick={() => onAdd(m)}
-                      sx={{
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        p: 0,
-                        fontSize: '14px',
-                        fontWeight: 500,
-                        letterSpacing: '0.06em',
-                        textTransform: 'uppercase',
-                        color: 'fg.default',
-                        lineHeight: 1,
-                      }}
-                    >
-                      ADD
-                    </Box>
+          {/* TLD rows — grid-template-rows trick for smooth collapse */}
+          <Box sx={{ display: 'grid', gridTemplateRows: listCollapsed ? '0fr' : '1fr', transition: 'grid-template-rows 0.25s cubic-bezier(0.4,0,0.2,1)', overflow: 'hidden' }}>
+            <Flex flexDirection="column" sx={{ gap: '4px', minHeight: 0, opacity: listCollapsed ? 0 : 1, maxHeight: `${animatedMatching.length * 52}px`, overflow: 'hidden', transition: 'max-height 0.25s ease, opacity 0.2s ease' }}>
+              {animatedMatching.map((m) => {
+                const price = m.salePrice ?? m.originalPrice
+                return (
+                  <Flex
+                    key={m.id}
+                    alignItems="center"
+                    justifyContent="space-between"
+                    sx={{
+                      background: '#f9f9f9',
+                      borderRadius: '4px',
+                      pl: 3,
+                      pr: 4,
+                      py: '10px',
+                      opacity: m.exiting ? 0 : 1,
+                      transform: m.exiting ? 'translateX(8px)' : 'translateX(0)',
+                      transition: 'opacity 0.2s ease, transform 0.2s ease',
+                    }}
+                  >
+                    <Text.Body m={0} sx={{ fontSize: '14px', letterSpacing: '-0.014px' }}>
+                      <Box as="span" sx={{ color: '#4f4f4f' }}>{sld}</Box>
+                      <Box as="span" sx={{ fontWeight: 500 }}>{m.tld}</Box>
+                    </Text.Body>
+                    <Flex alignItems="baseline" gap={2}>
+                      <Text.Body m={0} sx={{ fontSize: '14px', color: 'fg.default' }}>${price}</Text.Body>
+                      <Box
+                        as="button"
+                        onClick={() => onAdd(m)}
+                        sx={{
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          p: 0,
+                          fontSize: '14px',
+                          fontWeight: 500,
+                          letterSpacing: '0.06em',
+                          textTransform: 'uppercase',
+                          color: 'fg.default',
+                          lineHeight: 1,
+                        }}
+                      >
+                        ADD
+                      </Box>
+                    </Flex>
                   </Flex>
-                </Flex>
-              )
-            })}
-          </Flex>
+                )
+              })}
+            </Flex>
+          </Box>
         </Box>
       </Box>
     </Box>
@@ -506,6 +512,7 @@ function TldToast({
   onDismiss: () => void
 }) {
   const [visible, setVisible] = useState(false)
+  const [listCollapsed, setListCollapsed] = useState(false)
 
   useEffect(() => {
     let id1: number, id2: number
@@ -516,7 +523,8 @@ function TldToast({
   const sld = getSld(result.name)
   const matching = results
     .filter((r) => getSld(r.name) === sld && r.available && !cart.has(r.id) && r.id !== result.id)
-    .slice(0, 4)
+    .slice(0, 3)
+  const animatedMatching = useAnimatedList(matching)
 
   // Auto-dismiss when all alternatives added
   useEffect(() => {
@@ -554,46 +562,58 @@ function TldToast({
       }}
     >
       {/* Header */}
-      <Flex justifyContent="space-between" alignItems="center" mb={2}>
-        <Text.Caption m={0} sx={{ color: '#4f4f4f', fontSize: '12px' }}>Protect your brand name</Text.Caption>
+      <Flex justifyContent="space-between" alignItems="center" mb={listCollapsed ? 0 : 2}>
+        <Box
+          as="button"
+          onClick={() => setListCollapsed(c => !c)}
+          sx={{ background: 'none', border: 'none', cursor: 'pointer', p: 0, display: 'flex', alignItems: 'center', gap: 1, flex: 1 }}
+        >
+          <Text.Caption m={0} sx={{ color: '#4f4f4f', fontSize: '12px' }}>Add matching domains to secure your brand</Text.Caption>
+          {listCollapsed
+            ? <ChevronLargeDown sx={{ width: 16, height: 16, color: '#4f4f4f', flexShrink: 0 }} />
+            : <ChevronLargeUp sx={{ width: 16, height: 16, color: '#4f4f4f', flexShrink: 0 }} />
+          }
+        </Box>
         <Box
           as="button"
           onClick={dismiss}
-          sx={{ background: 'none', border: 'none', cursor: 'pointer', p: 0, display: 'flex', alignItems: 'center' }}
+          sx={{ background: 'none', border: 'none', cursor: 'pointer', p: 0, display: 'flex', alignItems: 'center', ml: 2 }}
         >
           <CrossSmall sx={{ width: 16, height: 16, color: 'fg.muted' }} />
         </Box>
       </Flex>
 
       {/* TLD rows */}
-      <Flex flexDirection="column" sx={{ gap: '4px' }}>
-        {matching.map((m) => {
-          const price = m.salePrice ?? m.originalPrice
-          return (
-            <Flex
-              key={m.id}
-              alignItems="center"
-              justifyContent="space-between"
-              sx={{ background: '#f9f9f9', borderRadius: '4px', pl: 3, pr: 4, py: '10px' }}
-            >
-              <Text.Body m={0} sx={{ fontSize: '14px', letterSpacing: '-0.014px' }}>
-                <Box as="span" sx={{ color: '#4f4f4f' }}>{sld}</Box>
-                <Box as="span" sx={{ fontWeight: 500 }}>{m.tld}</Box>
-              </Text.Body>
-              <Flex alignItems="baseline" gap={2}>
-                <Text.Body m={0} sx={{ fontSize: '14px', color: 'fg.default' }}>${price}</Text.Body>
-                <Box
-                  as="button"
-                  onClick={() => onAdd(m)}
-                  sx={{ background: 'none', border: 'none', cursor: 'pointer', p: 0, fontSize: '14px', fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'fg.default', lineHeight: 1 }}
-                >
-                  ADD
-                </Box>
+      <Box sx={{ display: 'grid', gridTemplateRows: listCollapsed ? '0fr' : '1fr', transition: 'grid-template-rows 0.25s cubic-bezier(0.4,0,0.2,1)', overflow: 'hidden' }}>
+        <Flex flexDirection="column" sx={{ gap: '4px', minHeight: 0, opacity: listCollapsed ? 0 : 1, maxHeight: `${animatedMatching.length * 52}px`, overflow: 'hidden', transition: 'max-height 0.25s ease, opacity 0.2s ease' }}>
+          {animatedMatching.map((m) => {
+            const price = m.salePrice ?? m.originalPrice
+            return (
+              <Flex
+                key={m.id}
+                alignItems="center"
+                justifyContent="space-between"
+                sx={{ background: '#f9f9f9', borderRadius: '4px', pl: 3, pr: 4, py: '10px', opacity: m.exiting ? 0 : 1, transform: m.exiting ? 'translateX(8px)' : 'translateX(0)', transition: 'opacity 0.2s ease, transform 0.2s ease' }}
+              >
+                <Text.Body m={0} sx={{ fontSize: '14px', letterSpacing: '-0.014px' }}>
+                  <Box as="span" sx={{ color: '#4f4f4f' }}>{sld}</Box>
+                  <Box as="span" sx={{ fontWeight: 500 }}>{m.tld}</Box>
+                </Text.Body>
+                <Flex alignItems="baseline" gap={2}>
+                  <Text.Body m={0} sx={{ fontSize: '14px', color: 'fg.default' }}>${price}</Text.Body>
+                  <Box
+                    as="button"
+                    onClick={() => onAdd(m)}
+                    sx={{ background: 'none', border: 'none', cursor: 'pointer', p: 0, fontSize: '14px', fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'fg.default', lineHeight: 1 }}
+                  >
+                    ADD
+                  </Box>
+                </Flex>
               </Flex>
-            </Flex>
-          )
-        })}
-      </Flex>
+            )
+          })}
+        </Flex>
+      </Box>
     </Box>
   )
 }
@@ -649,7 +669,7 @@ function CartSidebar({
 
   // For each SLD find other available results not in cart with same stem
   function getMatching(sld: string): DomainResult[] {
-    return results.filter((r) => getSld(r.name) === sld && r.available && !cartIds.has(r.id)).slice(0, 4)
+    return results.filter((r) => getSld(r.name) === sld && r.available && !cartIds.has(r.id)).slice(0, 3)
   }
 
   return (
@@ -900,8 +920,7 @@ function MobileMiniCart({
 }) {
   const [expanded, setExpanded] = useState(false)
   const [slideIn, setSlideIn] = useState(false)
-  const [tldTipPos, setTldTipPos] = useState<{ left: number; bottom: number } | null>(null)
-  const tldTipRef = useRef<HTMLElement>(null)
+  const [upsellCollapsed, setUpsellCollapsed] = useState(false)
   const subtotal = items.reduce((sum, r) => sum + (r.salePrice ?? r.originalPrice), 0)
   const cartIds = new Set(items.map((i) => i.id))
   const hasItems = items.length > 0
@@ -926,7 +945,7 @@ function MobileMiniCart({
   }, [hasItems])
 
   function getMatching(sld: string): DomainResult[] {
-    return results.filter((r) => getSld(r.name) === sld && r.available && !cartIds.has(r.id)).slice(0, 4)
+    return results.filter((r) => getSld(r.name) === sld && r.available && !cartIds.has(r.id)).slice(0, 3)
   }
 
   const sldOrder: string[] = []
@@ -940,6 +959,9 @@ function MobileMiniCart({
   const lastAddedSld = lastAddedId
     ? getSld(items.find((i) => i.id === lastAddedId)?.name ?? '')
     : null
+
+  const lastAddedMatching = lastAddedSld ? getMatching(lastAddedSld) : []
+  const animatedLastAddedMatching = useAnimatedList(lastAddedMatching)
 
   return (
     <>
@@ -1005,8 +1027,13 @@ function MobileMiniCart({
             <Box px={4} pb={4} sx={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {sldOrder.map((sld) => {
                 const groupItems = groups[sld]
-                const matching = getMatching(sld)
-                const showTlds = sld === lastAddedSld && matching.length > 0
+                const rawMatching = getMatching(sld)
+                const matching: (DomainResult & { exiting: boolean })[] = sld === lastAddedSld
+                  ? animatedLastAddedMatching
+                  : rawMatching.map((r) => ({ ...r, exiting: false }))
+                const showTlds = sld === lastAddedSld
+                  ? animatedLastAddedMatching.length > 0
+                  : rawMatching.length > 0
 
                 return (
                   <Box
@@ -1047,54 +1074,21 @@ function MobileMiniCart({
                     {/* TLD upsells — expanded only for most recently added domain */}
                     {showTlds && (
                       <Box sx={{ borderTop: '1px solid #ddd', px: 4, pt: 3, pb: 4 }}>
-                        <Flex alignItems="center" gap={1} sx={{ mb: 3 }}>
-                          <Text.Caption m={0} sx={{ color: '#4f4f4f' }}>Protect your brand name</Text.Caption>
-                          <Box
-                            as="button"
-                            ref={tldTipRef as React.Ref<HTMLElement>}
-                            onMouseEnter={() => {
-                              const rect = tldTipRef.current?.getBoundingClientRect()
-                              if (rect) setTldTipPos({ left: rect.left + rect.width / 2, bottom: window.innerHeight - rect.top + 6 })
-                            }}
-                            onMouseLeave={() => setTldTipPos(null)}
-                            onFocus={() => {
-                              const rect = tldTipRef.current?.getBoundingClientRect()
-                              if (rect) setTldTipPos({ left: rect.left + rect.width / 2, bottom: window.innerHeight - rect.top + 6 })
-                            }}
-                            onBlur={() => setTldTipPos(null)}
-                            aria-describedby="minicart-upsell-tooltip"
-                            sx={{ background: 'none', border: 'none', cursor: 'pointer', p: 0, display: 'flex', alignItems: 'center' }}
-                          >
-                            <InfoCircle sx={{ width: 16, height: 16, color: '#4f4f4f', flexShrink: 0 }} />
-                          </Box>
-                          {tldTipPos && (
-                            <Box
-                              role="tooltip"
-                              id="minicart-upsell-tooltip"
-                              sx={{
-                                position: 'fixed',
-                                bottom: tldTipPos.bottom,
-                                left: tldTipPos.left,
-                                transform: 'translateX(-50%)',
-                                textAlign: 'left',
-                                background: '#1a1a1a',
-                                color: '#fff',
-                                fontSize: '12px',
-                                lineHeight: 1.4,
-                                borderRadius: '6px',
-                                px: 3,
-                                py: 2,
-                                width: '220px',
-                                pointerEvents: 'none',
-                                zIndex: 9999,
-                                boxShadow: '0px 2px 8px rgba(0,0,0,0.2)',
-                              }}
-                            >
-                              Secure similar domain names to ensure you're the only one using your brand across the web.
-                            </Box>
-                          )}
+                        <Flex
+                          as="button"
+                          alignItems="center"
+                          justifyContent="space-between"
+                          onClick={() => setUpsellCollapsed(c => !c)}
+                          sx={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', p: 0, mb: upsellCollapsed ? 0 : 3, transition: 'margin-bottom 0.25s ease' }}
+                        >
+                          <Text.Caption m={0} sx={{ color: '#4f4f4f' }}>Add matching domains to secure your brand</Text.Caption>
+                          {upsellCollapsed
+                            ? <ChevronLargeDown sx={{ width: 16, height: 16, color: '#4f4f4f', flexShrink: 0 }} />
+                            : <ChevronLargeUp sx={{ width: 16, height: 16, color: '#4f4f4f', flexShrink: 0 }} />
+                          }
                         </Flex>
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <Box sx={{ display: 'grid', gridTemplateRows: upsellCollapsed ? '0fr' : '1fr', transition: 'grid-template-rows 0.25s cubic-bezier(0.4,0,0.2,1)', overflow: 'hidden' }}>
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: '4px', minHeight: 0, opacity: upsellCollapsed ? 0 : 1, maxHeight: `${matching.length * 52}px`, overflow: 'hidden', transition: 'max-height 0.25s ease, opacity 0.2s ease' }}>
                           {matching.map((m) => {
                             const stem = getSld(m.name)
                             const ext = m.name.slice(stem.length + 1)
@@ -1104,7 +1098,7 @@ function MobileMiniCart({
                                 key={m.id}
                                 alignItems="center"
                                 justifyContent="space-between"
-                                sx={{ px: 3, py: '10px', background: '#f9f9f9', borderRadius: 4 }}
+                                sx={{ px: 3, py: '10px', background: '#f9f9f9', borderRadius: 4, opacity: m.exiting ? 0 : 1, transform: m.exiting ? 'translateX(8px)' : 'translateX(0)', transition: 'opacity 0.2s ease, transform 0.2s ease' }}
                               >
                                 <Box sx={{ flex: '1 1 0', minWidth: 0 }}>
                                   <Text.Body as="span" m={0} sx={{ fontSize: '14px', color: '#4f4f4f' }}>{stem}.</Text.Body>
@@ -1123,6 +1117,7 @@ function MobileMiniCart({
                               </Flex>
                             )
                           })}
+                          </Box>
                         </Box>
                       </Box>
                     )}
@@ -1349,6 +1344,7 @@ export default function DomainSearch() {
           borderBottom: '1px solid #eee',
           py: '6px',
           px: 3,
+          '@media (max-width: 767px)': { display: 'none' },
         }}
       >
         <Text.Caption m={0} sx={{ color: '#878787', mr: 2, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
@@ -1409,7 +1405,7 @@ export default function DomainSearch() {
       </Flex>
 
       {/* ── Inline nav — scrolls with the page, not sticky ── */}
-      <Box sx={{ background: '#fff', pt: '37px' }}>
+      <Box sx={{ background: '#fff', pt: '37px', '@media (max-width: 767px)': { pt: 0 } }}>
         <Flex
           as="nav"
           alignItems="center"
