@@ -8,7 +8,7 @@ import {
   ShoppingBag,
   Star,
   Checkmark,
-  Diamond,
+  Tag,
   CrossSmall,
   Trash,
   ChevronSmallUp,
@@ -124,6 +124,44 @@ function generateResults(rawQuery: string): DomainResult[] {
   return results
 }
 
+// ── Tooltip ───────────────────────────────────────────────────────────────────
+
+function Tooltip({ text, children }: { text: string; children: React.ReactNode }) {
+  const [visible, setVisible] = useState(false)
+  return (
+    <Box
+      sx={{ position: 'relative', display: 'inline-flex' }}
+      onMouseEnter={() => setVisible(true)}
+      onMouseLeave={() => setVisible(false)}
+    >
+      {children}
+      {visible && (
+        <Box
+          sx={{
+            position: 'absolute',
+            bottom: 'calc(100% + 6px)',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: '#1a1a1a',
+            color: '#fff',
+            fontSize: '12px',
+            lineHeight: 1.4,
+            borderRadius: 6,
+            px: '10px',
+            py: '8px',
+            width: 220,
+            pointerEvents: 'none',
+            zIndex: 500,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+          }}
+        >
+          {text}
+        </Box>
+      )}
+    </Box>
+  )
+}
+
 // ── Badge ─────────────────────────────────────────────────────────────────────
 
 function Badge({ kind }: { kind: DomainBadge }) {
@@ -139,22 +177,26 @@ function Badge({ kind }: { kind: DomainBadge }) {
   }
   if (kind === 'premium') {
     return (
-      <Flex alignItems="center" gap={1} px={2} py={1} sx={{ borderRadius: 20, background: '#e8f0fe', flexShrink: 0 }}>
-        <Star sx={{ width: 11, height: 11, color: '#0862d1' }} />
-        <Text.Caption m={0} sx={{ fontSize: '11px', fontWeight: 600, color: '#0862d1', lineHeight: 1 }}>
-          Premium
-        </Text.Caption>
-      </Flex>
+      <Tooltip text="Premium domains are short, memorable, and often include common or highly searched words that may have strong brand value.">
+        <Flex alignItems="center" gap={1} px={2} py={1} sx={{ borderRadius: 20, background: '#e8f0fe', flexShrink: 0, cursor: 'default' }}>
+          <Star sx={{ width: 11, height: 11, color: '#0862d1' }} />
+          <Text.Caption m={0} sx={{ fontSize: '11px', fontWeight: 600, color: '#0862d1', lineHeight: 1 }}>
+            Premium
+          </Text.Caption>
+        </Flex>
+      </Tooltip>
     )
   }
   if (kind === 'promoted') {
     return (
-      <Flex alignItems="center" gap={1} px={2} py={1} sx={{ borderRadius: 20, background: '#e0f7fa', flexShrink: 0 }}>
-        <Diamond sx={{ width: 11, height: 11, color: '#00838f' }} />
-        <Text.Caption m={0} sx={{ fontSize: '11px', fontWeight: 600, color: '#00838f', lineHeight: 1 }}>
-          Promoted
-        </Text.Caption>
-      </Flex>
+      <Tooltip text="This TLD (the domain ending) is available at a promotional price for a limited time.">
+        <Flex alignItems="center" gap={1} px={2} py={1} sx={{ borderRadius: 20, background: '#e8f0fe', flexShrink: 0, cursor: 'default' }}>
+          <Tag sx={{ width: 11, height: 11, color: '#0862d1' }} />
+          <Text.Caption m={0} sx={{ fontSize: '11px', fontWeight: 600, color: '#0862d1', lineHeight: 1 }}>
+            Promoted
+          </Text.Caption>
+        </Flex>
+      </Tooltip>
     )
   }
   return null
@@ -179,6 +221,7 @@ function ResultRow({
       gap={3}
       px={4}
       py={3}
+      onClick={result.available ? () => onToggleCart(result) : undefined}
       sx={{
         minHeight: 44,
         opacity: result.available ? 1 : 0.4,
@@ -203,13 +246,13 @@ function ResultRow({
       <Flex alignItems="center" gap={2} sx={{ flex: '1 1 0', minWidth: 0, flexWrap: 'wrap' }}>
         <Text.Body
           m={0}
-          fontWeight={result.badges.includes('exact') ? 'semibold' : 'book'}
+          fontWeight={result.badges.includes('exact') ? 400 : 'book'}
           sx={{ color: result.available ? 'fg.default' : 'fg.disabled', flexShrink: 0 }}
         >
           {result.name}
         </Text.Body>
         {result.badges.length > 0 && (
-          <Flex gap={1} alignItems="center">
+          <Flex gap={1} alignItems="center" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
             {result.badges.map((b) => <Badge key={b} kind={b} />)}
           </Flex>
         )}
@@ -217,9 +260,7 @@ function ResultRow({
 
       {/* Price */}
       <Flex alignItems="center" gap={2} sx={{ flexShrink: 0 }}>
-        {!result.available ? (
-          <Text.Body m={0} color="fg.disabled" sx={{ fontSize: '13px' }}>Unavailable</Text.Body>
-        ) : result.salePrice !== null ? (
+        {result.salePrice !== null ? (
           <>
             <Text.Caption m={0} color="fg.disabled" sx={{ textDecoration: 'line-through', fontSize: '13px' }}>
               ${result.originalPrice}
@@ -231,37 +272,26 @@ function ResultRow({
         )}
       </Flex>
 
-      {/* Cart toggle button */}
-      {result.available ? (
-        <Box
-          as="button"
-          onClick={() => onToggleCart(result)}
-          aria-label={inCart ? 'Remove from cart' : 'Add to cart'}
-          sx={{
-            border: 'none',
-            cursor: 'pointer',
-            width: 36,
-            height: 36,
-            borderRadius: 8,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-            background: inCart ? 'var(--colors-fg-default)' : 'transparent',
-            transition: 'background 0.2s ease',
-            '&:hover': {
-              background: inCart ? '#333' : 'var(--colors-bg-default)',
-            },
-          }}
-        >
-          {inCart
-            ? <Checkmark sx={{ width: 16, height: 16, color: '#ffffff' }} />
-            : <ShoppingBag sx={{ width: 18, height: 18, color: 'var(--colors-fg-muted)' }} />
-          }
-        </Box>
-      ) : (
-        <Box sx={{ width: 36, flexShrink: 0 }} />
-      )}
+      {/* Cart state indicator */}
+      <Box
+        sx={{
+          width: 36,
+          height: 36,
+          borderRadius: 8,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0,
+          background: inCart ? 'var(--colors-fg-default)' : 'transparent',
+          transition: 'background 0.2s ease',
+          pointerEvents: 'none',
+        }}
+      >
+        {inCart
+          ? <Checkmark sx={{ width: 16, height: 16, color: '#ffffff' }} />
+          : <ShoppingBag sx={{ width: 18, height: 18, color: 'var(--colors-fg-muted)' }} />
+        }
+      </Box>
     </Flex>
   )
 }
@@ -449,8 +479,9 @@ function CartSidebar({
                   </Box>
 
                   {/* Matching items — each in its own rounded gray card with white gutters */}
-                  {isOpen && (
-                    <Box px="8px" pb="8px" sx={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <Box sx={{ display: 'grid', gridTemplateRows: isOpen ? '1fr' : '0fr', transition: 'grid-template-rows 0.3s cubic-bezier(0.4,0,0.2,1)' }}>
+                  <Box sx={{ minHeight: 0, overflow: 'hidden' }}>
+                  <Box px="8px" pb="8px" sx={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       {matching.map((m) => {
                         const stem = getSld(m.name)
                         const ext = m.name.slice(stem.length + 1) // "studio" (no dot)
@@ -498,7 +529,8 @@ function CartSidebar({
                         )
                       })}
                     </Box>
-                  )}
+                  </Box>
+                  </Box>
                 </Box>
               )}
             </Box>
@@ -572,6 +604,7 @@ function MobileMiniCart({
 }) {
   const [expanded, setExpanded] = useState(false)
   const [slideIn, setSlideIn] = useState(false)
+  const [tldsOpen, setTldsOpen] = useState<Record<string, boolean>>({})
   const subtotal = items.reduce((sum, r) => sum + (r.salePrice ?? r.originalPrice), 0)
   const cartIds = new Set(items.map((i) => i.id))
   const hasItems = items.length > 0
@@ -601,6 +634,12 @@ function MobileMiniCart({
   const lastAddedSld = lastAddedId
     ? getSld(items.find((i) => i.id === lastAddedId)?.name ?? '')
     : null
+
+  useEffect(() => {
+    if (lastAddedSld) {
+      setTldsOpen((prev) => ({ ...prev, [lastAddedSld]: true }))
+    }
+  }, [lastAddedSld])
 
   return (
     <>
@@ -667,7 +706,6 @@ function MobileMiniCart({
               {sldOrder.map((sld) => {
                 const groupItems = groups[sld]
                 const matching = getMatching(sld)
-                const showTlds = sld === lastAddedSld && matching.length > 0
 
                 return (
                   <Box
@@ -705,12 +743,25 @@ function MobileMiniCart({
                       )
                     })}
 
-                    {/* TLD upsells — expanded only for most recently added domain */}
-                    {showTlds && (
-                      <Box sx={{ borderTop: '1px solid #ddd', px: 4, pt: 3, pb: 4 }}>
-                        <Text.Caption m={0} sx={{ fontSize: '12px', color: '#4f4f4f', display: 'block', mb: 3 }}>
-                          Purchase additional TLDs
-                        </Text.Caption>
+                    {/* TLD upsells — collapsible per SLD */}
+                    {matching.length > 0 && (
+                      <Box sx={{ borderTop: '1px solid #ddd' }}>
+                        <Box
+                          as="button"
+                          onClick={() => setTldsOpen((prev) => ({ ...prev, [sld]: !tldsOpen[sld] }))}
+                          sx={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', px: 4, py: 3, textAlign: 'left' }}
+                        >
+                          <Text.Caption m={0} sx={{ fontSize: '12px', color: '#4f4f4f', flex: 1, lineHeight: 1 }}>
+                            Add matching domains
+                          </Text.Caption>
+                          {tldsOpen[sld]
+                            ? <ChevronSmallUp sx={{ width: 14, height: 14, color: '#4f4f4f', flexShrink: 0 }} />
+                            : <ChevronSmallDown sx={{ width: 14, height: 14, color: '#4f4f4f', flexShrink: 0 }} />
+                          }
+                        </Box>
+                        <Box sx={{ display: 'grid', gridTemplateRows: tldsOpen[sld] ? '1fr' : '0fr', transition: 'grid-template-rows 0.3s cubic-bezier(0.4,0,0.2,1)' }}>
+                        <Box sx={{ minHeight: 0, overflow: 'hidden' }}>
+                        <Box sx={{ px: 4, pb: 4 }}>
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                           {matching.map((m) => {
                             const stem = getSld(m.name)
@@ -740,6 +791,9 @@ function MobileMiniCart({
                               </Flex>
                             )
                           })}
+                        </Box>
+                        </Box>
+                        </Box>
                         </Box>
                       </Box>
                     )}
@@ -826,30 +880,10 @@ export default function DomainSearch() {
     return new Map()
   })
   const [searchFocused, setSearchFocused] = useState(false)
-  const [_heroPassed, setHeroPassed] = useState(false)
   const [lastAddedId, setLastAddedId] = useState<string | null>(null)
-  const [searchBarPassed, setSearchBarPassed] = useState(false)
   const heroRef = useRef<HTMLDivElement>(null)
   const searchBarRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => setHeroPassed(!entry.isIntersecting),
-      { threshold: 0 }
-    )
-    if (heroRef.current) observer.observe(heroRef.current)
-    return () => observer.disconnect()
-  }, [])
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => setSearchBarPassed(!entry.isIntersecting),
-      { threshold: 0 }
-    )
-    if (searchBarRef.current) observer.observe(searchBarRef.current)
-    return () => observer.disconnect()
-  }, [])
   const labelId = useId()
 
   useEffect(() => {
@@ -935,41 +969,7 @@ export default function DomainSearch() {
   return (
     <Box sx={{ minHeight: '100vh', background: '#fff' }}>
 
-      {/* ── Inline nav — scrolls with the page, not sticky ── */}
-      <Box sx={{ background: '#fff' }}>
-        <Flex
-          as="nav"
-          alignItems="center"
-          justifyContent="space-between"
-          px={6}
-          sx={{ height: 66, maxWidth: 1440, mx: 'auto' }}
-        >
-          <Box
-            as="button"
-            onClick={() => navigate('/')}
-            sx={{ background: 'none', border: 'none', cursor: 'pointer', p: 0, display: 'flex', alignItems: 'center', gap: 2 }}
-          >
-            <LogoSquarespace color="fg.default" />
-            <Flex alignItems="baseline" gap={1} sx={{ '@media (max-width: 767px)': { display: 'none' } }}>
-              <Text.Body m={0} sx={{ fontWeight: 600, fontSize: '13px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Squarespace</Text.Body>
-              <Text.Body m={0} color="fg.muted" sx={{ fontSize: '13px' }}>Domains</Text.Body>
-            </Flex>
-          </Box>
-          <Flex gap={6} alignItems="center" sx={{ '@media (max-width: 767px)': { display: 'none' } }}>
-            {['Transfer a domain', 'Build a website'].map((link) => (
-              <Text.Body key={link} m={0} color="fg.muted" sx={{ cursor: 'pointer', fontSize: '12px', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 500, '&:hover': { color: 'fg.default' } }}>{link}</Text.Body>
-            ))}
-          </Flex>
-          <Flex alignItems="center" gap={5}>
-            <Text.Body m={0} color="fg.muted" sx={{ cursor: 'pointer', fontSize: '12px', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 500, '&:hover': { color: 'fg.default' }, '@media (max-width: 767px)': { display: 'none' } }}>Log In</Text.Body>
-            <Box as="button" aria-label="Open menu" sx={{ display: 'none', '@media (max-width: 767px)': { display: 'flex' }, flexDirection: 'column', justifyContent: 'center', gap: '5px', background: 'none', border: 'none', cursor: 'pointer', p: 1 }}>
-              {[0, 1, 2].map((i) => <Box key={i} sx={{ width: 22, height: 2, borderRadius: 1, background: 'var(--colors-fg-default)' }} />)}
-            </Box>
-          </Flex>
-        </Flex>
-      </Box>
-
-      {/* ── Sticky nav — fixed, slides in once user scrolls past the search bar ── */}
+      {/* ── Nav ── */}
       <Box
         sx={{
           position: 'fixed',
@@ -978,62 +978,61 @@ export default function DomainSearch() {
           right: 0,
           zIndex: 200,
           background: '#fff',
-          boxShadow: '0 1px 12px rgba(0,0,0,0.08)',
-          transform: searchBarPassed ? 'translateY(0)' : 'translateY(-100%)',
-          transition: 'transform 0.28s ease',
+          borderBottom: '1px solid',
+          borderColor: 'border.default',
         }}
       >
         <Flex
           as="nav"
           alignItems="center"
           justifyContent="space-between"
-          px={6}
-          sx={{ height: 60, maxWidth: 1440, mx: 'auto' }}
+          sx={{ height: 80, maxWidth: 1440, mx: 'auto', px: '40px', '@media (max-width: 767px)': { px: '16px' } }}
         >
-          {/* Logo — hidden on mobile */}
+          {/* Logo */}
           <Box
             as="button"
             onClick={() => navigate('/')}
-            sx={{ background: 'none', border: 'none', cursor: 'pointer', p: 0, display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0, '@media (max-width: 767px)': { display: 'none' } }}
+            sx={{ background: 'none', border: 'none', cursor: 'pointer', p: 0, display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}
           >
             <LogoSquarespace color="fg.default" />
-            <Flex alignItems="baseline" gap={1}>
-              <Text.Body m={0} sx={{ fontWeight: 600, fontSize: '13px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Squarespace</Text.Body>
-              <Text.Body m={0} color="fg.muted" sx={{ fontSize: '13px' }}>Domains</Text.Body>
+            <Flex alignItems="baseline" gap={1} sx={{ '@media (max-width: 767px)': { display: 'none' } }}>
+              <Text.Body m={0} sx={{ fontWeight: 500, fontSize: '14px', fontFamily: '"Clarkson", Helvetica, sans-serif', letterSpacing: '0.02em', textTransform: 'uppercase' }}>Squarespace</Text.Body>
+              <Text.Body m={0} sx={{ fontSize: '14px', fontFamily: '"Clarkson", Helvetica, sans-serif', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.02em' }}>Domains</Text.Body>
             </Flex>
           </Box>
 
-          {/* Compact search bar — mobile only, shown after page search bar scrolls out */}
-          <Flex
-            alignItems="center"
-            gap={2}
-            sx={{
-              display: 'none',
-              '@media (max-width: 767px)': { display: 'flex', flex: 1, mx: 3, height: 36, px: 3, borderRadius: 8, background: '#f0f0f0' },
-            }}
-          >
-            <Search color="fg.muted" sx={{ width: 16, height: 16, flexShrink: 0 }} />
-            <Box
-              as="input"
-              value={inputValue}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setInputValue(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Search for a domain"
-              sx={{ flex: 1, border: 'none', background: 'transparent', outline: 'none', fontSize: '14px', color: 'fg.default', fontFamily: 'inherit' }}
-            />
+          {/* Center links — desktop only */}
+          <Flex gap={8} alignItems="center" sx={{ '@media (max-width: 767px)': { display: 'none' } }}>
+            {['Transfer a domain', 'Build a website'].map((link) => (
+              <Flex key={link} alignItems="center" gap={1} sx={{ cursor: 'pointer', '&:hover': { opacity: 0.7 } }}>
+                <Text.Body m={0} sx={{ fontSize: '14px', fontFamily: '"Clarkson", Helvetica, sans-serif', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#000' }}>{link}</Text.Body>
+                <ChevronSmallDown sx={{ width: 16, height: 16, color: '#000' }} />
+              </Flex>
+            ))}
           </Flex>
 
-          {/* Right: log in + cart */}
-          <Flex alignItems="center" gap={5} sx={{ flexShrink: 0, '@media (max-width: 767px)': { display: 'none' } }}>
-            <Text.Body m={0} color="fg.muted" sx={{ cursor: 'pointer', fontSize: '12px', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 500, '&:hover': { color: 'fg.default' } }}>Log In</Text.Body>
-            <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center', opacity: hasCart ? 1 : 0, pointerEvents: hasCart ? 'auto' : 'none', transition: 'opacity 0.3s ease' }}>
-              <Box as="button" sx={{ background: 'none', border: 'none', cursor: 'pointer', p: 1, display: 'flex', alignItems: 'center', color: 'fg.default' }}>
-                <ShoppingBag sx={{ width: 20, height: 20 }} />
-              </Box>
-              <Box sx={{ position: 'absolute', top: '-6px', right: '-6px', width: 16, height: 16, borderRadius: '50%', background: 'var(--colors-fg-default)', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-                <Text.Caption m={0} sx={{ fontSize: '10px', fontWeight: 700, color: '#fff', lineHeight: 1 }}>{cartCount}</Text.Caption>
-              </Box>
-            </Box>
+          {/* Right: Log in + CTA */}
+          <Flex alignItems="center" gap={8} sx={{ flexShrink: 0 }}>
+            {/* Mobile compact search */}
+            <Flex
+              alignItems="center"
+              gap={2}
+              sx={{
+                display: 'none',
+                '@media (max-width: 767px)': { display: 'flex', flex: 1, mx: 0, height: 36, px: 3, borderRadius: 8, background: '#f0f0f0' },
+              }}
+            >
+              <Search color="fg.muted" sx={{ width: 16, height: 16, flexShrink: 0 }} />
+              <Box
+                as="input"
+                value={inputValue}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setInputValue(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Search for a domain"
+                sx={{ flex: 1, border: 'none', background: 'transparent', outline: 'none', fontSize: '14px', color: 'fg.default', fontFamily: 'inherit' }}
+              />
+            </Flex>
+            <Text.Body m={0} sx={{ cursor: 'pointer', fontSize: '14px', fontFamily: '"Clarkson", Helvetica, sans-serif', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#000', '&:hover': { opacity: 0.7 }, '@media (max-width: 767px)': { display: 'none' } }}>Log in</Text.Body>
           </Flex>
         </Flex>
       </Box>
@@ -1044,7 +1043,7 @@ export default function DomainSearch() {
           maxWidth: hasCart ? 1440 : 900,
           mx: 'auto',
           px: 8,
-          pt: 80,
+          pt: 100,
           pb: 24,
           transition: 'max-width 0.35s ease',
           '@media (max-width: 767px)': { px: '16px', pt: '32px', pb: cartItems.length > 0 ? '160px' : '40px' },
@@ -1159,7 +1158,7 @@ export default function DomainSearch() {
             {/* Results */}
             {!isLoading && results.length > 0 && (
               <Box>
-                {results.map((r, i) => (
+                {results.filter((r) => r.available).map((r, i) => (
                   <ResultRow
                     key={r.id}
                     result={r}
