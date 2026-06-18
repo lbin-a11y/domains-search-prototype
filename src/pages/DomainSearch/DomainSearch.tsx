@@ -437,7 +437,6 @@ function MobileUpsellCard({
       sx={{
         display: 'grid',
         gridTemplateRows: expanded ? '1fr' : '0fr',
-        transition: 'grid-template-rows 0.3s cubic-bezier(0.4,0,0.2,1)',
         overflow: 'hidden',
         mt: '6px',
         mb: '4px',
@@ -495,9 +494,6 @@ function MobileUpsellCard({
                       pl: 3,
                       pr: 4,
                       py: '10px',
-                      opacity: m.exiting ? 0 : 1,
-                      transform: m.exiting ? 'translateX(8px)' : 'translateX(0)',
-                      transition: 'opacity 0.2s ease, transform 0.2s ease',
                     }}
                   >
                     <Text.Body m={0} sx={{ fontSize: '14px', letterSpacing: '-0.014px' }}>
@@ -635,7 +631,7 @@ function TldToast({
                 key={m.id}
                 alignItems="center"
                 justifyContent="space-between"
-                sx={{ background: '#f9f9f9', borderRadius: '4px', pl: 3, pr: 4, py: '10px', opacity: m.exiting ? 0 : 1, transform: m.exiting ? 'translateX(8px)' : 'translateX(0)', transition: 'opacity 0.2s ease, transform 0.2s ease' }}
+                sx={{ background: '#f9f9f9', borderRadius: '4px', pl: 3, pr: 4, py: '10px' }}
               >
                 <Text.Body m={0} sx={{ fontSize: '14px', letterSpacing: '-0.014px' }}>
                   <Box as="span" sx={{ color: '#4f4f4f' }}>{sld}</Box>
@@ -828,7 +824,6 @@ function CartSidebar({
                       <Text.Caption m={0} color="fg.muted" sx={{ fontSize: '12px', lineHeight: 1 }}>
                         Add matching domains
                       </Text.Caption>
-                      <InfoCircle sx={{ width: 12, height: 12, color: 'var(--colors-fg-muted)', flexShrink: 0 }} />
                     </Flex>
                     {isOpen
                       ? <ChevronSmallUp sx={{ width: 14, height: 14, color: 'var(--colors-fg-muted)', flexShrink: 0 }} />
@@ -1140,7 +1135,7 @@ function MobileMiniCart({
                                 key={m.id}
                                 alignItems="center"
                                 justifyContent="space-between"
-                                sx={{ px: 3, py: '10px', background: '#f9f9f9', borderRadius: 4, opacity: m.exiting ? 0 : 1, transform: m.exiting ? 'translateX(8px)' : 'translateX(0)', transition: 'opacity 0.2s ease, transform 0.2s ease' }}
+                                sx={{ px: 3, py: '10px', background: '#f9f9f9', borderRadius: 4 }}
                               >
                                 <Box sx={{ flex: '1 1 0', minWidth: 0 }}>
                                   <Text.Body as="span" m={0} sx={{ fontSize: '14px', color: '#4f4f4f' }}>{stem}.</Text.Body>
