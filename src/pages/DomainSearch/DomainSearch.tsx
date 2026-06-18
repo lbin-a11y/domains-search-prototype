@@ -125,39 +125,25 @@ function generateResults(rawQuery: string): DomainResult[] {
   return results
 }
 
-// ── Animated list hook ───────────────────────────────────────────────────────
-// Keeps exiting items in the DOM for `duration` ms so CSS can animate them out.
-function useAnimatedList<T extends { id: string }>(items: T[], duration = 250) {
-  const [displayed, setDisplayed] = useState<(T & { exiting: boolean })[]>(
-    items.map((i) => ({ ...i, exiting: false }))
-  )
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+// Tracks which item IDs just entered the list so they can animate in.
+function useEnteringItems<T extends { id: string }>(items: T[]) {
+  const [enteringIds, setEnteringIds] = useState<Set<string>>(new Set())
+  const prevIdsRef = useRef(new Set(items.map((i) => i.id)))
+  const rafRef = useRef<number | null>(null)
+  const mountedRef = useRef(false)
 
   useEffect(() => {
-    const currentIds = new Set(items.map((i) => i.id))
-    const displayedIds = new Set(displayed.filter((i) => !i.exiting).map((i) => i.id))
-
-    const entering = items.filter((i) => !displayedIds.has(i.id))
-    const exiting = displayed.filter((i) => !currentIds.has(i.id) && !i.exiting)
-
-    if (entering.length === 0 && exiting.length === 0) return
-
-    const exitingIds = new Set(exiting.map((i) => i.id))
-    setDisplayed((prev) => {
-      const next = prev.map((i) => exitingIds.has(i.id) ? { ...i, exiting: true } : i)
-      entering.forEach((i) => next.push({ ...i, exiting: false }))
-      return next
-    })
-
-    if (exiting.length > 0) {
-      if (timerRef.current) clearTimeout(timerRef.current)
-      timerRef.current = setTimeout(() => {
-        setDisplayed(items.map((i) => ({ ...i, exiting: false })))
-      }, duration)
-    }
+    if (!mountedRef.current) { mountedRef.current = true; return }
+    const newIds = items.filter((i) => !prevIdsRef.current.has(i.id)).map((i) => i.id)
+    prevIdsRef.current = new Set(items.map((i) => i.id))
+    if (newIds.length === 0) return
+    setEnteringIds(new Set(newIds))
+    if (rafRef.current) cancelAnimationFrame(rafRef.current)
+    rafRef.current = requestAnimationFrame(() => setEnteringIds(new Set()))
   }, [items]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  return displayed
+  return enteringIds
 }
 
 // ── Tooltip ───────────────────────────────────────────────────────────────────
@@ -336,7 +322,7 @@ function ResultRow({
       {result.available ? (
         <Box
           as="button"
-          onClick={() => onToggleCart(result)}
+          onClick={(e: React.MouseEvent) => { e.stopPropagation(); onToggleCart(result) }}
           aria-label={inCart ? 'Remove from cart' : 'Add to cart'}
           sx={{
             border: 'none',
@@ -428,7 +414,7 @@ function MobileUpsellCard({
   const matching = results
     .filter((r) => getSld(r.name) === sld && r.available && !cart.has(r.id) && r.id !== result.id)
     .slice(0, 3)
-  const animatedMatching = useAnimatedList(matching)
+  const enteringIds = useEnteringItems(matching)
 
   if (!mounted) return null
 
@@ -480,8 +466,8 @@ function MobileUpsellCard({
 
           {/* TLD rows — grid-template-rows trick for smooth collapse */}
           <Box sx={{ display: 'grid', gridTemplateRows: listCollapsed ? '0fr' : '1fr', transition: 'grid-template-rows 0.25s cubic-bezier(0.4,0,0.2,1)', overflow: 'hidden' }}>
-            <Flex flexDirection="column" sx={{ gap: '4px', minHeight: 0, opacity: listCollapsed ? 0 : 1, maxHeight: `${animatedMatching.length * 52}px`, overflow: 'hidden', transition: 'max-height 0.25s ease, opacity 0.2s ease' }}>
-              {animatedMatching.map((m) => {
+            <Flex flexDirection="column" sx={{ gap: '4px', minHeight: 0, opacity: listCollapsed ? 0 : 1, overflow: 'hidden', transition: 'opacity 0.2s ease' }}>
+              {matching.map((m) => {
                 const price = m.salePrice ?? m.originalPrice
                 return (
                   <Flex
@@ -494,6 +480,9 @@ function MobileUpsellCard({
                       pl: 3,
                       pr: 4,
                       py: '10px',
+                      opacity: enteringIds.has(m.id) ? 0 : 1,
+                      transform: enteringIds.has(m.id) ? 'translateX(24px)' : 'translateX(0)',
+                      transition: 'opacity 0.2s ease, transform 0.25s ease',
                     }}
                   >
                     <Text.Body m={0} sx={{ fontSize: '14px', letterSpacing: '-0.014px' }}>
@@ -562,7 +551,7 @@ function TldToast({
   const matching = results
     .filter((r) => getSld(r.name) === sld && r.available && !cart.has(r.id) && r.id !== result.id)
     .slice(0, 3)
-  const animatedMatching = useAnimatedList(matching)
+  const enteringIds = useEnteringItems(matching)
 
   // Auto-dismiss when all alternatives added
   useEffect(() => {
@@ -623,15 +612,15 @@ function TldToast({
 
       {/* TLD rows */}
       <Box sx={{ display: 'grid', gridTemplateRows: listCollapsed ? '0fr' : '1fr', transition: 'grid-template-rows 0.25s cubic-bezier(0.4,0,0.2,1)', overflow: 'hidden' }}>
-        <Flex flexDirection="column" sx={{ gap: '4px', minHeight: 0, opacity: listCollapsed ? 0 : 1, maxHeight: `${animatedMatching.length * 52}px`, overflow: 'hidden', transition: 'max-height 0.25s ease, opacity 0.2s ease' }}>
-          {animatedMatching.map((m) => {
+        <Flex flexDirection="column" sx={{ gap: '4px', minHeight: 0, opacity: listCollapsed ? 0 : 1, overflow: 'hidden', transition: 'opacity 0.2s ease' }}>
+          {matching.map((m) => {
             const price = m.salePrice ?? m.originalPrice
             return (
               <Flex
                 key={m.id}
                 alignItems="center"
                 justifyContent="space-between"
-                sx={{ background: '#f9f9f9', borderRadius: '4px', pl: 3, pr: 4, py: '10px' }}
+                sx={{ background: '#f9f9f9', borderRadius: '4px', pl: 3, pr: 4, py: '10px', opacity: enteringIds.has(m.id) ? 0 : 1, transform: enteringIds.has(m.id) ? 'translateX(24px)' : 'translateX(0)', transition: 'opacity 0.2s ease, transform 0.25s ease' }}
               >
                 <Text.Body m={0} sx={{ fontSize: '14px', letterSpacing: '-0.014px' }}>
                   <Box as="span" sx={{ color: '#4f4f4f' }}>{sld}</Box>
@@ -998,7 +987,7 @@ function MobileMiniCart({
     : null
 
   const lastAddedMatching = lastAddedSld ? getMatching(lastAddedSld) : []
-  const animatedLastAddedMatching = useAnimatedList(lastAddedMatching)
+  const enteringIds = useEnteringItems(lastAddedMatching)
 
   return (
     <>
@@ -1065,12 +1054,8 @@ function MobileMiniCart({
               {sldOrder.map((sld) => {
                 const groupItems = groups[sld]
                 const rawMatching = getMatching(sld)
-                const matching: (DomainResult & { exiting: boolean })[] = sld === lastAddedSld
-                  ? animatedLastAddedMatching
-                  : rawMatching.map((r) => ({ ...r, exiting: false }))
-                const showTlds = sld === lastAddedSld
-                  ? animatedLastAddedMatching.length > 0
-                  : rawMatching.length > 0
+                const matching = rawMatching
+                const showTlds = rawMatching.length > 0
 
                 return (
                   <Box
@@ -1125,7 +1110,7 @@ function MobileMiniCart({
                           }
                         </Flex>
                         <Box sx={{ display: 'grid', gridTemplateRows: upsellCollapsed ? '0fr' : '1fr', transition: 'grid-template-rows 0.25s cubic-bezier(0.4,0,0.2,1)', overflow: 'hidden' }}>
-                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: '4px', minHeight: 0, opacity: upsellCollapsed ? 0 : 1, maxHeight: `${matching.length * 52}px`, overflow: 'hidden', transition: 'max-height 0.25s ease, opacity 0.2s ease' }}>
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: '4px', minHeight: 0, opacity: upsellCollapsed ? 0 : 1, overflow: 'hidden', transition: 'opacity 0.2s ease' }}>
                           {matching.map((m) => {
                             const stem = getSld(m.name)
                             const ext = m.name.slice(stem.length + 1)
@@ -1135,7 +1120,7 @@ function MobileMiniCart({
                                 key={m.id}
                                 alignItems="center"
                                 justifyContent="space-between"
-                                sx={{ px: 3, py: '10px', background: '#f9f9f9', borderRadius: 4 }}
+                                sx={{ px: 3, py: '10px', background: '#f9f9f9', borderRadius: 4, opacity: enteringIds.has(m.id) ? 0 : 1, transform: enteringIds.has(m.id) ? 'translateX(24px)' : 'translateX(0)', transition: 'opacity 0.2s ease, transform 0.25s ease' }}
                               >
                                 <Box sx={{ flex: '1 1 0', minWidth: 0 }}>
                                   <Text.Body as="span" m={0} sx={{ fontSize: '14px', color: '#4f4f4f' }}>{stem}.</Text.Body>
