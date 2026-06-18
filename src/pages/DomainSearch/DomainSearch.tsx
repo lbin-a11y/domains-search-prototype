@@ -8,14 +8,13 @@ import {
   ShoppingBag,
   Star,
   Checkmark,
-  Diamond,
+  Tag,
   CrossSmall,
   Trash,
   ChevronSmallUp,
   ChevronSmallDown,
   ChevronLargeUp,
   ChevronLargeDown,
-  InfoCircle,
 } from '@sqs/rosetta-icons'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -161,6 +160,44 @@ function useAnimatedList<T extends { id: string }>(items: T[], duration = 250) {
   return displayed
 }
 
+// ── Tooltip ───────────────────────────────────────────────────────────────────
+
+function Tooltip({ text, children }: { text: string; children: React.ReactNode }) {
+  const [visible, setVisible] = useState(false)
+  return (
+    <Box
+      sx={{ position: 'relative', display: 'inline-flex' }}
+      onMouseEnter={() => setVisible(true)}
+      onMouseLeave={() => setVisible(false)}
+    >
+      {children}
+      {visible && (
+        <Box
+          sx={{
+            position: 'absolute',
+            bottom: 'calc(100% + 6px)',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: '#1a1a1a',
+            color: '#fff',
+            fontSize: '12px',
+            lineHeight: 1.4,
+            borderRadius: 6,
+            px: '10px',
+            py: '8px',
+            width: 220,
+            pointerEvents: 'none',
+            zIndex: 500,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+          }}
+        >
+          {text}
+        </Box>
+      )}
+    </Box>
+  )
+}
+
 // ── Badge ─────────────────────────────────────────────────────────────────────
 
 function Badge({ kind }: { kind: DomainBadge }) {
@@ -176,22 +213,26 @@ function Badge({ kind }: { kind: DomainBadge }) {
   }
   if (kind === 'premium') {
     return (
-      <Flex alignItems="center" gap={1} px={2} py={1} sx={{ borderRadius: 20, background: '#e8f0fe', flexShrink: 0 }}>
-        <Star sx={{ width: 11, height: 11, color: '#0862d1' }} />
-        <Text.Caption m={0} sx={{ fontSize: '11px', fontWeight: 600, color: '#0862d1', lineHeight: 1 }}>
-          Premium
-        </Text.Caption>
-      </Flex>
+      <Tooltip text="Premium domains are short, memorable, and often include common or highly searched words that may have strong brand value.">
+        <Flex alignItems="center" gap={1} px={2} py={1} sx={{ borderRadius: 20, background: '#e8f0fe', flexShrink: 0, cursor: 'default' }}>
+          <Star sx={{ width: 11, height: 11, color: '#0862d1' }} />
+          <Text.Caption m={0} sx={{ fontSize: '11px', fontWeight: 600, color: '#0862d1', lineHeight: 1 }}>
+            Premium
+          </Text.Caption>
+        </Flex>
+      </Tooltip>
     )
   }
   if (kind === 'promoted') {
     return (
-      <Flex alignItems="center" gap={1} px={2} py={1} sx={{ borderRadius: 20, background: '#e0f7fa', flexShrink: 0 }}>
-        <Diamond sx={{ width: 11, height: 11, color: '#00838f' }} />
-        <Text.Caption m={0} sx={{ fontSize: '11px', fontWeight: 600, color: '#00838f', lineHeight: 1 }}>
-          Promoted
-        </Text.Caption>
-      </Flex>
+      <Tooltip text="This TLD (the domain ending) is available at a promotional price for a limited time.">
+        <Flex alignItems="center" gap={1} px={2} py={1} sx={{ borderRadius: 20, background: '#e8f0fe', flexShrink: 0, cursor: 'default' }}>
+          <Tag sx={{ width: 11, height: 11, color: '#0862d1' }} />
+          <Text.Caption m={0} sx={{ fontSize: '11px', fontWeight: 600, color: '#0862d1', lineHeight: 1 }}>
+            Promoted
+          </Text.Caption>
+        </Flex>
+      </Tooltip>
     )
   }
   return null
@@ -218,6 +259,7 @@ function ResultRow({
       gap={3}
       px={4}
       py={3}
+      onClick={result.available ? () => onToggleCart(result) : undefined}
       sx={{
         minHeight: 44,
         opacity: result.available ? 1 : 0.4,
@@ -261,13 +303,13 @@ function ResultRow({
         <Flex alignItems="center" gap={2} sx={{ flex: '1 1 0', minWidth: 0, flexWrap: 'wrap' }}>
           <Text.Body
             m={0}
-            fontWeight={result.badges.includes('exact') ? 'semibold' : 'book'}
+            fontWeight={result.badges.includes('exact') ? 400 : 'book'}
             sx={{ color: result.available ? 'fg.default' : 'fg.disabled', flexShrink: 0 }}
           >
             {result.name}
           </Text.Body>
           {result.badges.length > 0 && (
-            <Flex gap={1} alignItems="center">
+            <Flex gap={1} alignItems="center" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
               {result.badges.map((b) => <Badge key={b} kind={b} />)}
             </Flex>
           )}
@@ -1628,7 +1670,7 @@ export default function DomainSearch() {
             {/* Results */}
             {!isLoading && results.length > 0 && (
               <Box>
-                {results.map((r, i) => (
+                {results.filter((r) => r.available).map((r, i) => (
                   <Box key={r.id}>
                     <ResultRow
                       result={r}
