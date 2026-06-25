@@ -978,8 +978,6 @@ export default function DomainSearch() {
           right: 0,
           zIndex: 200,
           background: '#fff',
-          borderBottom: '1px solid',
-          borderColor: 'border.default',
         }}
       >
         <Flex
@@ -1043,7 +1041,7 @@ export default function DomainSearch() {
           maxWidth: hasCart ? 1440 : 900,
           mx: 'auto',
           px: 8,
-          pt: 100,
+          pt: 140,
           pb: 24,
           transition: 'max-width 0.35s ease',
           '@media (max-width: 767px)': { px: '16px', pt: '32px', pb: cartItems.length > 0 ? '160px' : '40px' },
