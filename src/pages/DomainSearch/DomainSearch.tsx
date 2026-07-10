@@ -13,10 +13,7 @@ import {
   ChevronSmallUp,
   ChevronSmallDown,
   InfoCircle,
-  CheckmarkShield,
-  LineChart,
   Tag,
-  Sparkles,
 } from '@sqs/rosetta-icons'
 import { Sparkles as SparklesGlyph, Refresh } from '@sqs/rosetta-glyphs'
 
@@ -193,91 +190,6 @@ function prioritizeBadges(badges: DomainBadge[]): DomainBadge[] {
   return BADGE_PRIORITY.filter((p) => badges.includes(p)).slice(0, 2)
 }
 
-// ── RTB Tooltip ───────────────────────────────────────────────────────────────
-
-function RtbTooltip({ sentence1, sentence2 }: { sentence1?: string; sentence2?: string }) {
-  const s1 = sentence1 ?? 'The TLD is certified.'
-  const s2 = sentence2 ?? '400+ users have purchased it today.'
-  return (
-    <Box
-      sx={{
-        position: 'absolute',
-        bottom: 'calc(100% + 10px)',
-        left: '50%',
-        transform: 'translateX(-50%)',
-        background: '#000',
-        borderRadius: 4,
-        px: '16px',
-        py: '11px',
-        width: 280,
-        zIndex: 400,
-        boxShadow: '0 0 1px rgba(0,0,0,0.08), 0 8px 16px rgba(0,0,0,0.12)',
-        pointerEvents: 'none',
-        '&::after': {
-          content: '""',
-          position: 'absolute',
-          top: '100%',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          borderWidth: '6px',
-          borderStyle: 'solid',
-          borderColor: '#000 transparent transparent transparent',
-        },
-      }}
-    >
-      <Text.Body m={0} mb={2} sx={{ fontSize: '14px', color: '#fff', lineHeight: '22px' }}>
-        This domain is recommended because:
-      </Text.Body>
-      <Flex alignItems="center" gap={2} mb={1}>
-        <CheckmarkShield sx={{ width: 16, height: 16, color: '#fff', flexShrink: 0 }} />
-        <Text.Body m={0} sx={{ fontSize: '14px', color: '#fff', lineHeight: '22px' }}>
-          {s1}
-        </Text.Body>
-      </Flex>
-      <Flex alignItems="center" gap={2}>
-        <LineChart sx={{ width: 16, height: 16, color: '#fff', flexShrink: 0 }} />
-        <Text.Body m={0} sx={{ fontSize: '14px', color: '#fff', lineHeight: '22px' }}>
-          {s2}
-        </Text.Body>
-      </Flex>
-    </Box>
-  )
-}
-
-// ── RTB Badge ─────────────────────────────────────────────────────────────────
-
-function RtbBadge({ label, sentence1, sentence2 }: { label?: string; sentence1?: string; sentence2?: string }) {
-  const [hovered, setHovered] = useState(false)
-  return (
-    <Box
-      sx={{ position: 'relative', flexShrink: 0 }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
-      <Flex
-        alignItems="center"
-        gap={label ? 1 : 0}
-        justifyContent="center"
-        px={label ? 2 : 0}
-        sx={{
-          width: label ? 'auto' : 28,
-          height: 28,
-          borderRadius: label ? 20 : '50%',
-          background: '#d8e8fe',
-          cursor: 'default',
-        }}
-      >
-        <Sparkles sx={{ width: 14, height: 14, color: '#0862d1', flexShrink: 0 }} />
-        {label && (
-          <Text.Caption m={0} sx={{ fontSize: '11px', fontWeight: 600, color: '#0862d1', lineHeight: 1, whiteSpace: 'nowrap' }}>
-            {label}
-          </Text.Caption>
-        )}
-      </Flex>
-      {hovered && <RtbTooltip sentence1={sentence1} sentence2={sentence2} />}
-    </Box>
-  )
-}
 
 // ── Tooltip base ─────────────────────────────────────────────────────────────
 
@@ -362,7 +274,7 @@ function PremiumBadge() {
 
 // ── Badge ─────────────────────────────────────────────────────────────────────
 
-function Badge({ kind, rtbLabel, rtbTooltip }: { kind: DomainBadge; rtbLabel?: string; rtbTooltip?: { sentence1: string; sentence2: string } }) {
+function Badge({ kind, rtbLabel: _rtbLabel, rtbTooltip: _rtbTooltip }: { kind: DomainBadge; rtbLabel?: string; rtbTooltip?: { sentence1: string; sentence2: string } }) {
   if (kind === 'rtb') {
     return null
   }
@@ -533,76 +445,6 @@ function PriceDisplay({ result }: { result: DomainResult }) {
     </Flex>
   )
   return <Text.Body m={0}>${result.originalPrice}</Text.Body>
-}
-
-// ── Cards view ────────────────────────────────────────────────────────────────
-
-function CardsView({
-  results,
-  cart,
-  onToggleCart,
-}: {
-  results: DomainResult[]
-  cart: Set<string>
-  onToggleCart: (r: DomainResult) => void
-}) {
-  const exactResult = results.find((r) => r.badges.includes('exact'))
-  const firstRtb = results.find((r) => r.badges.includes('rtb') && !r.badges.includes('exact'))
-  const featuredIds = new Set([exactResult?.id, firstRtb?.id].filter(Boolean) as string[])
-  const cards = [exactResult, firstRtb].filter(Boolean) as DomainResult[]
-  const rest = results.filter((r) => !featuredIds.has(r.id))
-
-  return (
-    <Box>
-      {cards.length > 0 && (
-        <Flex gap={3} mb={2} sx={{ flexWrap: 'wrap' }}>
-          {cards.map((r) => {
-            const inCart = cart.has(r.id)
-            const isExact = r.badges.includes('exact')
-            const visibleBadges = isExact ? (['exact'] as DomainBadge[]) : prioritizeBadges(r.badges)
-            return (
-              <Box
-                key={r.id}
-                sx={{
-                  flex: '1 1 0',
-                  minWidth: 200,
-                  border: isExact ? '2px solid #aedcc2' : '1px solid #e7e7e7',
-                  borderRadius: 11,
-                  p: 3,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '11px',
-                  ...(isExact ? { boxShadow: '0 0 0.5px rgba(0,0,0,0.08), 0 4px 8px rgba(0,0,0,0.12)' } : {}),
-                }}
-              >
-                <Flex gap={1} alignItems="center">
-                  {visibleBadges.map((b) => (
-                    <Badge key={b} kind={b} rtbTooltip={r.rtbTooltip} />
-                  ))}
-                </Flex>
-                <Text.Body m={0} sx={{ fontSize: '16px', lineHeight: '22px' }}>
-                  {r.name}
-                </Text.Body>
-                <Flex alignItems="center" justifyContent="space-between">
-                  <PriceDisplay result={r} />
-                  <CartButton result={r} inCart={inCart} onToggleCart={onToggleCart} />
-                </Flex>
-              </Box>
-            )
-          })}
-        </Flex>
-      )}
-      {rest.map((r, i) => (
-        <ResultRow
-          key={r.id}
-          result={r}
-          inCart={cart.has(r.id)}
-          onToggleCart={onToggleCart}
-          isTop={cards.length === 0 && i === 0}
-        />
-      ))}
-    </Box>
-  )
 }
 
 // ── Recommended section ───────────────────────────────────────────────────────
@@ -1350,7 +1192,7 @@ export default function DomainSearch() {
     } catch {}
     return new Map()
   })
-  const [searchFocused, setSearchFocused] = useState(false)
+  const [_searchFocused, _setSearchFocused] = useState(false)
   const [lastAddedId, setLastAddedId] = useState<string | null>(null)
   const heroRef = useRef<HTMLDivElement>(null)
   const searchBarRef = useRef<HTMLDivElement>(null)
