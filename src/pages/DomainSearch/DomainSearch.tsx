@@ -15,7 +15,7 @@ import {
   InfoCircle,
   Tag,
 } from '@sqs/rosetta-icons'
-import { Sparkles as SparklesGlyph, Refresh } from '@sqs/rosetta-glyphs'
+import { Sparkles as SparklesGlyph } from '@sqs/rosetta-glyphs'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -515,7 +515,7 @@ function RecommendedSection({
                   </Text.Body>
                 </Flex>
                 <Flex alignItems="center" gap={3}>
-                  <Refresh sx={{ width: 16, height: 16, color: 'fg.default', flexShrink: 0 }} />
+                  <Checkmark sx={{ width: 16, height: 16, color: 'fg.default', flexShrink: 0 }} />
                   <Text.Body m={0} sx={{ fontSize: '14px', lineHeight: '22px', color: 'fg.default' }}>
                     {s2}
                   </Text.Body>
