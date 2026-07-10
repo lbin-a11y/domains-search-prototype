@@ -18,6 +18,7 @@ import {
   Tag,
   Sparkles,
 } from '@sqs/rosetta-icons'
+import { Sparkles as SparklesGlyph, Refresh } from '@sqs/rosetta-glyphs'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -72,13 +73,13 @@ const AUSTIN_CERAMICS_RESULTS: DomainResult[] = [
   { id: 'austinceramics.org',       name: 'austinceramics.org',       tld: '.org',       badges: [],                     originalPrice: 20,  salePrice: 9,    available: true },
   { id: 'austin-ceramics.com',      name: 'austin-ceramics.com',      tld: '.com',       badges: [],                     originalPrice: 20,  salePrice: 8,    available: true },
   { id: 'austinartworks.com',       name: 'austinartworks.com',       tld: '.com',       badges: ['rtb'],                originalPrice: 20,  salePrice: 8,    available: true,
-    rtbTooltip: { sentence1: "'Artworks' communicates your craft before a customer even visits your site.", sentence2: '73% of Squarespace ceramic businesses use an art-related word in their domain.' } },
+    rtbTooltip: { sentence1: "'Artworks' communicates your craft immediately.", sentence2: '73% of ceramic sites use art-related words.' } },
   { id: 'austin-ceramics.net',      name: 'austin-ceramics.net',      tld: '.net',       badges: [],                     originalPrice: 20,  salePrice: 14,   available: true },
   { id: 'austinceramics.studio',    name: 'austinceramics.studio',    tld: '.studio',    badges: ['rtb', 'promoted'],    originalPrice: 40,  salePrice: 10,   available: true,
-    rtbTooltip: { sentence1: '.studio sets a professional, creative tone.', sentence2: '84% of creative businesses on Squarespace this month use .studio.' } },
+    rtbTooltip: { sentence1: '.studio sets a professional, creative tone.', sentence2: '84% of peer creative businesses use .studio.' } },
   { id: 'austinceramics.live',      name: 'austinceramics.live',      tld: '.live',      badges: ['promoted'],           originalPrice: 20,  salePrice: 10,   available: true },
   { id: 'austinceramic.com',        name: 'austinceramic.com',        tld: '.com',       badges: ['rtb'],                originalPrice: 20,  salePrice: 8,    available: true,
-    rtbTooltip: { sentence1: "'Ceramic', a real word that defines your business at a glance.", sentence2: 'Dictionary-word, short domain names are remembered nearly 2x more than invented ones.' } },
+    rtbTooltip: { sentence1: "'Ceramic' defines your business instantly.", sentence2: 'Dictionary-word domains are 2x easier to remember.' } },
   { id: 'austinceramicscompany.com',name: 'austinceramicscompany.com',tld: '.com',       badges: [],                     originalPrice: 20,  salePrice: 8,    available: true },
   { id: 'southaustinceramics.com',  name: 'southaustinceramics.com',  tld: '.com',       badges: [],                     originalPrice: 20,  salePrice: 8,    available: true },
   { id: 'austinceramicsllc.com',    name: 'austinceramicsllc.com',    tld: '.com',       badges: [],                     originalPrice: 20,  salePrice: 8,    available: true },
@@ -190,12 +191,6 @@ const BADGE_PRIORITY: DomainBadge[] = ['exact', 'rtb', 'promoted', 'premium']
 
 function prioritizeBadges(badges: DomainBadge[]): DomainBadge[] {
   return BADGE_PRIORITY.filter((p) => badges.includes(p)).slice(0, 2)
-}
-
-const RTB_LABELS = ['For your industry', 'Memorable', 'High trust', 'Trending', 'Popular TLD']
-
-function getRtbLabel(name: string): string {
-  return RTB_LABELS[hashStr(name) % RTB_LABELS.length]
 }
 
 // ── RTB Tooltip ───────────────────────────────────────────────────────────────
@@ -369,13 +364,13 @@ function PremiumBadge() {
 
 function Badge({ kind, rtbLabel, rtbTooltip }: { kind: DomainBadge; rtbLabel?: string; rtbTooltip?: { sentence1: string; sentence2: string } }) {
   if (kind === 'rtb') {
-    return <RtbBadge label={rtbLabel} sentence1={rtbTooltip?.sentence1} sentence2={rtbTooltip?.sentence2} />
+    return null
   }
   if (kind === 'exact') {
     return (
-      <Flex alignItems="center" gap={1} px={2} py={1} sx={{ borderRadius: 20, background: '#e6f4ea', flexShrink: 0 }}>
+      <Flex alignItems="center" gap={1} px={2} py={1} sx={{ borderRadius: 20, background: '#cdeddb', flexShrink: 0 }}>
         <Checkmark sx={{ width: 12, height: 12, color: '#1a7a3a' }} />
-        <Text.Caption m={0} sx={{ fontSize: '11px', fontWeight: 600, color: '#1a7a3a', lineHeight: 1 }}>
+        <Text.Caption m={0} sx={{ fontSize: '12px', fontWeight: 600, color: '#1a7a3a', lineHeight: 1 }}>
           Exact match
         </Text.Caption>
       </Flex>
@@ -397,37 +392,39 @@ function ResultRow({
   inCart,
   onToggleCart,
   isTop,
-  variant,
+  isRecommended = false,
 }: {
   result: DomainResult
   inCart: boolean
   onToggleCart: (result: DomainResult) => void
   isTop: boolean
-  variant?: 'chips' | 'chips-label' | 'cards' | 'sections'
+  isRecommended?: boolean
 }) {
   return (
     <Flex
       alignItems="center"
       gap={3}
-      px={4}
-      py={3}
+      pl={4}
+      pr={2}
+      pt={2}
+      pb={isRecommended ? 1 : 2}
       onClick={result.available ? () => onToggleCart(result) : undefined}
       sx={{
         minHeight: 44,
         opacity: result.available ? 1 : 0.4,
         cursor: result.available ? 'pointer' : 'default',
+        borderRadius: isTop ? 8 : (isRecommended ? '8px 8px 0 0' : 8),
         ...(isTop ? {
           border: '1px solid',
           borderColor: 'border.default',
-          borderRadius: 8,
           mb: 2,
         } : {}),
         ...(result.available ? {
-          transition: 'background 0.15s ease, transform 0.15s ease, border-radius 0.15s ease',
+          transition: 'background 0.15s ease, padding-left 0.15s ease, border-radius 0.15s ease',
           '&:hover': {
             background: 'var(--colors-bg-default)',
-            transform: 'translateX(4px)',
-            borderRadius: 8,
+            paddingLeft: '24px',
+            borderRadius: isRecommended ? '8px 8px 0 0' : '8px',
           },
         } : {}),
       }}
@@ -449,7 +446,6 @@ function ResultRow({
               <Badge
                 key={b}
                 kind={b}
-                rtbLabel={variant === 'chips-label' ? getRtbLabel(result.name) : undefined}
                 rtbTooltip={result.rtbTooltip}
               />
             ))}
@@ -482,7 +478,7 @@ function ResultRow({
           justifyContent: 'center',
           flexShrink: 0,
           background: inCart ? 'var(--colors-fg-default)' : 'transparent',
-          transition: 'background 0.2s ease',
+          transition: 'background 0.5s ease',
           pointerEvents: 'none',
         }}
       >
@@ -501,7 +497,7 @@ function CartButton({ result, inCart, onToggleCart }: { result: DomainResult; in
   return (
     <Box
       as="button"
-      onClick={() => onToggleCart(result)}
+      onClick={(e: React.MouseEvent) => { e.stopPropagation(); onToggleCart(result) }}
       aria-label={inCart ? 'Remove from cart' : 'Add to cart'}
       sx={{
         border: 'none',
@@ -514,7 +510,7 @@ function CartButton({ result, inCart, onToggleCart }: { result: DomainResult; in
         justifyContent: 'center',
         flexShrink: 0,
         background: inCart ? 'var(--colors-fg-default)' : 'transparent',
-        transition: 'background 0.2s ease',
+        transition: 'background 0.5s ease',
         '&:hover': { background: inCart ? '#333' : 'var(--colors-bg-default)' },
       }}
     >
@@ -603,9 +599,90 @@ function CardsView({
           inCart={cart.has(r.id)}
           onToggleCart={onToggleCart}
           isTop={cards.length === 0 && i === 0}
-          variant="cards"
         />
       ))}
+    </Box>
+  )
+}
+
+// ── Recommended section ───────────────────────────────────────────────────────
+
+function RecommendedSection({
+  recommended,
+  cart,
+  onToggleCart,
+}: {
+  recommended: DomainResult[]
+  cart: Set<string>
+  onToggleCart: (r: DomainResult) => void
+}) {
+  const [expanded, setExpanded] = useState(false)
+  return (
+    <Box>
+      <Flex
+        alignItems="center"
+        gap="10px"
+        px={4}
+        sx={{ cursor: 'pointer', userSelect: 'none', height: 62 }}
+        onClick={() => setExpanded((v) => !v)}
+      >
+        <Text.Body
+          m={0}
+          sx={{ flex: '1 0 0', fontSize: '18px', lineHeight: '1.2', letterSpacing: '-0.018em', fontWeight: 600, color: '#000' }}
+        >
+          Recommended
+        </Text.Body>
+        <Flex alignItems="center" gap={1} sx={{ flexShrink: 0 }}>
+          <SparklesGlyph sx={{ width: 14, height: 14, color: 'fg.default', flexShrink: 0 }} />
+          <Text.Body m={0} sx={{ fontSize: '14px', color: 'fg.default', letterSpacing: '-0.01em' }}>
+            See why
+          </Text.Body>
+          {expanded
+            ? <ChevronSmallUp sx={{ width: 22, height: 22, color: 'fg.default' }} />
+            : <ChevronSmallDown sx={{ width: 22, height: 22, color: 'fg.default' }} />
+          }
+        </Flex>
+      </Flex>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        {recommended.map((r) => {
+          const s1 = r.rtbTooltip?.sentence1 ?? 'The TLD is certified.'
+          const s2 = r.rtbTooltip?.sentence2 ?? '400+ users have purchased it today.'
+          return (
+            <Box key={r.id}>
+              <ResultRow result={r} inCart={cart.has(r.id)} onToggleCart={onToggleCart} isTop={false} isRecommended={expanded} />
+              <Box
+                pl={4}
+                pr={2}
+                py={expanded ? 2 : 0}
+                sx={{
+                  borderRadius: '0 0 8px 8px',
+                  background: 'linear-gradient(8.25deg, rgba(136,188,216,0.3) 0%, rgba(243,255,193,0.3) 95%)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0px',
+                  maxHeight: expanded ? '120px' : '0px',
+                  overflow: 'hidden',
+                  opacity: expanded ? 1 : 0,
+                  transition: 'max-height 0.28s ease, opacity 0.2s ease, padding 0.28s ease',
+                }}
+              >
+                <Flex alignItems="center" gap={3}>
+                  <Checkmark sx={{ width: 16, height: 16, color: 'fg.default', flexShrink: 0 }} />
+                  <Text.Body m={0} sx={{ fontSize: '14px', lineHeight: '22px', color: 'fg.default' }}>
+                    {s1}
+                  </Text.Body>
+                </Flex>
+                <Flex alignItems="center" gap={3}>
+                  <Refresh sx={{ width: 16, height: 16, color: 'fg.default', flexShrink: 0 }} />
+                  <Text.Body m={0} sx={{ fontSize: '14px', lineHeight: '22px', color: 'fg.default' }}>
+                    {s2}
+                  </Text.Body>
+                </Flex>
+              </Box>
+            </Box>
+          )
+        })}
+      </Box>
     </Box>
   )
 }
@@ -626,39 +703,27 @@ function SectionsView({
   const rest = results.filter((r) => !r.badges.includes('exact') && !r.badges.includes('rtb'))
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: '40px' }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
       {/* Claim it today */}
       {exactResults.length > 0 && (
-        <Box
-          sx={{
-            background: '#edf8f2',
-            borderRadius: 11,
-            p: '22px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '16px',
-            boxShadow: '0 0 0.5px rgba(0,0,0,0.08), 0 4px 8px rgba(0,0,0,0.12)',
-          }}
-        >
-          <Text.Body m={0} sx={{ fontSize: '18px', lineHeight: '1.2', letterSpacing: '-0.018px' }}>
-            Your domain is available
-          </Text.Body>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {exactResults.map((r) => {
             const inCart = cart.has(r.id)
-            const visibleBadges = prioritizeBadges(r.badges).filter((b) => b !== 'exact')
+            const visibleBadges = prioritizeBadges(r.badges)
             return (
               <Box
                 key={r.id}
+                onClick={() => onToggleCart(r)}
                 sx={{
-                  background: '#fff',
-                  border: '1px solid #aedcc2',
-                  borderRadius: 11,
-                  pl: 3,
-                  pr: '11px',
-                  py: 3,
+                  border: '1px solid #ddd',
+                  borderRadius: 8,
+                  pl: '16px',
+                  pr: '8px',
+                  py: '8px',
+                  cursor: 'pointer',
                 }}
               >
-                <Flex alignItems="center" gap="11px">
+                <Flex alignItems="center" gap={2} sx={{ minHeight: 46 }}>
                   <Flex flex="1 1 0" alignItems="center" gap={2} sx={{ minWidth: 0, flexWrap: 'wrap' }}>
                     <Text.Body m={0} sx={{ fontSize: '15px', letterSpacing: '-0.015px', flexShrink: 0 }}>
                       {r.name}
@@ -667,7 +732,7 @@ function SectionsView({
                       {visibleBadges.map((b) => <Badge key={b} kind={b} rtbTooltip={r.rtbTooltip} />)}
                     </Flex>
                   </Flex>
-                  <Flex alignItems="center" gap="11px" sx={{ flexShrink: 0 }}>
+                  <Flex alignItems="center" gap={2} sx={{ flexShrink: 0 }}>
                     <PriceDisplay result={r} />
                     <CartButton result={r} inCart={inCart} onToggleCart={onToggleCart} />
                   </Flex>
@@ -680,27 +745,20 @@ function SectionsView({
 
       {/* Recommended */}
       {recommended.length > 0 && (
-        <Box>
-          <Text.Body m={0} mb={3} sx={{ fontSize: '18px', lineHeight: '1.2', letterSpacing: '-0.018px' }}>
-            Recommended
-          </Text.Body>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            {recommended.map((r) => (
-              <ResultRow key={r.id} result={r} inCart={cart.has(r.id)} onToggleCart={onToggleCart} isTop={false} variant="sections" />
-            ))}
-          </Box>
-        </Box>
+        <RecommendedSection recommended={recommended} cart={cart} onToggleCart={onToggleCart} />
       )}
 
       {/* More results */}
       {rest.length > 0 && (
         <Box>
-          <Text.Body m={0} mb={3} sx={{ fontSize: '18px', lineHeight: '1.2', letterSpacing: '-0.018px' }}>
-            {rest.length}+ more results
-          </Text.Body>
+          <Flex alignItems="center" px={4} sx={{ height: 62 }}>
+            <Text.Body m={0} sx={{ fontSize: '18px', fontWeight: 600, letterSpacing: '-0.018em' }}>
+              More results
+            </Text.Body>
+          </Flex>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
             {rest.map((r) => (
-              <ResultRow key={r.id} result={r} inCart={cart.has(r.id)} onToggleCart={onToggleCart} isTop={false} variant="sections" />
+              <ResultRow key={r.id} result={r} inCart={cart.has(r.id)} onToggleCart={onToggleCart} isTop={false} />
             ))}
           </Box>
         </Box>
@@ -773,9 +831,9 @@ function CartSidebar({
     <Box
       sx={{
         background: '#fff',
-        borderRadius: 12,
+        borderRadius: 8,
         boxShadow: '0 218px 61px 0 transparent, 0 139px 56px 0 rgba(0,0,0,0.01), 0 78px 47px 0 rgba(0,0,0,0.05), 0 -1px 35px 0 rgba(0,0,0,0.09), 0 4px 19px 0 rgba(0,0,0,0.1)',
-        height: 'calc(100vh - 160px)',
+        height: 'calc(100vh - 214px)',
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
@@ -783,7 +841,7 @@ function CartSidebar({
     >
       {/* ── Header ── */}
       <Box px={6} pt={6} pb={3}>
-        <Text.Body m={0} fontWeight="semibold" sx={{ fontSize: '18px', letterSpacing: '-0.01em' }}>
+        <Text.Body m={0} fontWeight="semibold" sx={{ fontSize: '20px', letterSpacing: '-0.2px' }}>
           Cart Overview
         </Text.Body>
         <Text.Caption m={0} color="fg.muted" sx={{ fontSize: '13px', mt: 3 }}>
@@ -1375,63 +1433,12 @@ export default function DomainSearch() {
     })
   }
 
-  const [variant, setVariant] = useState<'chips' | 'chips-label' | 'cards' | 'sections'>('chips')
-
   const cartItems = Array.from(cartDomains.values())
   const cartCount = cart.size
   const hasCart = cartCount > 0
 
-  const VARIANTS: { id: typeof variant; label: string }[] = [
-    { id: 'chips', label: 'Chips' },
-    { id: 'chips-label', label: 'Chips w/ label' },
-    { id: 'cards', label: 'Cards' },
-    { id: 'sections', label: 'Sections' },
-  ]
-
   return (
     <Box sx={{ minHeight: '100vh', background: '#fff' }}>
-
-      {/* ── Variant selector ── */}
-      <Box sx={{ borderBottom: '1px solid', borderColor: 'border.default', background: '#fff', py: '10px' }}>
-        <Flex
-          alignItems="center"
-          justifyContent="center"
-          gap={1}
-          sx={{ maxWidth: 1440, mx: 'auto', px: '16px' }}
-        >
-          {VARIANTS.map(({ id, label }) => {
-            const isActive = variant === id
-            return (
-              <Box
-                key={id}
-                as="button"
-                onClick={() => setVariant(id)}
-                sx={{
-                  background: isActive ? 'var(--colors-fg-default)' : 'transparent',
-                  border: '1px solid',
-                  borderColor: isActive ? 'fg.default' : 'border.default',
-                  borderRadius: 4,
-                  px: 3,
-                  py: '6px',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                  fontWeight: isActive ? 600 : 400,
-                  color: isActive ? '#fff' : 'fg.muted',
-                  letterSpacing: '0.01em',
-                  whiteSpace: 'nowrap',
-                  transition: 'background 0.12s, color 0.12s, border-color 0.12s',
-                  '&:hover': {
-                    borderColor: 'fg.default',
-                    color: isActive ? '#fff' : 'fg.default',
-                  },
-                }}
-              >
-                {label}
-              </Box>
-            )
-          })}
-        </Flex>
-      </Box>
 
       {/* ── Inline nav — scrolls with the page, not sticky ── */}
       <Box sx={{ background: '#fff' }}>
@@ -1440,7 +1447,7 @@ export default function DomainSearch() {
           alignItems="center"
           justifyContent="space-between"
           px={6}
-          sx={{ height: 66, maxWidth: 1440, mx: 'auto' }}
+          sx={{ height: 80, maxWidth: 1440, mx: 'auto' }}
         >
           <Box
             as="button"
@@ -1460,6 +1467,27 @@ export default function DomainSearch() {
           </Flex>
           <Flex alignItems="center" gap={5}>
             <Text.Body m={0} color="fg.muted" sx={{ cursor: 'pointer', fontSize: '12px', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 500, '&:hover': { color: 'fg.default' }, '@media (max-width: 767px)': { display: 'none' } }}>Log In</Text.Body>
+            <Box
+              as="button"
+              sx={{
+                background: '#000',
+                border: 'none',
+                color: '#fff',
+                cursor: 'pointer',
+                height: 62,
+                px: '28px',
+                fontSize: '14px',
+                fontFamily: '"Clarkson", Helvetica, sans-serif',
+                fontWeight: 500,
+                letterSpacing: '0.02em',
+                textTransform: 'uppercase',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+                '@media (max-width: 767px)': { display: 'none' },
+              }}
+            >
+              Find a domain
+            </Box>
             <Box as="button" aria-label="Open menu" sx={{ display: 'none', '@media (max-width: 767px)': { display: 'flex' }, flexDirection: 'column', justifyContent: 'center', gap: '5px', background: 'none', border: 'none', cursor: 'pointer', p: 1 }}>
               {[0, 1, 2].map((i) => <Box key={i} sx={{ width: 22, height: 2, borderRadius: 1, background: 'var(--colors-fg-default)' }} />)}
             </Box>
@@ -1510,24 +1538,6 @@ export default function DomainSearch() {
           {/* Right: Log in + CTA */}
           <Flex alignItems="center" gap={8} sx={{ flexShrink: 0 }}>
             {/* Mobile compact search */}
-            <Flex
-              alignItems="center"
-              gap={2}
-              sx={{
-                display: 'none',
-                '@media (max-width: 767px)': { display: 'flex', flex: 1, mx: 0, height: 36, px: 3, borderRadius: 8, background: '#f0f0f0' },
-              }}
-            >
-              <Search color="fg.muted" sx={{ width: 16, height: 16, flexShrink: 0 }} />
-              <Box
-                as="input"
-                value={inputValue}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setInputValue(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Search for a domain"
-                sx={{ flex: 1, border: 'none', background: 'transparent', outline: 'none', fontSize: '14px', color: 'fg.default', fontFamily: 'inherit' }}
-              />
-            </Flex>
             <Text.Body m={0} sx={{ cursor: 'pointer', fontSize: '14px', fontFamily: '"Clarkson", Helvetica, sans-serif', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#000', '&:hover': { opacity: 0.7 }, '@media (max-width: 767px)': { display: 'none' } }}>Log in</Text.Body>
           </Flex>
         </Flex>
@@ -1541,7 +1551,7 @@ export default function DomainSearch() {
           px: 8,
           pt: 140,
           pb: 24,
-          transition: 'max-width 0.35s ease',
+          transition: 'max-width 0.5s ease',
           '@media (max-width: 767px)': { px: '16px', pt: '32px', pb: cartItems.length > 0 ? '160px' : '40px' },
         }}
       >
@@ -1561,18 +1571,14 @@ export default function DomainSearch() {
                   fontStyle: 'normal',
                   fontWeight: 400,
                   color: '#000',
-                  fontSize: '32px',
+                  fontSize: '40px',
                   lineHeight: 1.1,
-                  letterSpacing: '-0.02em',
-                  display: '-webkit-box',
-                  WebkitLineClamp: 2,
-                  WebkitBoxOrient: 'vertical',
-                  overflow: 'hidden',
+                  letterSpacing: '-0.04em',
                 }}
               >
                 Find your domain
               </Box>
-              <Text.Body m={0} color="fg.muted">
+              <Text.Body m={0} sx={{ color: '#878787', fontSize: '15px', letterSpacing: '-0.015px' }}>
                 Each domain name registration comes with a free suite of tools including WHOIS privacy and SSL certificate.
               </Text.Body>
             </Box>
@@ -1582,16 +1588,12 @@ export default function DomainSearch() {
               ref={searchBarRef}
               alignItems="center"
               mb={8}
-              onFocus={() => setSearchFocused(true)}
-              onBlur={() => setSearchFocused(false)}
               sx={{
-                border: searchFocused ? '1px solid' : 'none',
-                borderColor: 'fg.default',
+                border: 'none',
                 borderRadius: 8,
                 height: 52,
-                background: searchFocused ? '#fff' : '#f5f5f5',
+                background: '#f9f9f9',
                 overflow: 'hidden',
-                transition: 'background 0.15s ease',
               }}
             >
               <Flex alignItems="center" gap={3} px={4} sx={{ flex: 1, minWidth: 0 }}>
@@ -1652,29 +1654,9 @@ export default function DomainSearch() {
             )}
 
             {/* Results */}
-            {!isLoading && results.length > 0 && (() => {
-              const available = results.filter((r) => r.available)
-              if (variant === 'cards') {
-                return <CardsView results={available} cart={cart} onToggleCart={toggleCart} />
-              }
-              if (variant === 'sections') {
-                return <SectionsView results={available} cart={cart} onToggleCart={toggleCart} />
-              }
-              return (
-                <Box>
-                  {available.map((r, i) => (
-                    <ResultRow
-                      key={r.id}
-                      result={r}
-                      inCart={cart.has(r.id)}
-                      onToggleCart={toggleCart}
-                      isTop={i === 0}
-                      variant={variant}
-                    />
-                  ))}
-                </Box>
-              )
-            })()}
+            {!isLoading && results.length > 0 && (
+              <SectionsView results={results.filter((r) => r.available)} cart={cart} onToggleCart={toggleCart} />
+            )}
 
             {/* Load more */}
             {!isLoading && results.length > 0 && (
@@ -1683,17 +1665,17 @@ export default function DomainSearch() {
                 sx={{
                   width: '100%',
                   mt: 4,
-                  py: 4,
-                  border: '1px solid',
-                  borderColor: 'border.default',
+                  height: 62,
+                  border: '1.5px solid rgba(0,0,0,0.2)',
                   borderRadius: 0,
                   background: 'transparent',
                   cursor: 'pointer',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  letterSpacing: '0.08em',
+                  fontSize: '14px',
+                  fontFamily: '"Clarkson", Helvetica, sans-serif',
+                  fontWeight: 500,
+                  letterSpacing: '0.02em',
                   textTransform: 'uppercase',
-                  color: 'fg.default',
+                  color: '#000',
                   transition: 'background 0.12s',
                   '&:hover': { background: 'var(--colors-bg-default)' },
                 }}
@@ -1711,11 +1693,22 @@ export default function DomainSearch() {
           </Box>
 
           {/* ── Right: cart sidebar (2/5) — hidden on mobile ── */}
-          {hasCart && (
-            <Box sx={{ flex: 2, minWidth: 0, alignSelf: 'flex-start', position: 'sticky', top: 80, '@media (max-width: 767px)': { display: 'none' } }}>
-              <CartSidebar items={cartItems} results={results} onRemove={removeFromCart} onAdd={toggleCart} />
-            </Box>
-          )}
+          <Box
+            sx={{
+              flex: hasCart ? 2 : 0,
+              minWidth: 0,
+              overflow: 'visible',
+              opacity: hasCart ? 1 : 0,
+              pointerEvents: hasCart ? 'auto' : 'none',
+              alignSelf: 'flex-start',
+              position: 'sticky',
+              top: 96,
+              transition: 'flex 0.5s ease, opacity 0.5s ease',
+              '@media (max-width: 767px)': { display: 'none' },
+            }}
+          >
+            <CartSidebar items={cartItems} results={results} onRemove={removeFromCart} onAdd={toggleCart} />
+          </Box>
 
         </Flex>
       </Box>
