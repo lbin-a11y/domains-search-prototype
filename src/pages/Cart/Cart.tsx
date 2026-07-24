@@ -6,12 +6,23 @@ import {
   Global,
   Trash,
   ChevronSmallDown,
+  ChevronSmallUp,
   ChevronSmallRight,
   Checkmark,
 } from '@sqs/rosetta-icons'
 import { InfoCircleFilled } from '@sqs/rosetta-glyphs'
 
+// ── Types ──────────────────────────────────────────────────────────────────
+
 type DomainBadge = 'exact' | 'premium' | 'promoted'
+type MyrVariant = 'divider' | 'label' | 'subtext'
+
+interface MyrDiscount {
+  type: 'flat' | 'incremental'
+  minYears: number
+  startPercent: number
+  step?: number
+}
 
 interface DomainResult {
   id: string
@@ -23,29 +34,75 @@ interface DomainResult {
   available: boolean
 }
 
+// ── MYR discount data ──────────────────────────────────────────────────────
+
+const TLD_MYR: Record<string, MyrDiscount> = {
+  '.com':    { type: 'incremental', minYears: 3, startPercent: 30, step: 10 },
+  '.net':    { type: 'flat',        minYears: 2, startPercent: 30 },
+  '.org':    { type: 'flat',        minYears: 2, startPercent: 25 },
+  '.co':     { type: 'incremental', minYears: 2, startPercent: 20, step: 10 },
+  '.io':     { type: 'flat',        minYears: 3, startPercent: 30 },
+  '.me':     { type: 'incremental', minYears: 2, startPercent: 15, step: 10 },
+  '.live':   { type: 'flat',        minYears: 2, startPercent: 30 },
+  '.store':  { type: 'flat',        minYears: 2, startPercent: 40 },
+  '.studio': { type: 'incremental', minYears: 3, startPercent: 30, step: 10 },
+  '.art':    { type: 'flat',        minYears: 2, startPercent: 20 },
+  '.shop':   { type: 'flat',        minYears: 3, startPercent: 30 },
+  '.online': { type: 'flat',        minYears: 2, startPercent: 40 },
+  '.design': { type: 'incremental', minYears: 2, startPercent: 25, step: 10 },
+}
+
+function getDiscount(tld: string): MyrDiscount | null {
+  return TLD_MYR[tld] ?? null
+}
+
+function getYearDiscount(years: number, discount: MyrDiscount): number | 'FREE' | null {
+  if (years < discount.minYears) return null
+  if (discount.type === 'flat') return discount.startPercent
+  const pct = discount.startPercent + (years - discount.minYears) * (discount.step ?? 10)
+  return pct >= 100 ? 'FREE' : pct
+}
+
 // ── Pricing helpers ────────────────────────────────────────────────────────
 
 const MAX_YEARS = 10
-/** Minimum term length (years) required to unlock the first-year discount. */
-const DISCOUNT_MIN_YEARS = 3
 
-/** Price for a given term. First year gets the sale price only at DISCOUNT_MIN_YEARS+. */
-function termPrice(item: DomainResult, years: number): number {
-  const firstYear =
-    item.salePrice !== null && years >= DISCOUNT_MIN_YEARS
-      ? item.salePrice
-      : item.originalPrice
-  return firstYear + item.originalPrice * (years - 1)
+function firstYearPrice(item: DomainResult, years: number): number {
+  const disc = getDiscount(item.tld)
+  if (disc) {
+    const d = getYearDiscount(years, disc)
+    if (d === 'FREE') return 0
+    if (d !== null) return Math.round(item.originalPrice * (1 - d / 100))
+  }
+  return item.salePrice ?? item.originalPrice
 }
 
-/** Full (non-discounted) price for a given term. */
+function termPrice(item: DomainResult, years: number): number {
+  return firstYearPrice(item, years) + item.originalPrice * (years - 1)
+}
+
 function termOriginalPrice(item: DomainResult, years: number): number {
   return item.originalPrice * years
 }
 
-/** Discount for a given term (0 if no salePrice). */
 function termDiscount(item: DomainResult, years: number): number {
   return termOriginalPrice(item, years) - termPrice(item, years)
+}
+
+// ── Variant helpers ────────────────────────────────────────────────────────
+
+const VARIANT_KEY = 'myr-variant'
+
+function readVariant(): MyrVariant {
+  try {
+    const v = localStorage.getItem(VARIANT_KEY)
+    if (v === 'divider' || v === 'label' || v === 'subtext') return v
+  } catch {}
+  return 'divider'
+}
+
+function writeVariant(v: MyrVariant) {
+  try { localStorage.setItem(VARIANT_KEY, v) } catch {}
 }
 
 // ── Breadcrumb ─────────────────────────────────────────────────────────────
@@ -95,30 +152,154 @@ function Breadcrumb() {
   )
 }
 
-// ── Term dropdown ──────────────────────────────────────────────────────────
+// ── Variant nav ────────────────────────────────────────────────────────────
+
+const VARIANT_LABELS: Record<MyrVariant, string> = {
+  divider: 'Divider',
+  label: 'Label',
+  subtext: 'Subtext',
+}
+
+const VARIANT_FIGMA: Record<MyrVariant, string> = {
+  divider: 'https://www.figma.com/design/LRN00J69dEcl5X5BHvhQJ6/Multi-year-term-discount?node-id=196-11538',
+  label:   'https://www.figma.com/design/LRN00J69dEcl5X5BHvhQJ6/Multi-year-term-discount?node-id=196-10572',
+  subtext: 'https://www.figma.com/design/LRN00J69dEcl5X5BHvhQJ6/Multi-year-term-discount?node-id=200-14480',
+}
+
+function VariantNav({ variant, onChange }: { variant: MyrVariant; onChange: (v: MyrVariant) => void }) {
+  return (
+    <Box
+      sx={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 500,
+        background: '#f5f5f5',
+        borderBottom: '1px solid #e2e2e2',
+        height: 44,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '6px',
+        px: 4,
+      }}
+    >
+      <Text.Caption m={0} color="fg.muted" sx={{ fontSize: '11px', letterSpacing: '0.06em', textTransform: 'uppercase', mr: 2, flexShrink: 0 }}>
+        Dropdown variant
+      </Text.Caption>
+      {(['divider', 'label', 'subtext'] as MyrVariant[]).map((v) => {
+        const active = variant === v
+        return (
+          <Flex key={v} alignItems="center" gap={1}>
+            <Box
+              as="button"
+              onClick={() => { onChange(v); writeVariant(v) }}
+              sx={{
+                px: '12px',
+                py: '5px',
+                borderRadius: 20,
+                border: '1px solid',
+                borderColor: active ? 'fg.default' : '#d0d0d0',
+                background: active ? 'var(--colors-fg-default)' : '#fff',
+                color: active ? '#fff' : 'var(--colors-fg-muted)',
+                cursor: 'pointer',
+                fontSize: '12px',
+                fontWeight: active ? 600 : 400,
+                letterSpacing: '0.02em',
+                transition: 'all 0.15s ease',
+                '&:hover': {
+                  borderColor: 'fg.default',
+                  background: active ? 'var(--colors-fg-default)' : '#f0f0f0',
+                },
+              }}
+            >
+              {VARIANT_LABELS[v]}
+            </Box>
+            <Box
+              as="a"
+              href={VARIANT_FIGMA[v]}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Figma reference"
+              sx={{ color: '#aaa', fontSize: '10px', textDecoration: 'none', display: 'flex', alignItems: 'center', '&:hover': { color: '#0862d1' } }}
+            >
+              ↗
+            </Box>
+          </Flex>
+        )
+      })}
+    </Box>
+  )
+}
+
+// ── Term dropdown (desktop) ────────────────────────────────────────────────
 
 function TermDropdown({
   item,
   selectedYears,
+  variant,
   onSelect,
   onClose,
 }: {
   item: DomainResult
   selectedYears: number
+  variant: MyrVariant
   onSelect: (years: number) => void
   onClose: () => void
 }) {
   const ref = useRef<HTMLDivElement>(null)
+  const disc = getDiscount(item.tld)
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        onClose()
-      }
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose()
     }
     document.addEventListener('mousedown', handleClick)
     return () => document.removeEventListener('mousedown', handleClick)
   }, [onClose])
+
+  const years = Array.from({ length: MAX_YEARS }, (_, i) => i + 1)
+
+  function renderRow(y: number, discLabel: React.ReactNode, caption?: React.ReactNode) {
+    const isSelected = y === selectedYears
+    const termLabel = y === 1 ? '1 year' : `${y} years`
+
+    return (
+      <Box
+        key={y}
+        as="button"
+        onClick={() => { onSelect(y); onClose() }}
+        sx={{
+          width: '100%',
+          display: 'flex',
+          alignItems: caption ? 'flex-start' : 'center',
+          gap: '8px',
+          px: '11px',
+          py: caption ? '9px' : '11px',
+          background: 'none',
+          border: 'none',
+          cursor: 'pointer',
+          textAlign: 'left',
+          '&:hover': { background: 'var(--colors-canvas-subtle, #f2f2f2)' },
+        }}
+      >
+        {/* Year label + optional caption */}
+        <Box sx={{ flex: '1 0 0', minWidth: 0 }}>
+          <Text.Body m={0} sx={{ fontSize: '14px', color: 'fg.default' }}>
+            {termLabel}
+          </Text.Body>
+          {caption}
+        </Box>
+
+        {/* Right: discount label/chip + checkmark */}
+        {discLabel}
+        <Box sx={{ width: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          {isSelected && <Checkmark sx={{ width: 14, height: 14, color: 'fg.default' }} />}
+        </Box>
+      </Box>
+    )
+  }
 
   return (
     <Box
@@ -134,56 +315,62 @@ function TermDropdown({
         py: '6px',
       }}
     >
-      {Array.from({ length: MAX_YEARS }, (_, i) => i + 1).map((years) => {
-        const orig = termOriginalPrice(item, years)
-        const sale = termPrice(item, years)
-        const hasDiscount = sale < orig
-        const isSelected = years === selectedYears
-        const label = years === 1 ? '1 year' : `${years} years`
-
+      {variant === 'divider' && (() => {
+        const noDisc = years.filter((y) => !disc || getYearDiscount(y, disc) === null)
+        const withDisc = years.filter((y) => disc && getYearDiscount(y, disc) !== null)
         return (
-          <Box
-            key={years}
-            as="button"
-            onClick={() => { onSelect(years); onClose() }}
-            sx={{
-              width: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              px: '11px',
-              py: '11px',
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              textAlign: 'left',
-              '&:hover': { background: 'var(--colors-canvas-subtle, #f2f2f2)' },
-            }}
-          >
-            {/* Label */}
-            <Text.Body m={0} sx={{ fontSize: '14px', color: 'fg.default', flex: '1 0 0' }}>
-              {label}
-            </Text.Body>
-
-            {/* Prices + checkmark */}
-            <Flex alignItems="center" gap={2}>
-              {hasDiscount && (
-                <Text.Body
-                  m={0}
-                  sx={{ fontSize: '14px', color: '#878787', textDecoration: 'line-through' }}
-                >
-                  ${orig}
-                </Text.Body>
-              )}
-              <Text.Body m={0} sx={{ fontSize: '14px', color: 'fg.default' }}>
-                ${sale}
-              </Text.Body>
-              <Box sx={{ width: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {isSelected && <Checkmark sx={{ width: 14, height: 14, color: 'fg.default' }} />}
-              </Box>
-            </Flex>
-          </Box>
+          <>
+            {noDisc.map((y) => renderRow(y, null))}
+            {withDisc.length > 0 && (
+              <>
+                {/* Section divider */}
+                <Flex alignItems="center" gap={3} px={3} py={2}>
+                  <Box sx={{ flex: 1, height: '1px', background: '#e7e7e7' }} />
+                  <Text.Caption
+                    m={0}
+                    sx={{ fontSize: '9.75px', fontWeight: 500, letterSpacing: '0.75px', textTransform: 'uppercase', color: '#666', whiteSpace: 'nowrap', flexShrink: 0 }}
+                  >
+                    Save on your first year
+                  </Text.Caption>
+                  <Box sx={{ flex: 1, height: '1px', background: '#e7e7e7' }} />
+                </Flex>
+                {withDisc.map((y) => {
+                  const d = disc ? getYearDiscount(y, disc) : null
+                  const chip = d !== null ? (
+                    <Box sx={{ px: '8px', py: '3px', borderRadius: 20, background: '#dbeafe', flexShrink: 0 }}>
+                      <Text.Caption m={0} sx={{ fontSize: '11px', fontWeight: 500, color: '#0862d1', lineHeight: 1 }}>
+                        {d === 'FREE' ? 'FREE' : `${d}%`} off
+                      </Text.Caption>
+                    </Box>
+                  ) : null
+                  return renderRow(y, chip)
+                })}
+              </>
+            )}
+          </>
         )
+      })()}
+
+      {variant === 'label' && years.map((y) => {
+        const d = disc ? getYearDiscount(y, disc) : null
+        const labelText = d === null ? null : d === 'FREE' ? 'FREE FIRST YEAR' : `${d}% OFF FIRST YEAR`
+        const label = labelText ? (
+          <Text.Caption m={0} sx={{ fontSize: '10px', fontWeight: 500, letterSpacing: '0.06em', color: '#0862d1', flexShrink: 0 }}>
+            {labelText}
+          </Text.Caption>
+        ) : null
+        return renderRow(y, label)
+      })}
+
+      {variant === 'subtext' && years.map((y) => {
+        const d = disc ? getYearDiscount(y, disc) : null
+        const captionText = d === null ? null : d === 'FREE' ? 'FREE first year' : `${d}% off first year`
+        const caption = captionText ? (
+          <Text.Caption m={0} sx={{ fontSize: '11px', color: '#0862d1', display: 'block', mt: '2px' }}>
+            {captionText}
+          </Text.Caption>
+        ) : null
+        return renderRow(y, null, caption)
       })}
     </Box>
   )
@@ -194,113 +381,133 @@ function TermDropdown({
 function TermBottomSheet({
   item,
   selectedYears,
+  variant,
   onSelect,
   onClose,
 }: {
   item: DomainResult
   selectedYears: number
+  variant: MyrVariant
   onSelect: (years: number) => void
   onClose: () => void
 }) {
   const [visible, setVisible] = useState(false)
+  const disc = getDiscount(item.tld)
 
   useEffect(() => {
     const id = requestAnimationFrame(() => setVisible(true))
     return () => cancelAnimationFrame(id)
   }, [])
 
+  const years = Array.from({ length: MAX_YEARS }, (_, i) => i + 1)
+
+  function sheetRow(y: number) {
+    const label = y === 1 ? '1 year' : `${y} years`
+    const isSelected = y === selectedYears
+    const d = disc ? getYearDiscount(y, disc) : null
+    const captionText = variant === 'subtext' && d !== null
+      ? (d === 'FREE' ? 'FREE first year' : `${d}% off first year`)
+      : null
+    const inlineLabel = variant === 'label' && d !== null
+      ? (d === 'FREE' ? 'FREE FIRST YEAR' : `${d}% OFF FIRST YEAR`)
+      : null
+    const chip = variant === 'divider' && d !== null
+      ? (d === 'FREE' ? 'FREE' : `${d}%`) + ' off'
+      : null
+
+    return (
+      <Box
+        key={y}
+        as="button"
+        onClick={() => { onSelect(y); onClose() }}
+        sx={{
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          px: 4,
+          py: '14px',
+          background: 'none',
+          border: 'none',
+          borderBottom: '1px solid #eee',
+          cursor: 'pointer',
+          textAlign: 'left',
+          gap: 3,
+        }}
+      >
+        <Box sx={{ flex: '1 0 0' }}>
+          <Flex alignItems="center" gap={2}>
+            <Text.Body m={0} sx={{ fontSize: '16px', color: 'fg.default' }}>{label}</Text.Body>
+            {chip && (
+              <Box sx={{ px: '8px', py: '3px', borderRadius: 20, background: '#dbeafe', flexShrink: 0 }}>
+                <Text.Caption m={0} sx={{ fontSize: '11px', fontWeight: 500, color: '#0862d1', lineHeight: 1 }}>{chip}</Text.Caption>
+              </Box>
+            )}
+            {inlineLabel && (
+              <Text.Caption m={0} sx={{ fontSize: '10px', fontWeight: 500, letterSpacing: '0.06em', color: '#0862d1', flexShrink: 0 }}>
+                {inlineLabel}
+              </Text.Caption>
+            )}
+          </Flex>
+          {captionText && (
+            <Text.Caption m={0} sx={{ fontSize: '12px', color: '#0862d1', display: 'block', mt: '2px' }}>
+              {captionText}
+            </Text.Caption>
+          )}
+        </Box>
+        <Box sx={{ width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          {isSelected && <Checkmark sx={{ width: 16, height: 16, color: 'fg.default' }} />}
+        </Box>
+      </Box>
+    )
+  }
+
+  const noDiscYears = years.filter((y) => !disc || getYearDiscount(y, disc) === null)
+  const discYears = years.filter((y) => disc && getYearDiscount(y, disc) !== null)
+
   return (
     <>
-      {/* Overlay */}
       <Box
         onClick={onClose}
         sx={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(0,0,0,0.4)',
-          zIndex: 400,
-          opacity: visible ? 1 : 0,
-          transition: 'opacity 0.25s ease',
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 400,
+          opacity: visible ? 1 : 0, transition: 'opacity 0.25s ease',
         }}
       />
-
-      {/* Sheet */}
       <Box
         sx={{
-          position: 'fixed',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          zIndex: 401,
-          background: '#fff',
-          borderTopLeftRadius: 12,
-          borderTopRightRadius: 12,
+          position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 401,
+          background: '#fff', borderTopLeftRadius: 12, borderTopRightRadius: 12,
           transform: visible ? 'translateY(0)' : 'translateY(100%)',
           transition: 'transform 0.3s cubic-bezier(0.4,0,0.2,1)',
+          maxHeight: '85vh', overflowY: 'auto',
         }}
       >
-        {/* Header */}
-        <Flex
-          alignItems="center"
-          justifyContent="space-between"
-          px={4}
-          sx={{ height: 56, borderBottom: '1px solid #eee' }}
-        >
-          <Text.Body m={0} sx={{ fontSize: '16px', fontWeight: 600 }}>Select Term Length</Text.Body>
-          <Box
-            as="button"
-            onClick={onClose}
-            sx={{ background: 'none', border: 'none', cursor: 'pointer', p: 0 }}
-          >
-            <Text.Body m={0} sx={{ fontSize: '13px', fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-              Done
-            </Text.Body>
+        <Flex alignItems="center" justifyContent="space-between" px={4} sx={{ height: 56, borderBottom: '1px solid #eee' }}>
+          <Text.Body m={0} sx={{ fontSize: '16px', fontWeight: 600 }}>Select term length</Text.Body>
+          <Box as="button" onClick={onClose} sx={{ background: 'none', border: 'none', cursor: 'pointer', p: 0 }}>
+            <Text.Body m={0} sx={{ fontSize: '13px', fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Done</Text.Body>
           </Box>
         </Flex>
 
-        {/* Options */}
-        {Array.from({ length: MAX_YEARS }, (_, i) => i + 1).map((years) => {
-          const label = years === 1 ? '1 year' : `${years} years`
-          const orig = termOriginalPrice(item, years)
-          const sale = termPrice(item, years)
-          const hasDiscount = sale < orig
-          const isSelected = years === selectedYears
-          return (
-            <Box
-              key={years}
-              as="button"
-              onClick={() => { onSelect(years); onClose() }}
-              sx={{
-                width: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                px: 4,
-                py: '14px',
-                background: 'none',
-                border: 'none',
-                borderBottom: '1px solid #eee',
-                cursor: 'pointer',
-                textAlign: 'left',
-              }}
-            >
-              <Text.Body m={0} sx={{ fontSize: '16px', color: 'fg.default', flex: '1 0 0' }}>{label}</Text.Body>
-              <Flex alignItems="center" gap={2}>
-                {hasDiscount && (
-                  <Text.Body m={0} sx={{ fontSize: '16px', color: '#878787', textDecoration: 'line-through' }}>
-                    ${orig}
-                  </Text.Body>
-                )}
-                <Text.Body m={0} sx={{ fontSize: '16px', color: 'fg.default' }}>
-                  ${sale}
-                </Text.Body>
-                <Box sx={{ width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {isSelected && <Checkmark sx={{ width: 16, height: 16, color: 'fg.default' }} />}
-                </Box>
-              </Flex>
-            </Box>
-          )
-        })}
+        {variant === 'divider' ? (
+          <>
+            {noDiscYears.map(sheetRow)}
+            {discYears.length > 0 && (
+              <>
+                <Flex alignItems="center" gap={3} px={4} py={2} sx={{ borderTop: '1px solid #e7e7e7', borderBottom: '1px solid #e7e7e7' }}>
+                  <Box sx={{ flex: 1, height: '1px', background: '#e7e7e7' }} />
+                  <Text.Caption m={0} sx={{ fontSize: '9.75px', fontWeight: 500, letterSpacing: '0.75px', textTransform: 'uppercase', color: '#666', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                    Save on your first year
+                  </Text.Caption>
+                  <Box sx={{ flex: 1, height: '1px', background: '#e7e7e7' }} />
+                </Flex>
+                {discYears.map(sheetRow)}
+              </>
+            )}
+          </>
+        ) : (
+          years.map(sheetRow)
+        )}
       </Box>
     </>
   )
@@ -311,24 +518,27 @@ function TermBottomSheet({
 function DomainCard({
   item,
   selectedYears,
+  variant,
   onTermChange,
   onRemove,
 }: {
   item: DomainResult
   selectedYears: number
+  variant: MyrVariant
   onTermChange: (id: string, years: number) => void
   onRemove: (id: string) => void
 }) {
   const [dropdownOpen, setDropdownOpen] = useState(false)
 
+  const disc = getDiscount(item.tld)
   const price = termPrice(item, selectedYears)
   const orig = termOriginalPrice(item, selectedYears)
-  const hasDiscount = price < orig
-  const discountEligible = item.salePrice !== null && selectedYears >= DISCOUNT_MIN_YEARS
-  const discountPct = discountEligible
-    ? Math.round((1 - item.salePrice! / item.originalPrice) * 100)
-    : null
-  const showDiscountPrompt = item.salePrice !== null && selectedYears < DISCOUNT_MIN_YEARS
+  const hasTermDiscount = price < orig
+
+  const d = disc ? getYearDiscount(selectedYears, disc) : null
+  const discountPct = d !== null && d !== 'FREE' ? d : d === 'FREE' ? 100 : null
+  const showDiscountBadge = d !== null
+  const showDiscountPrompt = disc !== null && d === null
   const termLabel = selectedYears === 1 ? '1 year' : `${selectedYears} years`
 
   return (
@@ -343,30 +553,17 @@ function DomainCard({
         background: '#fff',
       }}
     >
-      {/* Thumbnail — hidden on mobile */}
+      {/* Thumbnail */}
       <Box
         sx={{
-          width: 117,
-          minHeight: 160,
-          flexShrink: 0,
+          width: 117, minHeight: 160, flexShrink: 0,
           background: 'linear-gradient(135deg, #1a1a1a 0%, #3a2a20 50%, #1a1a1a 100%)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          position: 'relative',
-          borderRadius: '3px 0 0 3px',
-          overflow: 'hidden',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          position: 'relative', borderRadius: '3px 0 0 3px', overflow: 'hidden',
           '@media (max-width: 767px)': { display: 'none' },
         }}
       >
-        <Box
-          sx={{
-            position: 'absolute',
-            inset: 0,
-            background: 'rgba(196,196,196,0.12)',
-            backdropFilter: 'blur(4px)',
-          }}
-        />
+        <Box sx={{ position: 'absolute', inset: 0, background: 'rgba(196,196,196,0.12)', backdropFilter: 'blur(4px)' }} />
         <Global sx={{ width: 26, height: 26, color: 'rgba(255,255,255,0.75)', position: 'relative', zIndex: 1 }} />
       </Box>
 
@@ -374,12 +571,12 @@ function DomainCard({
       <Box sx={{ flex: '1 0 0', minWidth: 0, px: 5, '@media (max-width: 767px)': { px: 4 } }}>
         <Box sx={{ height: 20 }} />
 
-        {/* Name + badge */}
+        {/* Name + discount badge */}
         <Flex alignItems="center" justifyContent="space-between" sx={{ gap: 3 }}>
           <Text.Body m={0} sx={{ fontSize: '15px', fontWeight: 500, color: 'fg.default', whiteSpace: 'nowrap' }}>
             {item.name}
           </Text.Body>
-          {discountPct !== null && (
+          {showDiscountBadge && (
             <Box
               sx={{
                 border: '1px solid',
@@ -401,7 +598,7 @@ function DomainCard({
                   whiteSpace: 'nowrap',
                 }}
               >
-                {discountPct}% off first year
+                {d === 'FREE' ? 'FREE first year' : `${discountPct}% off first year`}
               </Text.Body>
             </Box>
           )}
@@ -429,7 +626,7 @@ function DomainCard({
                 {termLabel}
               </Text.Body>
               <Flex alignItems="center" gap={2}>
-                {hasDiscount && (
+                {hasTermDiscount && (
                   <Text.Body m={0} sx={{ fontSize: '14px', color: 'fg.muted', textDecoration: 'line-through' }}>
                     ${orig}
                   </Text.Body>
@@ -437,7 +634,10 @@ function DomainCard({
                 <Text.Body m={0} sx={{ fontSize: '14px', fontWeight: 500, color: 'fg.default' }}>
                   ${price}
                 </Text.Body>
-                <ChevronSmallDown sx={{ width: 20, height: 20, color: 'fg.default' }} />
+                {dropdownOpen
+                  ? <ChevronSmallUp sx={{ width: 20, height: 20, color: 'fg.default' }} />
+                  : <ChevronSmallDown sx={{ width: 20, height: 20, color: 'fg.default' }} />
+                }
               </Flex>
             </Flex>
           </Box>
@@ -448,6 +648,7 @@ function DomainCard({
               <TermDropdown
                 item={item}
                 selectedYears={selectedYears}
+                variant={variant}
                 onSelect={(years) => onTermChange(item.id, years)}
                 onClose={() => setDropdownOpen(false)}
               />
@@ -460,6 +661,7 @@ function DomainCard({
               <TermBottomSheet
                 item={item}
                 selectedYears={selectedYears}
+                variant={variant}
                 onSelect={(years) => onTermChange(item.id, years)}
                 onClose={() => setDropdownOpen(false)}
               />
@@ -474,13 +676,9 @@ function DomainCard({
             />
             <Text.Body
               m={0}
-              sx={{
-                fontSize: '12px',
-                lineHeight: '16px',
-                color: 'var(--colors-accent-fg, #0862d1)',
-              }}
+              sx={{ fontSize: '12px', lineHeight: '16px', color: 'var(--colors-accent-fg, #0862d1)' }}
             >
-              Get a first-year discount when you subscribe for {DISCOUNT_MIN_YEARS} or more years.
+              Get a first-year discount when you subscribe for {disc!.minYears} or more years.
             </Text.Body>
           </Flex>
         ) : (
@@ -500,16 +698,9 @@ function DomainCard({
             as="button"
             onClick={() => onRemove(item.id)}
             sx={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              padding: 0,
-              color: 'fg.muted',
-              flexShrink: 0,
-              display: 'flex',
-              alignItems: 'center',
-              mt: '1px',
-              '&:hover': { color: 'fg.default' },
+              background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+              color: 'fg.muted', flexShrink: 0, display: 'flex', alignItems: 'center',
+              mt: '1px', '&:hover': { color: 'fg.default' },
             }}
           >
             <Trash sx={{ width: 15, height: 15 }} />
@@ -524,13 +715,7 @@ function DomainCard({
 
 // ── Order Summary panel ────────────────────────────────────────────────────
 
-function OrderSummary({
-  items,
-  terms,
-}: {
-  items: DomainResult[]
-  terms: Record<string, number>
-}) {
+function OrderSummary({ items, terms }: { items: DomainResult[]; terms: Record<string, number> }) {
   const subtotal = items.reduce((sum, r) => sum + termOriginalPrice(r, terms[r.id] ?? 1), 0)
   const totalDiscounts = items.reduce((sum, r) => sum + termDiscount(r, terms[r.id] ?? 1), 0)
   const estimatedTotal = subtotal - totalDiscounts
@@ -554,13 +739,8 @@ function OrderSummary({
         flexShrink: 0,
         alignSelf: 'flex-start',
         '@media (max-width: 767px)': {
-          background: 'transparent',
-          width: '100%',
-          p: 0,
-          alignSelf: 'stretch',
-          borderTop: '1px solid',
-          borderColor: 'border.default',
-          pt: 5,
+          background: 'transparent', width: '100%', p: 0, alignSelf: 'stretch',
+          borderTop: '1px solid', borderColor: 'border.default', pt: 5,
         },
       }}
     >
@@ -568,7 +748,6 @@ function OrderSummary({
         Order Summary
       </Text.Body>
 
-      {/* Domain section label — desktop only */}
       <Flex alignItems="center" gap={2} sx={{ mb: 3, '@media (max-width: 767px)': { display: 'none' } }}>
         <Global sx={{ width: 16, height: 16, color: 'fg.muted' }} />
         <Text.Body m={0} sx={{ fontSize: '13px', color: 'fg.muted' }}>
@@ -576,11 +755,9 @@ function OrderSummary({
         </Text.Body>
       </Flex>
 
-      {/* Per-domain rows — desktop only */}
       {items.map((item) => {
         const years = terms[item.id] ?? 1
         const discount = termDiscount(item, years)
-
         return (
           <Box key={item.id} sx={{ mb: 3, '@media (max-width: 767px)': { display: 'none' } }}>
             <Flex justifyContent="space-between" sx={{ mb: '3px' }}>
@@ -593,13 +770,8 @@ function OrderSummary({
             </Flex>
             {discount > 0 && (
               <Flex justifyContent="space-between" sx={{ mb: '3px' }}>
-                <Text.Body m={0} sx={{ fontSize: '12px', color: 'fg.muted' }}>
-                  First-year discount
-                </Text.Body>
-                <Text.Body
-                  m={0}
-                  sx={{ fontSize: '12px', color: 'var(--colors-accent-fg, #0862d1)', whiteSpace: 'nowrap' }}
-                >
+                <Text.Body m={0} sx={{ fontSize: '12px', color: 'fg.muted' }}>First-year discount</Text.Body>
+                <Text.Body m={0} sx={{ fontSize: '12px', color: 'var(--colors-accent-fg, #0862d1)', whiteSpace: 'nowrap' }}>
                   -${discount}.00
                 </Text.Body>
               </Flex>
@@ -611,10 +783,8 @@ function OrderSummary({
         )
       })}
 
-      {/* Divider — desktop only (mobile uses borderTop on the card itself) */}
       <Box sx={{ borderTop: '1px solid', borderColor: 'border.default', my: 4, '@media (max-width: 767px)': { display: 'none' } }} />
 
-      {/* Totals */}
       <Flex justifyContent="space-between" sx={{ mb: 2 }}>
         <Text.Body m={0} sx={{ fontSize: '13px', color: 'fg.default' }}>Subtotal</Text.Body>
         <Text.Body m={0} sx={{ fontSize: '13px', color: 'fg.default' }}>${subtotal}.00</Text.Body>
@@ -635,15 +805,10 @@ function OrderSummary({
       <Box sx={{ borderTop: '1px solid', borderColor: 'border.default', my: 3 }} />
 
       <Flex justifyContent="space-between" sx={{ mb: 4 }}>
-        <Text.Body m={0} sx={{ fontSize: '14px', fontWeight: 600, color: 'fg.default' }}>
-          Estimated Total
-        </Text.Body>
-        <Text.Body m={0} sx={{ fontSize: '14px', fontWeight: 600, color: 'fg.default' }}>
-          ${estimatedTotal}.00
-        </Text.Body>
+        <Text.Body m={0} sx={{ fontSize: '14px', fontWeight: 600, color: 'fg.default' }}>Estimated Total</Text.Body>
+        <Text.Body m={0} sx={{ fontSize: '14px', fontWeight: 600, color: 'fg.default' }}>${estimatedTotal}.00</Text.Body>
       </Flex>
 
-      {/* Currency */}
       <Flex alignItems="center" gap={1}>
         <Text.Body m={0} sx={{ fontSize: '12px', color: 'fg.muted' }}>
           All prices are in{' '}
@@ -657,6 +822,8 @@ function OrderSummary({
 
 // ── Page ───────────────────────────────────────────────────────────────────
 
+const VARIANT_NAV_HEIGHT = 44
+
 export default function Cart() {
   const location = useLocation()
   const navigate = useNavigate()
@@ -665,11 +832,12 @@ export default function Cart() {
     try { return JSON.parse(localStorage.getItem('domains-cart-items') ?? '[]') } catch { return [] }
   })()
 
+  const [variant, setVariant] = useState<MyrVariant>(readVariant)
   const [items, setItems] = useState<DomainResult[]>(initialItems)
   const [terms, setTerms] = useState<Record<string, number>>(() => {
     let saved: Record<string, number> = {}
     try { saved = JSON.parse(localStorage.getItem('domains-cart-terms') ?? '{}') } catch {}
-    return Object.fromEntries(initialItems.map((i) => [i.id, saved[i.id] ?? DISCOUNT_MIN_YEARS]))
+    return Object.fromEntries(initialItems.map((i) => [i.id, saved[i.id] ?? (getDiscount(i.tld)?.minYears ?? 1)]))
   })
 
   if (initialItems.length === 0) {
@@ -702,7 +870,8 @@ export default function Cart() {
   const subtotal = items.reduce((s, r) => s + (r.salePrice ?? r.originalPrice), 0)
 
   return (
-    <Box sx={{ minHeight: '100vh', background: '#fff' }}>
+    <Box sx={{ minHeight: '100vh', background: '#fff', pt: `${VARIANT_NAV_HEIGHT}px` }}>
+      <VariantNav variant={variant} onChange={setVariant} />
       <Breadcrumb />
 
       <Box sx={{ maxWidth: 960, mx: 'auto', px: 6, pt: 7, pb: 8, '@media (max-width: 767px)': { px: 4, pt: 5, pb: 6 } }}>
@@ -712,12 +881,8 @@ export default function Cart() {
 
         <Flex
           alignItems="flex-start"
-          sx={{
-            gap: '64px',
-            '@media (max-width: 767px)': { flexDirection: 'column', gap: '24px', alignItems: 'stretch' },
-          }}
+          sx={{ gap: '64px', '@media (max-width: 767px)': { flexDirection: 'column', gap: '24px', alignItems: 'stretch' } }}
         >
-          {/* Left: domain list */}
           <Box sx={{ flex: '1 1 0', minWidth: 0 }}>
             <Flex alignItems="center" justifyContent="space-between" sx={{ mb: 3 }}>
               <Text.Body m={0} sx={{ fontSize: '14px', color: 'fg.default' }}>
@@ -734,21 +899,17 @@ export default function Cart() {
                   key={item.id}
                   item={item}
                   selectedYears={terms[item.id] ?? 1}
+                  variant={variant}
                   onTermChange={handleTermChange}
                   onRemove={removeItem}
                 />
               ))}
             </Flex>
 
-            {/* Desktop CTA — hidden on mobile */}
             <Button.Primary
               sx={{
-                width: '100%',
-                height: 52,
-                borderRadius: '2px',
-                fontSize: '12px',
-                letterSpacing: '0.08em',
-                textTransform: 'uppercase',
+                width: '100%', height: 52, borderRadius: '2px',
+                fontSize: '12px', letterSpacing: '0.08em', textTransform: 'uppercase',
                 '@media (max-width: 767px)': { display: 'none' },
               }}
             >
@@ -756,27 +917,17 @@ export default function Cart() {
             </Button.Primary>
           </Box>
 
-          {/* Right: order summary */}
           <OrderSummary items={items} terms={terms} />
 
-          {/* Mobile CTA — shown below order summary on mobile only */}
           <Box
             as="button"
             onClick={() => {}}
             sx={{
               display: 'none',
               '@media (max-width: 767px)': {
-                display: 'block',
-                width: '100%',
-                background: '#000',
-                color: '#fff',
-                border: 'none',
-                height: 52,
-                cursor: 'pointer',
-                fontSize: '12px',
-                letterSpacing: '0.08em',
-                textTransform: 'uppercase',
-                fontWeight: 400,
+                display: 'block', width: '100%', background: '#000', color: '#fff',
+                border: 'none', height: 52, cursor: 'pointer', fontSize: '12px',
+                letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 400,
               },
             }}
           >
