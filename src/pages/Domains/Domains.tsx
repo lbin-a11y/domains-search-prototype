@@ -1,8 +1,17 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Box, Flex, Text } from '@sqs/rosetta-primitives'
 import { LogoSquarespace, Search, ArrowRight } from '@sqs/rosetta-icons'
 import { Accordion } from '@sqs/rosetta-compositions'
+
+const SEARCH_HINTS = [
+  'Hypha Florals',
+  'lioagency.com',
+  'Unique domains for a wellness center in Austin',
+  'Brooklyn Coffee Co.',
+  'modernarchstudio.design',
+  'A photography portfolio for a travel photographer',
+]
 
 // Figma asset URLs — valid for ~7 days from 2026-07-24
 const IMG_BLOBS = 'https://www.figma.com/api/mcp/asset/14128ebd-bda4-4e1a-a56d-64cd92954e36'
@@ -60,6 +69,26 @@ export default function Domains() {
   const navigate = useNavigate()
   const [query, setQuery] = useState('')
   const [tab, setTab] = useState<'buy' | 'transfer'>('buy')
+  const [searchFocused, setSearchFocused] = useState(false)
+  const [hintIndex, setHintIndex] = useState(0)
+  const [guideMe, setGuideMe] = useState(false)
+  const [selectedVibes, setSelectedVibes] = useState<string[]>([])
+  const [industry, setIndustry] = useState('')
+  const [businessName, setBusinessName] = useState('')
+
+  const guideMeSummary = [businessName, industry, selectedVibes.join(', ')].filter(Boolean).join(' · ')
+
+  useEffect(() => {
+    if (query || tab === 'transfer') return
+    const timer = setInterval(() => {
+      setHintIndex(i => (i + 1) % SEARCH_HINTS.length)
+    }, 3000)
+    return () => clearInterval(timer)
+  }, [query, tab])
+
+  function toggleVibe(v: string) {
+    setSelectedVibes(prev => prev.includes(v) ? prev.filter(x => x !== v) : [...prev, v])
+  }
 
   function handleSearch() {
     const trimmed = query.trim().toLowerCase().replace(/\s+/g, '').replace(/^\./, '')
@@ -108,7 +137,7 @@ export default function Domains() {
 
         {/* Blobs background */}
         <Box sx={{ position: 'absolute', left: 178, top: 308, width: 1152, height: 820, pointerEvents: 'none', zIndex: 0 }}>
-          <img src={IMG_BLOBS} style={{ width: '100%', height: '100%', display: 'block' }} alt="" />
+          <img src={IMG_BLOBS} style={{ width: '100%', height: '100%', display: 'block', filter: 'brightness(1.05) saturate(1.05)' }} alt="" />
         </Box>
 
         {/* Left screenshot */}
@@ -134,22 +163,37 @@ export default function Domains() {
         >
           {/* Buy / Transfer toggle */}
           <Box sx={{
+            position: 'relative',
             backdropFilter: 'blur(25px)',
             background: 'rgba(183,183,183,0.2)',
             border: '1px solid #e7e7e7',
             borderRadius: 30,
-            padding: '8px',
-            display: 'flex',
-            gap: '8px',
-            alignItems: 'center',
+            padding: '4px',
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
           }}>
+            {/* Sliding pill — pure CSS, no JS measurement */}
+            <Box sx={{
+              position: 'absolute',
+              top: '4px',
+              bottom: '4px',
+              left: tab === 'buy' ? '4px' : 'calc(50%)',
+              width: 'calc(50% - 4px)',
+              borderRadius: 30,
+              background: '#0e0e0e',
+              transition: 'left 0.25s cubic-bezier(0.4,0,0.2,1)',
+              zIndex: 0,
+              pointerEvents: 'none',
+            }} />
             {(['buy', 'transfer'] as const).map((t) => (
               <Box
                 key={t}
                 as="button"
                 onClick={() => setTab(t)}
                 sx={{
-                  background: tab === t ? '#0e0e0e' : 'transparent',
+                  position: 'relative',
+                  zIndex: 1,
+                  background: 'transparent',
                   color: tab === t ? '#fff' : '#0e0e0e',
                   border: 'none',
                   borderRadius: 30,
@@ -157,92 +201,264 @@ export default function Domains() {
                   py: '8px',
                   cursor: 'pointer',
                   fontFamily: CLARKSON,
-                  fontWeight: tab === t ? 600 : 400,
+                  fontWeight: 400,
                   fontSize: '15px',
                   letterSpacing: '-0.015px',
                   lineHeight: 1.4,
-                  transition: 'background 0.15s, color 0.15s',
-                  textTransform: 'capitalize',
+                  transition: 'color 0.2s',
+                  textAlign: 'center',
                 }}
               >
-                {t}
+                {t === 'buy' ? 'Buy' : 'Transfer'}
               </Box>
             ))}
           </Box>
 
           {/* Headline */}
-          <Box as="p" m={0} sx={{
-            fontFamily: CLARKSON,
-            fontWeight: 300,
-            fontSize: '80px',
-            lineHeight: 0.93,
-            letterSpacing: '-4px',
-            color: '#0e0e0e',
-            textAlign: 'center',
-            width: '100%',
-          }}>
-            Buy your dream domain
+          <Box
+            key={`headline-${tab}`}
+            as="p"
+            m={0}
+            sx={{
+              fontFamily: CLARKSON,
+              fontWeight: 300,
+              fontSize: '80px',
+              lineHeight: 0.93,
+              letterSpacing: '-4px',
+              color: '#0e0e0e',
+              textAlign: 'center',
+              width: '100%',
+              animation: 'heroTextIn 0.3s cubic-bezier(0.4,0,0.2,1) forwards',
+            }}
+          >
+            {tab === 'buy' ? 'Buy your dream domain' : <>Transfer your<br />domain</>}
           </Box>
 
           {/* Subtitle */}
-          <Box as="p" m={0} sx={{
-            fontFamily: CLARKSON,
-            fontWeight: 400,
-            fontSize: '15px',
-            lineHeight: 1.4,
-            letterSpacing: '-0.015px',
-            color: '#0e0e0e',
-            textAlign: 'center',
-            textShadow: '0px 1.802px 99.11px #432619',
-            width: 544,
-          }}>
-            Each domain name registration comes with free suite of tools including WHOIS privacy and SSL certificate.
+          <Box
+            key={`subtitle-${tab}`}
+            as="p"
+            m={0}
+            sx={{
+              fontFamily: CLARKSON,
+              fontWeight: 400,
+              fontSize: '15px',
+              lineHeight: 1.4,
+              letterSpacing: '-0.015px',
+              color: '#0e0e0e',
+              textAlign: 'center',
+              textShadow: '0px 1.802px 99.11px #432619',
+              width: 544,
+              animation: 'heroTextIn 0.35s cubic-bezier(0.4,0,0.2,1) 0.05s both',
+            }}
+          >
+            {tab === 'buy'
+              ? 'Each domain name registration comes with free suite of tools including WHOIS privacy and SSL certificate.'
+              : 'Bring your domain to Squarespace where pricing is transparent, and premium privacy and security features come standard.'
+            }
           </Box>
 
           {/* Search field */}
-          <Flex
-            alignItems="center"
+          <style>{`
+            @keyframes hintSlideIn {
+              from { transform: translateY(-8px); opacity: 0; }
+              to { transform: translateY(0); opacity: 1; }
+            }
+            @keyframes heroTextIn {
+              from { opacity: 0; transform: translateY(6px); }
+              to { opacity: 1; transform: translateY(0); }
+            }
+            @keyframes guideMeExpand {
+              from { opacity: 0; transform: translateY(-6px); }
+              to { opacity: 1; transform: translateY(0); }
+            }
+          `}</style>
+          {/* Search + Guide me card — single container, one shadow */}
+          <Box
+            onFocus={() => setSearchFocused(true)}
+            onBlur={() => setSearchFocused(false)}
             sx={{
-              background: '#fff',
-              borderRadius: 8,
-              boxShadow: '0px 0px 1px 0px rgba(0,0,0,0.08), 0px 8px 32px 0px rgba(0,0,0,0.12)',
-              height: 62,
               width: 660,
-              gap: '16px',
-              px: '24px',
+              borderRadius: 8,
+              background: '#fff',
+              boxShadow: searchFocused
+                ? '0px 0px 2px 0px rgba(0,0,0,0.14), 0px 12px 40px 0px rgba(0,0,0,0.18)'
+                : '0px 0px 1px 0px rgba(0,0,0,0.04), 0px 2px 8px 0px rgba(0,0,0,0.06)',
+              transition: 'box-shadow 0.2s ease',
               overflow: 'hidden',
               flexShrink: 0,
             }}
           >
-            <Search sx={{ width: 22, height: 22, flexShrink: 0, color: '#878787' }} />
-            <Box
-              as="input"
-              value={query}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Hypha Florals"
-              sx={{
-                flex: 1,
-                border: 'none',
-                background: 'transparent',
-                outline: 'none',
-                fontSize: '15px',
-                color: '#0e0e0e',
-                fontFamily: CLARKSON,
-                letterSpacing: '-0.015px',
-                lineHeight: 1.4,
-                '&::placeholder': { color: '#878787' },
-              }}
-            />
-            <Box
-              as="button"
-              onClick={handleSearch}
-              aria-label="Search"
-              sx={{ background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', p: 0 }}
+            {/* Search row */}
+            <Flex
+              alignItems="center"
+              sx={{ height: 62, gap: '16px', px: '24px' }}
             >
-              <ArrowRight sx={{ width: 22, height: 22, color: '#0e0e0e' }} />
-            </Box>
-          </Flex>
+              <Search sx={{ width: 22, height: 22, flexShrink: 0, color: '#878787' }} />
+              <Box sx={{ position: 'relative', flex: 1, overflow: 'hidden', display: 'flex', alignItems: 'center' }}>
+                {!query && (
+                  tab === 'transfer' ? (
+                    <Box as="span" sx={{
+                      position: 'absolute', left: 0, right: 0,
+                      fontFamily: CLARKSON, fontSize: '15px', letterSpacing: '-0.015px',
+                      color: '#878787', pointerEvents: 'none',
+                    }}>
+                      Enter your domain to get started
+                    </Box>
+                  ) : guideMeSummary ? (
+                    <Box as="span" sx={{
+                      position: 'absolute', left: 0, right: 0,
+                      fontFamily: CLARKSON, fontSize: '15px', letterSpacing: '-0.015px',
+                      color: '#0e0e0e', pointerEvents: 'none',
+                      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                    }}>
+                      {guideMeSummary}
+                    </Box>
+                  ) : (
+                    <Box
+                      key={hintIndex}
+                      as="span"
+                      sx={{
+                        position: 'absolute', left: 0, right: 0,
+                        fontFamily: CLARKSON, fontSize: '15px', letterSpacing: '-0.015px',
+                        color: '#878787', pointerEvents: 'none',
+                        animation: 'hintSlideIn 0.35s cubic-bezier(0.4,0,0.2,1) forwards',
+                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                      }}
+                    >
+                      {SEARCH_HINTS[hintIndex]}
+                    </Box>
+                  )
+                )}
+                <Box
+                  as="input"
+                  value={query}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder=""
+                  sx={{
+                    width: '100%', border: 'none', background: 'transparent', outline: 'none',
+                    fontSize: '15px', color: '#0e0e0e', fontFamily: CLARKSON,
+                    letterSpacing: '-0.015px', lineHeight: 1.4, position: 'relative', zIndex: 1,
+                  }}
+                />
+              </Box>
+              {/* Guide me button */}
+              <Flex
+                as="button"
+                alignItems="center"
+                onClick={() => setGuideMe(g => !g)}
+                sx={{
+                  background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0,
+                  color: '#666', fontFamily: CLARKSON, fontSize: '15px', letterSpacing: '-0.015px',
+                  lineHeight: 1.4, p: 0, gap: '2px',
+                }}
+              >
+                Guide me
+                <svg width="10" height="7" viewBox="0 0 10 7" fill="none" style={{ transition: 'transform 0.2s', transform: guideMe ? 'rotate(180deg)' : 'rotate(0deg)', flexShrink: 0 }}>
+                  <path d="M1 1L5 5L9 1" stroke="#666" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </Flex>
+              <Box
+                as="button"
+                onClick={handleSearch}
+                aria-label="Search"
+                sx={{ background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', p: 0, ml: '4px' }}
+              >
+                <ArrowRight sx={{ width: 22, height: 22, color: '#0e0e0e' }} />
+              </Box>
+            </Flex>
+
+            {/* Guide me expanded panel */}
+            {guideMe && (
+              <Box sx={{
+                borderTop: '1px solid #e7e7e7',
+                p: '22px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '22px',
+                animation: 'guideMeExpand 0.25s cubic-bezier(0.4,0,0.2,1) forwards',
+              }}>
+                {/* Dropdowns row */}
+                <Flex gap="16px">
+                  {/* Industry select */}
+                  <Box as="select"
+                    value={industry}
+                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setIndustry(e.target.value)}
+                    sx={{
+                      flex: 1, height: 62,
+                      background: 'rgba(0,0,0,0.05)',
+                      border: 'none', borderRadius: 8,
+                      px: '16px', py: '12px',
+                      fontFamily: CLARKSON, fontSize: '15px',
+                      color: industry ? '#0e0e0e' : '#898989',
+                      letterSpacing: '-0.015px', lineHeight: 1.4,
+                      appearance: 'none', cursor: 'pointer', outline: 'none',
+                    }}
+                  >
+                    <option value="" disabled>Industry</option>
+                    {['Retail', 'Food & Beverage', 'Health & Wellness', 'Creative Arts', 'Tech', 'Professional Services', 'Education', 'Travel', 'Real Estate', 'Non-profit'].map(o => (
+                      <option key={o} value={o}>{o}</option>
+                    ))}
+                  </Box>
+                  {/* Business name text input */}
+                  <Box
+                    as="input"
+                    type="text"
+                    value={businessName}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBusinessName(e.target.value)}
+                    placeholder="Business name (Optional)"
+                    sx={{
+                      flex: 1, height: 62,
+                      background: 'rgba(0,0,0,0.05)',
+                      border: 'none', borderRadius: 8,
+                      px: '16px', py: '12px',
+                      fontFamily: CLARKSON, fontSize: '15px',
+                      color: businessName ? '#0e0e0e' : '#898989',
+                      letterSpacing: '-0.015px', lineHeight: 1.4,
+                      outline: 'none', boxSizing: 'border-box',
+                      '&::placeholder': { color: '#898989' },
+                    }}
+                  />
+                </Flex>
+
+                {/* Vibe section */}
+                <Box>
+                  <Box mb="16px">
+                    <Box as="p" m={0} sx={{ fontFamily: CLARKSON, fontSize: '15px', color: '#0e0e0e', letterSpacing: '-0.015px', lineHeight: 1.4 }}>
+                      What's the vibe of your business?
+                    </Box>
+                    <Box as="p" m={0} sx={{ fontFamily: CLARKSON, fontSize: '15px', color: '#666', letterSpacing: '-0.015px', lineHeight: 1.4 }}>
+                      Select one or more.
+                    </Box>
+                  </Box>
+                  <Flex flexWrap="wrap" gap="8px">
+                    {['Professional', 'Friendly', 'Sophisticated', 'Playful', 'Modern', 'Informative'].map(vibe => (
+                      <Box
+                        key={vibe}
+                        as="button"
+                        onClick={() => toggleVibe(vibe)}
+                        sx={{
+                          backdropFilter: 'blur(25px)',
+                          background: selectedVibes.includes(vibe) ? '#0e0e0e' : 'rgba(183,183,183,0.2)',
+                          border: '1px solid',
+                          borderColor: selectedVibes.includes(vibe) ? '#0e0e0e' : '#fff',
+                          borderRadius: 30, px: '16px', py: '12px',
+                          fontFamily: CLARKSON, fontSize: '15px',
+                          color: selectedVibes.includes(vibe) ? '#fff' : '#0e0e0e',
+                          letterSpacing: '-0.015px', lineHeight: 1.4,
+                          cursor: 'pointer', whiteSpace: 'nowrap',
+                          transition: 'background 0.15s, color 0.15s',
+                        }}
+                      >
+                        {vibe}
+                      </Box>
+                    ))}
+                  </Flex>
+                </Box>
+              </Box>
+            )}
+          </Box>
         </Flex>
       </Box>
 

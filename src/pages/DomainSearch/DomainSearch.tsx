@@ -1,32 +1,11 @@
-import { useState, useEffect, useId, useRef } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
-import { Box, Flex, Text, Field } from '@sqs/rosetta-primitives'
-import { ActivityIndicator, TextInput } from '@sqs/rosetta-elements'
-import {
-  LogoSquarespace,
-  Search,
-  ShoppingBag,
-  Star,
-  Checkmark,
-  Tag,
-  CrossSmall,
-  Trash,
-  ChevronSmallUp,
-  ChevronSmallDown,
-  InfoCircle,
-} from '@sqs/rosetta-icons'
+import { Box, Flex } from '@sqs/rosetta-primitives'
+import { LogoSquarespace, Search, ArrowRight, ChevronSmallDown, ChevronSmallUp, Sparkles, Checkmark } from '@sqs/rosetta-icons'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
 type DomainBadge = 'exact' | 'premium' | 'promoted'
-type MyrVariant = 'divider' | 'label' | 'subtext'
-
-interface MyrDiscount {
-  type: 'flat' | 'incremental'
-  minYears: number      // discount starts from this term length
-  startPercent: number  // % off first year at minYears
-  step?: number         // incremental: extra % per additional year
-}
 
 interface DomainResult {
   id: string
@@ -36,10 +15,15 @@ interface DomainResult {
   originalPrice: number
   salePrice: number | null
   available: boolean
+  premiumFee?: number
+  limitedTime?: boolean
 }
 
+const CLARKSON = '"Clarkson", Helvetica, sans-serif'
+const BLUE = '#0072F0'
+const BLUE_BG = '#D8E8FE'
 
-// ── Mock data ────────────────────────────────────────────────────────────────
+// ── Data ─────────────────────────────────────────────────────────────────────
 
 function hashStr(s: string): number {
   let h = 0
@@ -48,96 +32,65 @@ function hashStr(s: string): number {
 }
 
 const TLD_CATALOG: Array<{
-  tld: string
-  base: number
-  sale: number | null
-  promoted?: boolean
-  premium?: boolean
-  myrDiscount?: MyrDiscount
+  tld: string; base: number; sale: number | null; promoted?: boolean; premium?: boolean; premiumFee?: number; limitedTime?: boolean
 }> = [
-  {
-    tld: '.com', base: 20, sale: 14,
-    myrDiscount: { type: 'incremental', minYears: 3, startPercent: 30, step: 10 },
-  },
-  {
-    tld: '.net', base: 20, sale: 14,
-    myrDiscount: { type: 'flat', minYears: 2, startPercent: 30 },
-  },
-  {
-    tld: '.org', base: 20, sale: 9,
-    myrDiscount: { type: 'flat', minYears: 2, startPercent: 25 },
-  },
-  {
-    tld: '.co', base: 36, sale: 26,
-    myrDiscount: { type: 'incremental', minYears: 2, startPercent: 20, step: 10 },
-  },
-  {
-    tld: '.io', base: 60, sale: 48,
-    myrDiscount: { type: 'flat', minYears: 3, startPercent: 30 },
-  },
-  {
-    tld: '.me', base: 26, sale: 18,
-    myrDiscount: { type: 'incremental', minYears: 2, startPercent: 15, step: 10 },
-  },
-  {
-    tld: '.live', base: 20, sale: 10, promoted: true,
-    myrDiscount: { type: 'flat', minYears: 2, startPercent: 30 },
-  },
-  {
-    tld: '.store', base: 20, sale: 12, promoted: true,
-    myrDiscount: { type: 'flat', minYears: 2, startPercent: 40 },
-  },
-  {
-    tld: '.studio', base: 28, sale: 22,
-    myrDiscount: { type: 'incremental', minYears: 3, startPercent: 30, step: 10 },
-  },
-  {
-    tld: '.art', base: 24, sale: 18,
-    myrDiscount: { type: 'flat', minYears: 2, startPercent: 20 },
-  },
-  {
-    tld: '.shop', base: 30, sale: 20,
-    myrDiscount: { type: 'flat', minYears: 3, startPercent: 30 },
-  },
-  {
-    tld: '.online', base: 20, sale: 8, promoted: true,
-    myrDiscount: { type: 'flat', minYears: 2, startPercent: 40 },
-  },
-  { tld: '.photos', base: 30, sale: null, premium: true },
-  {
-    tld: '.design', base: 34, sale: 28,
-    myrDiscount: { type: 'incremental', minYears: 2, startPercent: 25, step: 10 },
-  },
+  { tld: '.com', base: 20, sale: 14 },
+  { tld: '.net', base: 20, sale: 14 },
+  { tld: '.org', base: 20, sale: 9 },
+  { tld: '.co', base: 36, sale: 26 },
+  { tld: '.io', base: 60, sale: 48 },
+  { tld: '.me', base: 26, sale: 18 },
+  { tld: '.live', base: 20, sale: 10, promoted: true, limitedTime: true },
+  { tld: '.store', base: 20, sale: 12, promoted: true },
+  { tld: '.studio', base: 28, sale: 10, promoted: true, limitedTime: true },
+  { tld: '.art', base: 24, sale: 18 },
+  { tld: '.shop', base: 30, sale: 20 },
+  { tld: '.online', base: 20, sale: 8 },
+  { tld: '.photos', base: 40, sale: null, premium: true, premiumFee: 1000 },
+  { tld: '.design', base: 34, sale: 28 },
   { tld: '.agency', base: 28, sale: null },
 ]
 
-function relatedNames(stem: string): string[] {
+const STOP_WORDS = new Set(['a','an','the','and','or','of','in','for','to','my','our','i','is','with','at','by','from','as','be','that','on','are','we','it','us','about','but','not','this','have','has','want','need','idea','business','company','brand','shop','store','service','based'])
+
+function extractKeywords(query: string): string[] {
+  return query.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter(w => w.length > 2 && !STOP_WORDS.has(w))
+}
+
+function isDescription(query: string): boolean {
+  return extractKeywords(query).length >= 3
+}
+
+function descriptionToStem(query: string): string {
+  const words = extractKeywords(query)
+  if (words.length === 0) return query.trim().toLowerCase().replace(/\s+/g, '')
+  // combine first two meaningful keywords
+  return words.length >= 2 ? words[0] + words[1] : words[0]
+}
+
+function relatedNames(stem: string, extraKeywords?: string[]): string[] {
   const stripped = stem.replace(/[aeiou]/gi, '').slice(0, 4)
-  return [
-    `${stem}images`,
-    `${stem}photos`,
-    `${stem}studio`,
-    `${stripped}${stem.slice(-3)}`,
-    `my${stem}`,
-    `get${stem}`,
-    `the${stem}`,
-  ].filter((s) => s !== stem).slice(0, 5)
+  const base = [
+    `${stem}studio`, `${stripped}${stem.slice(-3)}`,
+    `my${stem}`, `get${stem}`, `the${stem}`,
+  ]
+  const fromKeywords = (extraKeywords ?? []).flatMap(k => [`${k}hq`, `${k}co`, `get${k}`])
+  return [...new Set([...base, ...fromKeywords])].filter((s) => s !== stem).slice(0, 5)
 }
 
 function generateResults(rawQuery: string): DomainResult[] {
-  const stem = rawQuery.trim().toLowerCase().replace(/\s+/g, '').replace(/^\./, '').replace(/\.[a-z]+$/, '')
+  const raw = rawQuery.trim().toLowerCase()
+  const desc = isDescription(raw)
+  const stem = desc
+    ? descriptionToStem(raw)
+    : raw.replace(/\s+/g, '').replace(/^\./, '').replace(/\.[a-z]+$/, '')
   const results: DomainResult[] = []
 
-  const exactTld = rawQuery.includes('.') ? '.' + rawQuery.split('.').pop()! : '.photos'
-  const exactCatalog = TLD_CATALOG.find((t) => t.tld === exactTld) ?? { tld: exactTld, base: 30, sale: null, premium: true }
+  const exactTld = !desc && rawQuery.includes('.') ? '.' + rawQuery.trim().split('.').pop()! : '.com'
+  const exactCatalog = TLD_CATALOG.find((t) => t.tld === exactTld) ?? { tld: exactTld, base: 20, sale: 14 }
   results.push({
-    id: `${stem}${exactTld}`,
-    name: stem + exactTld,
-    tld: exactTld,
-    badges: ['exact', ...(exactCatalog.premium ? ['premium' as DomainBadge] : [])],
-    originalPrice: exactCatalog.base,
-    salePrice: exactCatalog.sale,
-    available: true,
+    id: `${stem}${exactTld}`, name: stem + exactTld, tld: exactTld,
+    badges: ['exact'], originalPrice: exactCatalog.base, salePrice: exactCatalog.sale, available: true,
   })
 
   for (const cat of TLD_CATALOG) {
@@ -147,27 +100,16 @@ function generateResults(rawQuery: string): DomainResult[] {
     if (cat.promoted) badges.push('promoted')
     if (cat.premium) badges.push('premium')
     results.push({
-      id: `${stem}${cat.tld}`,
-      name: stem + cat.tld,
-      tld: cat.tld,
-      badges,
-      originalPrice: cat.base,
-      salePrice: cat.sale,
-      available,
+      id: `${stem}${cat.tld}`, name: stem + cat.tld, tld: cat.tld,
+      badges, originalPrice: cat.base, salePrice: cat.sale, available,
+      premiumFee: cat.premiumFee, limitedTime: cat.limitedTime,
     })
   }
 
-  for (const altName of relatedNames(stem)) {
+  const extraKeywords = desc ? extractKeywords(raw).slice(2, 5) : undefined
+  for (const altName of relatedNames(stem, extraKeywords)) {
     const available = hashStr(altName + '.com') % 3 !== 0
-    results.push({
-      id: `${altName}.com`,
-      name: `${altName}.com`,
-      tld: '.com',
-      badges: [],
-      originalPrice: 20,
-      salePrice: 14,
-      available,
-    })
+    results.push({ id: `${altName}.com`, name: `${altName}.com`, tld: '.com', badges: [], originalPrice: 20, salePrice: 14, available })
   }
 
   return results
@@ -175,1145 +117,571 @@ function generateResults(rawQuery: string): DomainResult[] {
 
 // ── Tooltip ───────────────────────────────────────────────────────────────────
 
-function Tooltip({ text, children }: { text: string; children: React.ReactNode }) {
-  const [visible, setVisible] = useState(false)
+function Tooltip({ children, text }: { children: React.ReactNode; text: string }) {
   return (
-    <Box
-      sx={{ position: 'relative', display: 'inline-flex' }}
-      onMouseEnter={() => setVisible(true)}
-      onMouseLeave={() => setVisible(false)}
-    >
+    <Box sx={{ position: 'relative', display: 'inline-flex', alignItems: 'center', '&:hover .tt': { opacity: 1 } }}>
       {children}
-      {visible && (
-        <Box
-          sx={{
-            position: 'absolute',
-            bottom: 'calc(100% + 6px)',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            background: '#1a1a1a',
-            color: '#fff',
-            fontSize: '12px',
-            lineHeight: 1.4,
-            borderRadius: 6,
-            px: '10px',
-            py: '8px',
-            width: 220,
-            pointerEvents: 'none',
-            zIndex: 500,
-            boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
-          }}
-        >
-          {text}
-        </Box>
-      )}
+      <Box className="tt" sx={{
+        position: 'absolute', bottom: 'calc(100% + 8px)', left: '50%',
+        transform: 'translateX(-50%)', background: '#0e0e0e', color: '#fff',
+        fontFamily: CLARKSON, fontSize: '12px', px: '10px', py: '6px',
+        borderRadius: 6, whiteSpace: 'nowrap', opacity: 0,
+        pointerEvents: 'none', transition: 'opacity 0.15s', zIndex: 20,
+      }}>
+        {text}
+      </Box>
     </Box>
   )
 }
 
-// ── Badge ─────────────────────────────────────────────────────────────────────
+// ── Add button (cards) ────────────────────────────────────────────────────────
 
-function Badge({ kind }: { kind: DomainBadge }) {
-  if (kind === 'exact') {
-    return (
-      <Flex alignItems="center" gap={1} px={2} py={1} sx={{ borderRadius: 20, background: '#e6f4ea', flexShrink: 0 }}>
-        <Checkmark sx={{ width: 12, height: 12, color: '#1a7a3a' }} />
-        <Text.Caption m={0} sx={{ fontSize: '11px', fontWeight: 600, color: '#1a7a3a', lineHeight: 1 }}>
-          Exact match
-        </Text.Caption>
-      </Flex>
-    )
-  }
-  if (kind === 'premium') {
-    return (
-      <Tooltip text="Premium domains are short, memorable, and often include common or highly searched words that may have strong brand value.">
-        <Flex alignItems="center" gap={1} px={2} py={1} sx={{ borderRadius: 20, background: '#e8f0fe', flexShrink: 0, cursor: 'default' }}>
-          <Star sx={{ width: 11, height: 11, color: '#0862d1' }} />
-          <Text.Caption m={0} sx={{ fontSize: '11px', fontWeight: 600, color: '#0862d1', lineHeight: 1 }}>
-            Premium
-          </Text.Caption>
-        </Flex>
-      </Tooltip>
-    )
-  }
-  if (kind === 'promoted') {
-    return (
-      <Tooltip text="This TLD (the domain ending) is available at a promotional price for a limited time.">
-        <Flex alignItems="center" gap={1} px={2} py={1} sx={{ borderRadius: 20, background: '#e8f0fe', flexShrink: 0, cursor: 'default' }}>
-          <Tag sx={{ width: 11, height: 11, color: '#0862d1' }} />
-          <Text.Caption m={0} sx={{ fontSize: '11px', fontWeight: 600, color: '#0862d1', lineHeight: 1 }}>
-            Promoted
-          </Text.Caption>
-        </Flex>
-      </Tooltip>
-    )
-  }
-  return null
-}
-
-// ── Variant nav ───────────────────────────────────────────────────────────────
-
-const VARIANT_LABELS: Record<MyrVariant, string> = {
-  divider: 'Divider',
-  label: 'Label',
-  subtext: 'Subtext',
-}
-
-const VARIANT_FIGMA: Record<MyrVariant, string> = {
-  divider: 'https://www.figma.com/design/LRN00J69dEcl5X5BHvhQJ6/Multi-year-term-discount?node-id=196-11538',
-  label: 'https://www.figma.com/design/LRN00J69dEcl5X5BHvhQJ6/Multi-year-term-discount?node-id=196-10572',
-  subtext: 'https://www.figma.com/design/LRN00J69dEcl5X5BHvhQJ6/Multi-year-term-discount?node-id=200-14480',
-}
-
-const VARIANT_KEY = 'myr-variant'
-
-function VariantNav({ variant, onChange }: { variant: MyrVariant; onChange: (v: MyrVariant) => void }) {
+function AddBtn({ added, onClick }: { added: boolean; onClick: () => void }) {
   return (
     <Box
+      as="button" onClick={onClick}
       sx={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        zIndex: 400,
-        background: '#f5f5f5',
-        borderBottom: '1px solid #e2e2e2',
-        height: 44,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: '6px',
-        px: 4,
+        width: 46, height: 46, borderRadius: 8, border: 'none',
+        background: added ? '#444' : '#0e0e0e',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        cursor: 'pointer', flexShrink: 0, transition: 'background 0.15s',
+        '&:hover': { background: '#333' },
       }}
     >
-      <Text.Caption m={0} color="fg.muted" sx={{ fontSize: '11px', letterSpacing: '0.06em', textTransform: 'uppercase', mr: 2, flexShrink: 0 }}>
-        Dropdown variant
-      </Text.Caption>
-      {(['divider', 'label', 'subtext'] as MyrVariant[]).map((v) => {
-        const active = variant === v
-        return (
-          <Flex key={v} alignItems="center" gap={1}>
-            <Box
-              as="button"
-              onClick={() => { onChange(v); try { localStorage.setItem(VARIANT_KEY, v) } catch {} }}
-              sx={{
-                px: '12px',
-                py: '5px',
-                borderRadius: 20,
-                border: '1px solid',
-                borderColor: active ? 'fg.default' : '#d0d0d0',
-                background: active ? 'var(--colors-fg-default)' : '#fff',
-                color: active ? '#fff' : 'var(--colors-fg-muted)',
-                cursor: 'pointer',
-                fontSize: '12px',
-                fontWeight: active ? 600 : 400,
-                letterSpacing: '0.02em',
-                transition: 'all 0.15s ease',
-                '&:hover': {
-                  borderColor: 'fg.default',
-                  background: active ? 'var(--colors-fg-default)' : '#f0f0f0',
-                },
-              }}
-            >
-              {VARIANT_LABELS[v]}
-            </Box>
-            <Box
-              as="a"
-              href={VARIANT_FIGMA[v]}
-              target="_blank"
-              rel="noopener noreferrer"
-              title="Figma reference"
-              sx={{
-                color: '#aaa',
-                fontSize: '10px',
-                textDecoration: 'none',
-                display: 'flex',
-                alignItems: 'center',
-                '&:hover': { color: '#0862d1' },
-              }}
-            >
-              ↗
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+        {added
+          ? <path d="M2 7H12" stroke="white" strokeWidth="1.6" strokeLinecap="round" />
+          : <><path d="M7 2V12" stroke="white" strokeWidth="1.6" strokeLinecap="round" /><path d="M2 7H12" stroke="white" strokeWidth="1.6" strokeLinecap="round" /></>
+        }
+      </svg>
+    </Box>
+  )
+}
+
+// ── Featured card ─────────────────────────────────────────────────────────────
+
+function FeaturedCard({ domain, isExact, added, onToggle }: {
+  domain: DomainResult; isExact: boolean; added: boolean; onToggle: () => void
+}) {
+  const price = domain.salePrice ?? domain.originalPrice
+  const hasDiscount = domain.salePrice !== null && domain.salePrice < domain.originalPrice
+
+  return (
+    <Box onClick={onToggle} sx={{
+      border: isExact ? '1px solid' : 'none', borderColor: '#a8cff8',
+      borderRadius: 12, p: '28px',
+      display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+      minHeight: 190,
+      background: isExact ? '#F4F5FD' : '#f8f8f8',
+      boxShadow: isExact ? '0px 4px 20px 0px rgba(0,0,0,0.10)' : 'none',
+      cursor: 'pointer',
+    }}>
+      <Box>
+        <Flex alignItems="center" gap="5px" mb="10px">
+          {isExact ? (
+            <>
+              <svg width="13" height="10" viewBox="0 0 13 10" fill="none">
+                <path d="M1 5L4.5 8.5L12 1" stroke={BLUE} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '14px', fontWeight: 300, color: BLUE }}>Exact match</Box>
+            </>
+          ) : (
+            <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '14px', fontWeight: 300, color: '#888' }}>Close match</Box>
+          )}
+        </Flex>
+        <Box as="p" m={0} sx={{
+          fontFamily: CLARKSON, fontSize: '22px', fontWeight: 300,
+          letterSpacing: '-0.8px', color: '#0e0e0e', lineHeight: 1.2, wordBreak: 'break-all',
+        }}>
+          {domain.name}
+        </Box>
+      </Box>
+      <Flex alignItems="flex-end" justifyContent="space-between" mt="14px">
+        <Box>
+          <Flex alignItems="baseline" gap="6px">
+            {hasDiscount && (
+              <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '22px', fontWeight: 300, color: '#aaa', textDecoration: 'line-through', letterSpacing: '-0.5px' }}>
+                ${domain.originalPrice}
+              </Box>
+            )}
+            <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '22px', fontWeight: 300, color: '#0e0e0e', letterSpacing: '-0.5px' }}>
+              ${price}
             </Box>
           </Flex>
-        )
-      })}
+          <Box as="p" m={0} sx={{ fontFamily: CLARKSON, fontSize: '13px', fontWeight: 300, color: '#888', mt: '3px' }}>
+            {domain.premiumFee ? `per year + $${domain.premiumFee.toLocaleString()} one-time fee` : 'per year'}
+          </Box>
+        </Box>
+        <Box onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+          <AddBtn added={added} onClick={onToggle} />
+        </Box>
+      </Flex>
     </Box>
   )
 }
 
 // ── Result row ────────────────────────────────────────────────────────────────
 
-function ResultRow({
-  result,
-  inCart,
-  onToggleCart,
-  isTop,
-}: {
-  result: DomainResult
-  inCart: boolean
-  onToggleCart: (result: DomainResult) => void
-  isTop: boolean
+function ResultRow({ domain, added, onToggle, showLimitedTimeColumn, showRtb }: {
+  domain: DomainResult; added: boolean; onToggle: () => void; showLimitedTimeColumn: boolean; showRtb?: boolean
+}) {
+  const price = domain.salePrice ?? domain.originalPrice
+  const hasDiscount = domain.salePrice !== null && domain.salePrice < domain.originalPrice
+  const isPromoted = domain.badges.includes('promoted')
+
+  return (
+    <Box sx={{ borderRadius: 8, overflow: 'hidden' }}>
+    <Flex
+      alignItems="center"
+      gap="12px"
+      onClick={onToggle}
+      sx={{
+        height: 62, px: '16px', cursor: 'pointer',
+        borderRadius: showRtb ? '8px 8px 0 0' : 8,
+        '&:hover': { background: '#f5f5f5' },
+        transition: 'background 0.1s',
+      }}
+    >
+      {/* Domain name */}
+      <Box sx={{ fontFamily: CLARKSON, fontSize: '16px', color: '#0e0e0e', letterSpacing: '-0.015px' }}>
+        {domain.name}
+      </Box>
+
+      {/* Popular badge — directly right of domain name, then flex spacer */}
+      {isPromoted && (
+        <Tooltip text="Trending for this category">
+          <Flex alignItems="center" gap="5px" sx={{
+            background: BLUE_BG, borderRadius: 20, px: '12px', py: '6px', flexShrink: 0,
+          }}>
+            <Sparkles sx={{ width: 13, height: 13, color: BLUE, flexShrink: 0 }} />
+            <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '13px', fontWeight: 400, color: BLUE }}>Popular</Box>
+          </Flex>
+        </Tooltip>
+      )}
+
+      {/* Spacer pushes remaining items right */}
+      <Box sx={{ flex: 1 }} />
+
+      {/* Limited time — fixed-width so prices align across rows */}
+      {showLimitedTimeColumn && (
+        <Box sx={{ width: 92, flexShrink: 0, display: 'flex', justifyContent: 'flex-end' }}>
+          {domain.limitedTime && (
+            <Tooltip text="Discounted for a limited time">
+              <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '13px', color: BLUE, whiteSpace: 'nowrap', cursor: 'default' }}>
+                Limited time
+              </Box>
+            </Tooltip>
+          )}
+        </Box>
+      )}
+
+      {/* Prices */}
+      <Flex alignItems="baseline" gap="5px" sx={{ flexShrink: 0, minWidth: 72, justifyContent: 'flex-end' }}>
+        {hasDiscount && (
+          <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '16px', color: '#bbb', textDecoration: 'line-through' }}>
+            ${domain.originalPrice}
+          </Box>
+        )}
+        <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '16px', color: '#0e0e0e', letterSpacing: '-0.015px' }}>
+          ${price}
+        </Box>
+      </Flex>
+
+      {/* Plain + */}
+      <Box as="span" onClick={(e: React.MouseEvent) => e.stopPropagation()}
+        sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: 24, height: 24 }}
+      >
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          {added
+            ? <path d="M3 8H13" stroke="#0e0e0e" strokeWidth="1.5" strokeLinecap="round" />
+            : <><path d="M8 3V13" stroke="#0e0e0e" strokeWidth="1.5" strokeLinecap="round" /><path d="M3 8H13" stroke="#0e0e0e" strokeWidth="1.5" strokeLinecap="round" /></>
+          }
+        </svg>
+      </Box>
+    </Flex>
+    {/* RTB panel */}
+    <Box sx={{
+      px: '16px',
+      py: showRtb ? '10px' : 0,
+      background: 'linear-gradient(8.25deg, rgba(136,188,216,0.3) 0%, rgba(243,255,193,0.3) 95%)',
+      borderRadius: '0 0 8px 8px',
+      maxHeight: showRtb ? '120px' : '0px',
+      overflow: 'hidden',
+      opacity: showRtb ? 1 : 0,
+      transition: 'max-height 0.28s ease, opacity 0.2s ease, padding 0.28s ease',
+      display: 'flex', flexDirection: 'column', gap: '4px',
+    }}>
+      <Flex alignItems="center" gap="10px">
+        <Checkmark sx={{ width: 14, height: 14, color: '#0e0e0e', flexShrink: 0 }} />
+        <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '14px', lineHeight: '22px', color: '#0e0e0e' }}>
+          Popular choice for businesses in this category
+        </Box>
+      </Flex>
+      <Flex alignItems="center" gap="10px">
+        <Checkmark sx={{ width: 14, height: 14, color: '#0e0e0e', flexShrink: 0 }} />
+        <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '14px', lineHeight: '22px', color: '#0e0e0e' }}>
+          Available at a competitive price
+        </Box>
+      </Flex>
+    </Box>
+    </Box>
+  )
+}
+
+// ── Filter pill ───────────────────────────────────────────────────────────────
+
+function FilterPill({ label, active, onClick, chevron, muted }: {
+  label: string; active?: boolean; onClick?: () => void; chevron?: boolean; muted?: boolean
 }) {
   return (
     <Flex
-      alignItems="center"
-      gap={3}
-      px={4}
-      py={3}
-      onClick={result.available ? () => onToggleCart(result) : undefined}
+      as="button" alignItems="center" gap="3px" onClick={onClick}
       sx={{
-        minHeight: 44,
-        opacity: result.available ? 1 : 0.4,
-        cursor: result.available ? 'pointer' : 'default',
-        ...(isTop ? {
-          border: '1px solid',
-          borderColor: 'border.default',
-          borderRadius: 8,
-          mb: 2,
-        } : {}),
-        ...(result.available ? {
-          transition: 'background 0.15s ease, transform 0.15s ease, border-radius 0.15s ease',
-          '&:hover': {
-            background: 'var(--colors-bg-default)',
-            transform: 'translateX(4px)',
-            borderRadius: 8,
-          },
-        } : {}),
+        height: 40, px: '16px', py: '10px',
+        backdropFilter: 'blur(25px)',
+        background: active ? '#0e0e0e' : 'rgba(183,183,183,0.2)',
+        border: 'none',
+        borderRadius: 30,
+        cursor: 'pointer', fontFamily: CLARKSON, fontSize: '14px',
+        color: active ? '#fff' : muted ? '#666' : '#0e0e0e',
+        letterSpacing: '-0.01px', whiteSpace: 'nowrap', flexShrink: 0,
+        transition: 'background 0.15s, color 0.15s',
       }}
     >
-      {/* Domain name + badges */}
-      <Flex alignItems="center" gap={2} sx={{ flex: '1 1 0', minWidth: 0, flexWrap: 'wrap' }}>
-        <Text.Body
-          m={0}
-          fontWeight={result.badges.includes('exact') ? 400 : 'book'}
-          sx={{ color: result.available ? 'fg.default' : 'fg.disabled', flexShrink: 0 }}
-        >
-          {result.name}
-        </Text.Body>
-        {result.badges.length > 0 && (
-          <Flex gap={1} alignItems="center" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
-            {result.badges.map((b) => <Badge key={b} kind={b} />)}
-          </Flex>
-        )}
-      </Flex>
-
-      {/* Price */}
-      <Flex alignItems="center" gap={2} sx={{ flexShrink: 0 }}>
-        {result.salePrice !== null ? (
-          <>
-            <Text.Caption m={0} color="fg.disabled" sx={{ textDecoration: 'line-through', fontSize: '13px' }}>
-              ${result.originalPrice}
-            </Text.Caption>
-            <Text.Body m={0}>${result.salePrice}</Text.Body>
-          </>
-        ) : (
-          <Text.Body m={0}>${result.originalPrice}</Text.Body>
-        )}
-      </Flex>
-
-      {/* Cart state indicator */}
-      <Box
-        sx={{
-          width: 36,
-          height: 36,
-          borderRadius: 8,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexShrink: 0,
-          background: inCart ? 'var(--colors-fg-default)' : 'transparent',
-          transition: 'background 0.2s ease',
-          pointerEvents: 'none',
-        }}
-      >
-        {inCart
-          ? <Checkmark sx={{ width: 16, height: 16, color: '#ffffff' }} />
-          : <ShoppingBag sx={{ width: 18, height: 18, color: 'var(--colors-fg-muted)' }} />
-        }
-      </Box>
+      {label}
+      {chevron && <ChevronSmallDown sx={{ width: 12, height: 12, color: 'currentColor', ml: '2px' }} />}
     </Flex>
   )
 }
 
-// ── Cart sidebar ──────────────────────────────────────────────────────────────
+// ── Results section ───────────────────────────────────────────────────────────
 
-function getSld(name: string): string {
-  const dot = name.lastIndexOf('.')
-  return dot > 0 ? name.slice(0, dot) : name
-}
-
-function CartSidebar({
-  items,
-  results,
-  onRemove,
-  onAdd,
-}: {
-  items: DomainResult[]
-  results: DomainResult[]
-  onRemove: (id: string) => void
-  onAdd: (result: DomainResult) => void
+function ResultsSection({ label, domains, cart, onToggle, showSeeWhy }: {
+  label: string; domains: DomainResult[]; cart: Set<string>; onToggle: (id: string) => void; showSeeWhy?: boolean
 }) {
-  const navigate = useNavigate()
-  const [matchingOpen, setMatchingOpen] = useState<Record<string, boolean>>({})
-  const prevItemIdsRef = useRef<Set<string>>(new Set())
-
-  const subtotal = items.reduce((sum, r) => sum + (r.salePrice ?? r.originalPrice), 0)
-  const cartIds = new Set(items.map((i) => i.id))
-
-  useEffect(() => {
-    const currentIds = new Set(items.map((i) => i.id))
-    const newItems = items.filter((i) => !prevItemIdsRef.current.has(i.id))
-
-    if (newItems.length > 0) {
-      setMatchingOpen((prev) => {
-        const next = { ...prev }
-        for (const item of newItems) {
-          const sld = getSld(item.name)
-          const hasMatching = results.some((r) => getSld(r.name) === sld && r.available && !currentIds.has(r.id))
-          if (hasMatching) next[sld] = true
-        }
-        return next
-      })
-    }
-
-    prevItemIdsRef.current = currentIds
-  }, [items, results])
-
-  const sldOrder: string[] = []
-  const groups: Record<string, DomainResult[]> = {}
-  for (const item of items) {
-    const sld = getSld(item.name)
-    if (!groups[sld]) { groups[sld] = []; sldOrder.push(sld) }
-    groups[sld].push(item)
-  }
-
-  function getMatching(sld: string): DomainResult[] {
-    return results.filter((r) => getSld(r.name) === sld && r.available && !cartIds.has(r.id)).slice(0, 4)
-  }
-
+  const [expanded, setExpanded] = useState(false)
+  const hasAnyLimitedTime = domains.some((d) => d.limitedTime)
   return (
-    <Box
-      sx={{
-        background: '#fff',
-        borderRadius: 12,
-        boxShadow: '0 218px 61px 0 transparent, 0 139px 56px 0 rgba(0,0,0,0.01), 0 78px 47px 0 rgba(0,0,0,0.05), 0 -1px 35px 0 rgba(0,0,0,0.09), 0 4px 19px 0 rgba(0,0,0,0.1)',
-        height: 'calc(100vh - 160px)',
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden',
-      }}
-    >
-      <Box px={6} pt={6} pb={3}>
-        <Text.Body m={0} fontWeight="semibold" sx={{ fontSize: '18px', letterSpacing: '-0.01em' }}>
-          Cart Overview
-        </Text.Body>
-        <Text.Caption m={0} color="fg.muted" sx={{ fontSize: '13px', mt: 3 }}>
-          Domain ({items.length})
-        </Text.Caption>
-      </Box>
-
-      <Box sx={{ flex: '1 1 0', overflowY: 'auto', px: 5, pb: 4 }}>
-        {sldOrder.map((sld) => {
-          const groupItems = groups[sld]
-          const matching = getMatching(sld)
-          const isOpen = matchingOpen[sld] ?? false
-
-          return (
-            <Box
-              key={sld}
-              mb={3}
-              sx={{
-                border: '1px solid',
-                borderColor: 'border.default',
-                borderRadius: 8,
-                overflow: 'hidden',
-              }}
-            >
-              {groupItems.map((item, idx) => {
-                const price = item.salePrice ?? item.originalPrice
-                const isLast = idx === groupItems.length - 1
-                return (
-                  <Flex
-                    key={item.id}
-                    alignItems="center"
-                    gap={3}
-                    px={4}
-                    sx={{
-                      minHeight: 48,
-                      borderBottom: (!isLast || matching.length > 0) ? '1px solid' : 'none',
-                      borderColor: 'border.default',
-                    }}
-                  >
-                    <Text.Body
-                      m={0}
-                      fontWeight="semibold"
-                      sx={{ flex: '1 1 0', minWidth: 0, fontSize: '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                    >
-                      {item.name}
-                    </Text.Body>
-                    <Text.Body m={0} sx={{ fontSize: '14px', flexShrink: 0 }}>
-                      ${price}
-                    </Text.Body>
-                    <Box
-                      as="button"
-                      onClick={() => onRemove(item.id)}
-                      aria-label={`Remove ${item.name} from cart`}
-                      sx={{
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        p: '4px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        flexShrink: 0,
-                        color: 'fg.muted',
-                        borderRadius: 4,
-                        transition: 'color 0.12s',
-                        '&:hover': { color: 'fg.default' },
-                      }}
-                    >
-                      <Trash sx={{ width: 14, height: 14 }} />
-                    </Box>
-                  </Flex>
-                )
-              })}
-
-              {matching.length > 0 && (
-                <Box>
-                  <Box
-                    as="button"
-                    onClick={() => setMatchingOpen((prev) => ({ ...prev, [sld]: !isOpen }))}
-                    sx={{
-                      width: '100%',
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      px: '16px',
-                      py: '10px',
-                      textAlign: 'left',
-                    }}
-                  >
-                    <Flex alignItems="center" gap={1} sx={{ flex: 1 }}>
-                      <Text.Caption m={0} color="fg.muted" sx={{ fontSize: '12px', lineHeight: 1 }}>
-                        Add matching domains
-                      </Text.Caption>
-                      <InfoCircle sx={{ width: 12, height: 12, color: 'var(--colors-fg-muted)', flexShrink: 0 }} />
-                    </Flex>
-                    {isOpen
-                      ? <ChevronSmallUp sx={{ width: 14, height: 14, color: 'var(--colors-fg-muted)', flexShrink: 0 }} />
-                      : <ChevronSmallDown sx={{ width: 14, height: 14, color: 'var(--colors-fg-muted)', flexShrink: 0 }} />
-                    }
-                  </Box>
-
-                  {/* Matching items — each in its own rounded gray card with white gutters */}
-                  <Box sx={{ display: 'grid', gridTemplateRows: isOpen ? '1fr' : '0fr', transition: 'grid-template-rows 0.3s cubic-bezier(0.4,0,0.2,1)' }}>
-                  <Box sx={{ minHeight: 0, overflow: 'hidden' }}>
-                  <Box px="8px" pb="8px" sx={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      {matching.map((m) => {
-                        const stem = getSld(m.name)
-                        const ext = m.name.slice(stem.length + 1)
-                        const price = m.salePrice ?? m.originalPrice
-                        return (
-                          <Flex
-                            key={m.id}
-                            alignItems="center"
-                            gap={3}
-                            px={3}
-                            sx={{
-                              minHeight: 44,
-                              borderRadius: 6,
-                              background: '#f5f5f5',
-                            }}
-                          >
-                            <Box sx={{ flex: '1 1 0', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              <Text.Body as="span" m={0} sx={{ fontSize: '14px' }}>{stem}.</Text.Body>
-                              <Text.Body as="span" m={0} fontWeight="semibold" sx={{ fontSize: '14px' }}>{ext}</Text.Body>
-                            </Box>
-                            <Text.Body m={0} sx={{ fontSize: '14px', flexShrink: 0 }}>
-                              ${price}
-                            </Text.Body>
-                            <Box
-                              as="button"
-                              onClick={() => onAdd(m)}
-                              sx={{
-                                background: 'none',
-                                border: 'none',
-                                cursor: 'pointer',
-                                p: 0,
-                                flexShrink: 0,
-                                color: 'var(--colors-fg-default)',
-                                fontSize: '13px',
-                                fontWeight: 700,
-                                letterSpacing: '0.04em',
-                                transition: 'opacity 0.12s',
-                                '&:hover': { opacity: 0.7 },
-                              }}
-                            >
-                              ADD
-                            </Box>
-                          </Flex>
-                        )
-                      })}
-                    </Box>
-                  </Box>
-                  </Box>
-                </Box>
-              )}
-            </Box>
-          )
-        })}
-      </Box>
-
-      <Box
-        sx={{
-          borderTop: '1px solid',
-          borderColor: 'border.default',
-          flexShrink: 0,
-        }}
-      >
-        <Flex alignItems="center" justifyContent="space-between" px={6} py={4}>
-          <Flex alignItems="center" gap={2}>
-            <ShoppingBag sx={{ width: 16, height: 16, color: 'var(--colors-fg-muted)' }} />
-            <Text.Body m={0} sx={{ fontSize: '14px' }}>
-              {items.length} Item{items.length !== 1 ? 's' : ''}
-            </Text.Body>
-          </Flex>
-          <Text.Body m={0} sx={{ fontSize: '15px' }}>
-            ${subtotal}
-          </Text.Body>
-        </Flex>
-        <Box px={5} pb={5}>
-          <Box
-            as="button"
-            onClick={() => navigate('/cart', { state: { items } })}
-            sx={{
-              width: '100%',
-              background: 'var(--colors-fg-default)',
-              color: '#fff',
-              border: 'none',
-              borderRadius: 4,
-              height: 48,
-              cursor: 'pointer',
-              fontSize: '13px',
-              fontWeight: 400,
-              letterSpacing: '0.08em',
-              textTransform: 'uppercase',
-              transition: 'opacity 0.15s ease',
-              '&:hover': { opacity: 0.82 },
-            }}
-          >
-            Checkout
-          </Box>
+    <Box>
+      <Flex alignItems="center" justifyContent="space-between" sx={{ height: 62, px: '16px' }}>
+        <Box sx={{ fontFamily: CLARKSON, fontSize: '18px', fontWeight: 500, color: '#0e0e0e', letterSpacing: '-0.3px' }}>
+          {label}
         </Box>
+        {showSeeWhy && (
+          <Flex
+            as="button" alignItems="center" gap="5px"
+            onClick={() => setExpanded((v) => !v)}
+            sx={{ background: 'none', border: 'none', cursor: 'pointer', p: 0, fontFamily: CLARKSON, fontSize: '14px', color: '#0e0e0e', letterSpacing: '-0.01em' }}
+          >
+            <Sparkles sx={{ width: 14, height: 14, color: '#0e0e0e', flexShrink: 0 }} />
+            See why
+            {expanded
+              ? <ChevronSmallUp sx={{ width: 22, height: 22, color: '#0e0e0e' }} />
+              : <ChevronSmallDown sx={{ width: 22, height: 22, color: '#0e0e0e' }} />
+            }
+          </Flex>
+        )}
+      </Flex>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        {domains.map((d) => (
+          <ResultRow key={d.id} domain={d} added={cart.has(d.id)} onToggle={() => onToggle(d.id)} showLimitedTimeColumn={hasAnyLimitedTime} showRtb={expanded} />
+        ))}
       </Box>
     </Box>
   )
 }
 
-// ── Mobile mini cart ─────────────────────────────────────────────────────────
-
-function MobileMiniCart({
-  items,
-  results,
-  onRemove,
-  onAdd,
-  onCheckout,
-  lastAddedId,
-}: {
-  items: DomainResult[]
-  results: DomainResult[]
-  onRemove: (id: string) => void
-  onAdd: (result: DomainResult) => void
-  onCheckout: () => void
-  lastAddedId: string | null
-}) {
-  const [expanded, setExpanded] = useState(false)
-  const [slideIn, setSlideIn] = useState(false)
-  const [tldsOpen, setTldsOpen] = useState<Record<string, boolean>>({})
-  const subtotal = items.reduce((sum, r) => sum + (r.salePrice ?? r.originalPrice), 0)
-  const cartIds = new Set(items.map((i) => i.id))
-  const hasItems = items.length > 0
-
-  useEffect(() => {
-    if (hasItems) {
-      const id = requestAnimationFrame(() => setSlideIn(true))
-      return () => cancelAnimationFrame(id)
-    } else {
-      setSlideIn(false)
-      setExpanded(false)
-    }
-  }, [hasItems])
-
-  function getMatching(sld: string): DomainResult[] {
-    return results.filter((r) => getSld(r.name) === sld && r.available && !cartIds.has(r.id)).slice(0, 4)
-  }
-
-  const sldOrder: string[] = []
-  const groups: Record<string, DomainResult[]> = {}
-  for (const item of items) {
-    const sld = getSld(item.name)
-    if (!groups[sld]) { groups[sld] = []; sldOrder.push(sld) }
-    groups[sld].push(item)
-  }
-
-  const lastAddedSld = lastAddedId
-    ? getSld(items.find((i) => i.id === lastAddedId)?.name ?? '')
-    : null
-
-  useEffect(() => {
-    if (lastAddedSld) {
-      setTldsOpen((prev) => ({ ...prev, [lastAddedSld]: true }))
-    }
-  }, [lastAddedSld])
-
-  return (
-    <>
-      <Box
-        onClick={() => setExpanded(false)}
-        sx={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(79,79,79,0.5)',
-          zIndex: 299,
-          opacity: expanded ? 1 : 0,
-          pointerEvents: expanded ? 'auto' : 'none',
-          transition: 'opacity 0.3s ease',
-        }}
-      />
-
-      <Box
-        sx={{
-          position: 'fixed',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          zIndex: 300,
-          background: '#fff',
-          borderTop: '1px solid #ddd',
-          borderTopLeftRadius: expanded ? 6 : 0,
-          borderTopRightRadius: expanded ? 6 : 0,
-          boxShadow: '0px -1px 35px rgba(0,0,0,0.09), 0px 4px 19px rgba(0,0,0,0.1)',
-          transform: slideIn ? 'translateY(0)' : 'translateY(100%)',
-          transition: 'transform 0.3s cubic-bezier(0.4,0,0.2,1), border-radius 0.2s ease',
-        }}
-      >
-        <Box
-          sx={{
-            display: 'grid',
-            gridTemplateRows: expanded ? '1fr' : '0fr',
-            transition: 'grid-template-rows 0.35s cubic-bezier(0.4,0,0.2,1)',
-          }}
-        >
-          <Box sx={{ minHeight: 0, overflow: 'hidden' }}>
-            <Box sx={{ maxHeight: '65vh', overflowY: 'auto' }}>
-              <Flex alignItems="center" justifyContent="space-between" px={4} pt={6} pb={3}>
-                <Text.Body m={0} sx={{ fontSize: '18px', fontWeight: 500 }}>Cart Overview</Text.Body>
-                <Box
-                  as="button"
-                  onClick={() => setExpanded(false)}
-                  sx={{ background: 'none', border: 'none', cursor: 'pointer', p: 0, display: 'flex', alignItems: 'center' }}
-                >
-                  <ChevronSmallDown sx={{ width: 20, height: 20, color: 'fg.default' }} />
-                </Box>
-              </Flex>
-
-              <Text.Caption m={0} sx={{ display: 'block', px: 4, pb: 3, fontSize: '12px', color: '#4f4f4f' }}>
-                Domain ({items.length})
-              </Text.Caption>
-
-              <Box px={4} pb={4} sx={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {sldOrder.map((sld) => {
-                  const groupItems = groups[sld]
-                  const matching = getMatching(sld)
-                  const showTlds = sld === lastAddedSld && matching.length > 0
-
-                  return (
-                    <Box
-                      key={sld}
-                      sx={{ border: '1px solid #ddd', borderRadius: 4, background: '#fff', overflow: 'hidden' }}
-                    >
-                      {groupItems.map((item) => {
-                        const price = item.salePrice ?? item.originalPrice
-                        return (
-                          <Flex
-                            key={item.id}
-                            alignItems="center"
-                            justifyContent="space-between"
-                            sx={{ px: 4, py: 3 }}
-                          >
-                            <Text.Body
-                              m={0}
-                              sx={{ fontSize: '15px', fontWeight: 500, flex: '1 1 0', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                            >
-                              {item.name}
-                            </Text.Body>
-                            <Flex alignItems="center" gap={2} sx={{ flexShrink: 0, ml: 2 }}>
-                              <Text.Body m={0} sx={{ fontSize: '14px' }}>${price}</Text.Body>
-                              <Box
-                                as="button"
-                                onClick={() => onRemove(item.id)}
-                                aria-label={`Remove ${item.name}`}
-                                sx={{ background: 'none', border: 'none', cursor: 'pointer', p: '2px', color: 'fg.muted', display: 'flex', alignItems: 'center' }}
-                              >
-                                <Trash sx={{ width: 14, height: 14 }} />
-                              </Box>
-                            </Flex>
-                          </Flex>
-                        )
-                      })}
-
-                      {showTlds && (
-                        <Box sx={{ borderTop: '1px solid #ddd', px: 4, pt: 3, pb: 4 }}>
-                          <Text.Caption m={0} sx={{ fontSize: '12px', color: '#4f4f4f', display: 'block', mb: 3 }}>
-                            Purchase additional TLDs
-                          </Text.Caption>
-                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            {matching.map((m) => {
-                              const stem = getSld(m.name)
-                              const ext = m.name.slice(stem.length + 1)
-                              const price = m.salePrice ?? m.originalPrice
-                              return (
-                                <Flex
-                                  key={m.id}
-                                  alignItems="center"
-                                  justifyContent="space-between"
-                                  sx={{ px: 3, py: '10px', background: '#f9f9f9', borderRadius: 4 }}
-                                >
-                                  <Box sx={{ flex: '1 1 0', minWidth: 0 }}>
-                                    <Text.Body as="span" m={0} sx={{ fontSize: '14px', color: '#4f4f4f' }}>{stem}.</Text.Body>
-                                    <Text.Body as="span" m={0} sx={{ fontSize: '14px', fontWeight: 500 }}>{ext}</Text.Body>
-                                  </Box>
-                                  <Flex alignItems="baseline" gap={2} sx={{ flexShrink: 0 }}>
-                                    <Text.Body m={0} sx={{ fontSize: '14px' }}>${price}</Text.Body>
-                                    <Box
-                                      as="button"
-                                      onClick={() => onAdd(m)}
-                                      sx={{ background: 'none', border: 'none', cursor: 'pointer', p: 0, fontSize: '14px', fontWeight: 500, letterSpacing: '0.04em', color: 'fg.default' }}
-                                    >
-                                      ADD
-                                    </Box>
-                                  </Flex>
-                                </Flex>
-                              )
-                            })}
-                          </Box>
-                        </Box>
-                      )}
-                    </Box>
-                  )
-                })}
-              </Box>
-            </Box>
-          </Box>
-        </Box>
-
-        <Box sx={{ px: 4, pt: 4, pb: '16px', borderTop: expanded ? '1px solid #ddd' : 'none' }}>
-          {expanded ? (
-            <Flex alignItems="center" justifyContent="space-between" sx={{ mb: 4 }}>
-              <Text.Body m={0} sx={{ fontSize: '15px' }}>Estimated total</Text.Body>
-              <Text.Body m={0} sx={{ fontSize: '15px' }}>${subtotal}</Text.Body>
-            </Flex>
-          ) : (
-            <Flex alignItems="center" justifyContent="space-between" sx={{ mb: 4 }}>
-              <Flex alignItems="center" gap={2}>
-                <ShoppingBag sx={{ width: 16, height: 16, color: '#4f4f4f' }} />
-                <Text.Body m={0} sx={{ fontSize: '15px', color: '#4f4f4f' }}>
-                  {items.length} item{items.length !== 1 ? 's' : ''}
-                </Text.Body>
-                <Text.Body m={0} sx={{ fontSize: '15px', color: '#ddd' }}>•</Text.Body>
-                <Text.Body m={0} sx={{ fontSize: '15px' }}>${subtotal}</Text.Body>
-              </Flex>
-              <Box
-                as="button"
-                onClick={() => setExpanded(true)}
-                sx={{ background: 'none', border: 'none', cursor: 'pointer', p: 0 }}
-              >
-                <Text.Body m={0} sx={{ fontSize: '15px', fontWeight: 500 }}>View Details</Text.Body>
-              </Box>
-            </Flex>
-          )}
-          <Box
-            as="button"
-            onClick={onCheckout}
-            sx={{
-              width: '100%',
-              background: '#000',
-              color: '#fff',
-              border: 'none',
-              height: 56,
-              cursor: 'pointer',
-              fontSize: '14px',
-              fontWeight: 500,
-              letterSpacing: '0.06em',
-              textTransform: 'uppercase',
-            }}
-          >
-            Checkout
-          </Box>
-        </Box>
-      </Box>
-    </>
-  )
-}
-
-// ── Main page ─────────────────────────────────────────────────────────────────
-
-const VARIANT_NAV_HEIGHT = 44
+// ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function DomainSearch() {
-  const [searchParams, setSearchParams] = useSearchParams()
+  const [searchParams] = useSearchParams()
   const navigate = useNavigate()
-  const q = searchParams.get('q') ?? ''
+  const rawQuery = searchParams.get('q') ?? ''
 
-  const [variant, setVariant] = useState<MyrVariant>(() => {
-    try {
-      const v = localStorage.getItem(VARIANT_KEY)
-      if (v === 'divider' || v === 'label' || v === 'subtext') return v
-    } catch {}
-    return 'divider'
-  })
-  const [inputValue, setInputValue] = useState(q)
-  const [results, setResults] = useState<DomainResult[]>([])
-  const [isLoading, setIsLoading] = useState(false)
-  const [cart, setCart] = useState<Set<string>>(() => {
-    try {
-      const raw = localStorage.getItem('domains-cart-items')
-      if (raw) return new Set((JSON.parse(raw) as DomainResult[]).map((d) => d.id))
-    } catch {}
-    return new Set()
-  })
-  const [cartDomains, setCartDomains] = useState<Map<string, DomainResult>>(() => {
-    try {
-      const raw = localStorage.getItem('domains-cart-items')
-      if (raw) return new Map((JSON.parse(raw) as DomainResult[]).map((d) => [d.id, d]))
-    } catch {}
-    return new Map()
-  })
+  const [searchQuery, setSearchQuery] = useState(rawQuery)
+  const results = useMemo(() => generateResults(rawQuery), [rawQuery])
+  const [cart, setCart] = useState<Set<string>>(new Set())
+  const [activeFilter, setActiveFilter] = useState<string | null>(null)
   const [searchFocused, setSearchFocused] = useState(false)
-  const [lastAddedId, setLastAddedId] = useState<string | null>(null)
-  const heroRef = useRef<HTMLDivElement>(null)
-  const searchBarRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
-  const labelId = useId()
 
-  useEffect(() => {
-    setInputValue(q)
-    if (!q) { setResults([]); return }
-    setIsLoading(true)
-    setResults([])
-    const t = window.setTimeout(() => {
-      setResults(generateResults(q))
-      setIsLoading(false)
-    }, 200)
-    return () => window.clearTimeout(t)
-  }, [q])
+  const [guideMe, setGuideMe] = useState(false)
+  const [industry, setIndustry] = useState('')
+  const [businessName, setBusinessName] = useState('')
+  const [selectedVibes, setSelectedVibes] = useState<string[]>([])
 
+  const guideMeSummary = [businessName, industry, selectedVibes.join(', ')].filter(Boolean).join(' · ')
+
+  // Sync input when URL query changes
+  useEffect(() => { setSearchQuery(rawQuery) }, [rawQuery])
+
+  // Feed guide me fields directly into search bar, overwriting previous input
+  const prevGuideMeSummary = useRef('')
   useEffect(() => {
-    const trimmed = inputValue.trim()
-    if (trimmed) {
-      setIsLoading(true)
-      setResults([])
-    } else {
-      setIsLoading(false)
-      setResults([])
-      setSearchParams({}, { replace: true })
-      return
+    if (guideMeSummary && guideMeSummary !== prevGuideMeSummary.current) {
+      setSearchQuery(guideMeSummary)
     }
-    const t = window.setTimeout(() => {
-      setSearchParams({ q: trimmed }, { replace: true })
-    }, 300)
-    return () => window.clearTimeout(t)
-  }, [inputValue]) // eslint-disable-line react-hooks/exhaustive-deps
+    prevGuideMeSummary.current = guideMeSummary
+  }, [guideMeSummary])
+
+  function toggleVibe(v: string) {
+    setSelectedVibes((prev) => prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v])
+  }
+
+  const exact = results.find((r) => r.badges.includes('exact'))!
+  const closeMatch = results.find((r) => !r.badges.includes('exact') && r.available)
+  const available = results.filter((r) => r.available && !r.badges.includes('exact'))
+  const recommended = available.slice(0, 3)
+  const more = available.slice(5)
+
+  function toggleCart(id: string) {
+    setCart((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
 
   function handleSearch() {
-    const trimmed = inputValue.trim()
-    if (!trimmed) return
-    setSearchParams({ q: trimmed })
+    const trimmed = searchQuery.trim()
+    if (trimmed) navigate(`/domain-search?q=${encodeURIComponent(trimmed)}`)
   }
 
-  function handleKeyDown(e: React.KeyboardEvent) {
-    if (e.key === 'Enter') handleSearch()
-  }
-
-  function handleClear() {
-    setInputValue('')
-    setSearchParams({})
-    inputRef.current?.focus()
-  }
-
-  function toggleCart(result: DomainResult) {
-    const { id } = result
-    const isAdding = !cart.has(id)
-    setCart((prev) => {
-      const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
-      return next
-    })
-    setCartDomains((prev) => {
-      const next = new Map(prev)
-      next.has(id) ? next.delete(id) : next.set(id, result)
-      localStorage.setItem('domains-cart-items', JSON.stringify(Array.from(next.values())))
-      return next
-    })
-    if (isAdding) setLastAddedId(id)
-  }
-
-  function removeFromCart(id: string) {
-    setCart((prev) => {
-      const next = new Set(prev)
-      next.delete(id)
-      return next
-    })
-    setCartDomains((prev) => {
-      const next = new Map(prev)
-      next.delete(id)
-      localStorage.setItem('domains-cart-items', JSON.stringify(Array.from(next.values())))
-      return next
-    })
-  }
-
-  const cartItems = Array.from(cartDomains.values())
-  const cartCount = cart.size
-  const hasCart = cartCount > 0
+  const FILTERS = [`Popular for ${industry || 'your industry'}`, 'Short', 'Bundle deals']
 
   return (
-    <Box sx={{ minHeight: '100vh', background: '#fff', pt: `${VARIANT_NAV_HEIGHT}px` }}>
-
-      {/* ── Variant nav ── */}
-      <VariantNav variant={variant} onChange={setVariant} />
+    <Box sx={{ minHeight: '100vh', background: '#fff' }}>
+      <style>{`
+        @keyframes guideMeExpand {
+          from { opacity: 0; transform: translateY(-6px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
 
       {/* ── Nav ── */}
-      <Box
-        sx={{
-          position: 'fixed',
-          top: VARIANT_NAV_HEIGHT,
-          left: 0,
-          right: 0,
-          zIndex: 200,
-          background: '#fff',
-        }}
-      >
+      <Box sx={{ position: 'sticky', top: 0, zIndex: 100, background: '#fff', height: 80 }}>
         <Flex
-          as="nav"
-          alignItems="center"
-          justifyContent="space-between"
-          sx={{ height: 80, maxWidth: 1440, mx: 'auto', px: '40px', '@media (max-width: 767px)': { px: '16px' } }}
+          as="nav" alignItems="center" justifyContent="space-between"
+          sx={{ height: '100%', px: '40px', maxWidth: 1440, mx: 'auto' }}
         >
-          <Box
-            as="button"
-            onClick={() => navigate('/')}
-            sx={{ background: 'none', border: 'none', cursor: 'pointer', p: 0, display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}
-          >
+          <Flex alignItems="center" gap="12px" sx={{ cursor: 'pointer' }} onClick={() => navigate('/')}>
             <LogoSquarespace color="fg.default" />
-            <Flex alignItems="baseline" gap={1} sx={{ '@media (max-width: 767px)': { display: 'none' } }}>
-              <Text.Body m={0} sx={{ fontWeight: 500, fontSize: '14px', fontFamily: '"Clarkson", Helvetica, sans-serif', letterSpacing: '0.02em', textTransform: 'uppercase' }}>Squarespace</Text.Body>
-              <Text.Body m={0} sx={{ fontSize: '14px', fontFamily: '"Clarkson", Helvetica, sans-serif', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.02em' }}>Domains</Text.Body>
+            <Flex alignItems="baseline" gap="4px">
+              <Box as="span" sx={{ fontFamily: CLARKSON, fontWeight: 500, fontSize: '14px', textTransform: 'uppercase', letterSpacing: '0.02em', color: '#0e0e0e' }}>
+                Squarespace
+              </Box>
+              <Box as="span" sx={{ fontFamily: CLARKSON, fontWeight: 500, fontSize: '14px', textTransform: 'uppercase', letterSpacing: '0.02em', color: '#0e0e0e' }}>
+                Domains
+              </Box>
             </Flex>
-          </Box>
-
-          {/* Center links — desktop only */}
-          <Flex gap={8} alignItems="center" sx={{ '@media (max-width: 767px)': { display: 'none' } }}>
-            {['Transfer a domain', 'Build a website'].map((link) => (
-              <Flex key={link} alignItems="center" gap={1} sx={{ cursor: 'pointer', '&:hover': { opacity: 0.7 } }}>
-                <Text.Body m={0} sx={{ fontSize: '14px', fontFamily: '"Clarkson", Helvetica, sans-serif', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#000' }}>{link}</Text.Body>
-                <ChevronSmallDown sx={{ width: 16, height: 16, color: '#000' }} />
-              </Flex>
-            ))}
           </Flex>
-
-          {/* Right: Log in + cart */}
-          <Flex alignItems="center" gap={8} sx={{ flexShrink: 0 }}>
-            {/* Mobile compact search */}
-            <Flex
-              alignItems="center"
-              gap={2}
-              sx={{
-                display: 'none',
-                '@media (max-width: 767px)': { display: 'flex', flex: 1, mx: 0, height: 36, px: 3, borderRadius: 8, background: '#f0f0f0' },
-              }}
-            >
-              <Search color="fg.muted" sx={{ width: 16, height: 16, flexShrink: 0 }} />
-              <Box
-                as="input"
-                value={inputValue}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setInputValue(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Search for a domain"
-                sx={{ flex: 1, border: 'none', background: 'transparent', outline: 'none', fontSize: '14px', color: 'fg.default', fontFamily: 'inherit' }}
-              />
-            </Flex>
-            <Text.Body m={0} sx={{ cursor: 'pointer', fontSize: '14px', fontFamily: '"Clarkson", Helvetica, sans-serif', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.02em', color: '#000', '&:hover': { opacity: 0.7 }, '@media (max-width: 767px)': { display: 'none' } }}>Log in</Text.Body>
-            <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center', opacity: hasCart ? 1 : 0, pointerEvents: hasCart ? 'auto' : 'none', transition: 'opacity 0.3s ease' }}>
-              <Box as="button" sx={{ background: 'none', border: 'none', cursor: 'pointer', p: 1, display: 'flex', alignItems: 'center', color: 'fg.default' }}>
-                <ShoppingBag sx={{ width: 20, height: 20 }} />
-              </Box>
-              <Box sx={{ position: 'absolute', top: '-6px', right: '-6px', width: 16, height: 16, borderRadius: '50%', background: 'var(--colors-fg-default)', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-                <Text.Caption m={0} sx={{ fontSize: '10px', fontWeight: 700, color: '#fff', lineHeight: 1 }}>{cartCount}</Text.Caption>
-              </Box>
+          <Flex alignItems="center" gap="32px">
+            <Box as="span" sx={{ fontFamily: CLARKSON, fontWeight: 500, fontSize: '14px', textTransform: 'uppercase', letterSpacing: '0.02em', color: '#0e0e0e', cursor: 'pointer', '&:hover': { opacity: 0.7 } }}>
+              Build a website
+            </Box>
+            <Box as="span" sx={{ fontFamily: CLARKSON, fontWeight: 500, fontSize: '14px', textTransform: 'uppercase', letterSpacing: '0.02em', color: '#0e0e0e', cursor: 'pointer', '&:hover': { opacity: 0.7 } }}>
+              Log in
             </Box>
           </Flex>
         </Flex>
       </Box>
 
-      {/* ── Page content ── */}
-      <Box
-        sx={{
-          maxWidth: hasCart ? 1440 : 900,
-          mx: 'auto',
-          px: 8,
-          pt: 140,
-          pb: 24,
-          transition: 'max-width 0.35s ease',
-          '@media (max-width: 767px)': { px: '16px', pt: '32px', pb: cartItems.length > 0 ? '160px' : '40px' },
-        }}
-      >
-        <Flex sx={{ gap: '100px', '@media (max-width: 767px)': { gap: 0 } }} alignItems="flex-start">
+      {/* ── Content ── */}
+      <Box sx={{ maxWidth: 895, mx: 'auto', px: '40px', pb: '120px' }}>
 
-          {/* ── Left: search + results ── */}
-          <Box sx={{ flex: 3, minWidth: 0 }}>
+        {/* Header, search, cards, filters — 16px inset to align with row content */}
+        <Box sx={{ mx: '16px' }}>
 
-            <Box ref={heroRef} mb={6} px={4}>
+        {/* Header */}
+        <Box pt="48px" pb="24px">
+          <Box as="p" m={0} mb="8px" sx={{
+            fontFamily: CLARKSON,
+            fontSize: '28px',
+            fontWeight: 300,
+            letterSpacing: '-1px',
+            color: '#0e0e0e',
+            lineHeight: 1.1,
+          }}>
+            Buy your dream domain
+          </Box>
+          <Box as="p" m={0} sx={{
+            fontFamily: CLARKSON, fontSize: '15px', color: '#666',
+            letterSpacing: '-0.01px', lineHeight: 1.5, maxWidth: 480,
+          }}>
+            Each domain name registration comes with free suite of tools including WHOIS privacy and SSL certificate.
+          </Box>
+        </Box>
+
+        {/* Search bar — filter: drop-shadow when active, border when idle */}
+        <Box sx={{
+          position: 'relative', zIndex: 50, mb: '32px',
+          filter: (searchFocused || guideMe)
+            ? 'drop-shadow(0px 2px 8px rgba(0,0,0,0.10)) drop-shadow(0px 0px 1px rgba(0,0,0,0.04))'
+            : 'none',
+          transition: 'filter 0.2s ease',
+        }}>
+          {/* Card */}
+          <Box
+            onFocus={() => setSearchFocused(true)}
+            onBlur={() => setSearchFocused(false)}
+            sx={{
+              background: '#fff',
+              borderRadius: guideMe ? '8px 8px 0 0' : 8,
+              border: (searchFocused || guideMe) ? '1px solid transparent' : '1px solid #e2e2e2',
+              transition: 'border-color 0.2s ease',
+            }}
+          >
+            {/* Search row */}
+            <Flex alignItems="center" sx={{ height: 62, gap: '16px', px: '24px' }}>
+              <Search sx={{ width: 22, height: 22, flexShrink: 0, color: '#878787' }} />
               <Box
-                as="div"
-                m={0}
-                mb={2}
+                as="input" value={searchQuery}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
+                onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => { if (e.key === 'Enter') handleSearch() }}
                 sx={{
-                  fontFamily: '"Clarkson", Helvetica, sans-serif',
-                  fontStyle: 'normal',
-                  fontWeight: 400,
-                  color: '#000',
-                  fontSize: '32px',
-                  lineHeight: 1.1,
-                  letterSpacing: '-0.02em',
-                  display: '-webkit-box',
-                  WebkitLineClamp: 2,
-                  WebkitBoxOrient: 'vertical',
-                  overflow: 'hidden',
+                  flex: 1, border: 'none', background: 'transparent', outline: 'none',
+                  fontSize: '15px', color: '#0e0e0e', fontFamily: CLARKSON,
+                  letterSpacing: '-0.015px', lineHeight: 1.4,
+                }}
+              />
+              {/* Guide me button */}
+              <Box
+                as="button"
+                onClick={() => setGuideMe((g) => !g)}
+                sx={{
+                  background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0,
+                  color: '#666', fontFamily: CLARKSON, fontSize: '15px',
+                  letterSpacing: '-0.015px', lineHeight: 1.4, p: 0,
+                  display: 'flex', alignItems: 'center',
                 }}
               >
-                Find your domain
+                Guide me
+                <svg width="10" height="7" viewBox="0 0 10 7" fill="none" style={{ marginLeft: '2px', transition: 'transform 0.25s cubic-bezier(0.4,0,0.2,1)', transform: guideMe ? 'rotate(180deg)' : 'rotate(0deg)', flexShrink: 0 }}>
+                  <path d="M1 1L5 5L9 1" stroke="#666" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
               </Box>
-              <Text.Body m={0} color="fg.muted">
-                Each domain name registration comes with a free suite of tools including WHOIS privacy and SSL certificate.
-              </Text.Body>
-            </Box>
-
-            {/* Search input */}
-            <Flex
-              ref={searchBarRef}
-              alignItems="center"
-              mb={8}
-              onFocus={() => setSearchFocused(true)}
-              onBlur={() => setSearchFocused(false)}
-              sx={{
-                border: searchFocused ? '1px solid' : 'none',
-                borderColor: 'fg.default',
-                borderRadius: 8,
-                height: 52,
-                background: searchFocused ? '#fff' : '#f5f5f5',
-                overflow: 'hidden',
-                transition: 'background 0.15s ease',
-              }}
-            >
-              <Flex alignItems="center" gap={3} px={4} sx={{ flex: 1, minWidth: 0 }}>
-                <Search color="fg.muted" sx={{ flexShrink: 0 }} />
-                <Field.Root name="domain-search" sx={{ flex: 1, minWidth: 0 }}>
-                  <label id={labelId} style={{ display: 'none' }}>Search for a domain</label>
-                  <TextInput
-                    ref={inputRef}
-                    aria-labelledby={labelId}
-                    placeholder="Search for a domain"
-                    value={inputValue}
-                    onChange={(value: string) => setInputValue(value)}
-                    onKeyDown={handleKeyDown}
-                    sx={{
-                      border: 'none',
-                      outline: 'none',
-                      background: 'transparent',
-                      width: '100%',
-                      color: 'fg.default',
-                      fontSize: 3,
-                      padding: 0,
-                    }}
-                  />
-                </Field.Root>
-              </Flex>
-              {inputValue && (
-                <Box
-                  as="button"
-                  onClick={handleClear}
-                  aria-label="Clear search"
-                  sx={{
-                    background: '#d9d9d9',
-                    border: 'none',
-                    borderRadius: '50%',
-                    width: 24,
-                    height: 24,
-                    mr: 3,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0,
-                    color: 'fg.default',
-                    transition: 'background 0.12s',
-                    '&:hover': { background: '#c8c8c8' },
-                  }}
-                >
-                  <CrossSmall sx={{ width: 14, height: 14 }} />
-                </Box>
-              )}
+              <Box
+                as="button" onClick={handleSearch} aria-label="Search"
+                sx={{ background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', p: 0, ml: '4px' }}
+              >
+                <ArrowRight sx={{ width: 22, height: 22, color: '#0e0e0e' }} />
+              </Box>
             </Flex>
-
-            {isLoading && (
-              <Flex justifyContent="center" alignItems="center" sx={{ minHeight: 300 }}>
-                <ActivityIndicator />
-              </Flex>
-            )}
-
-            {!isLoading && results.length > 0 && (
-              <Box>
-                {results.filter((r) => r.available).map((r, i) => (
-                  <ResultRow
-                    key={r.id}
-                    result={r}
-                    inCart={cart.has(r.id)}
-                    onToggleCart={toggleCart}
-                    isTop={i === 0}
-                  />
-                ))}
-              </Box>
-            )}
-
-            {!isLoading && !q && (
-              <Flex justifyContent="center" alignItems="center" sx={{ minHeight: 200 }}>
-                <Text.Body m={0} color="fg.muted">Enter a domain name to search.</Text.Body>
-              </Flex>
-            )}
           </Box>
 
-          {/* ── Right: cart sidebar ── */}
-          {hasCart && (
-            <Box sx={{ flex: 2, minWidth: 0, alignSelf: 'flex-start', position: 'sticky', top: VARIANT_NAV_HEIGHT + 80, '@media (max-width: 767px)': { display: 'none' } }}>
-              <CartSidebar items={cartItems} results={results} onRemove={removeFromCart} onAdd={toggleCart} />
+          {/* Guide me panel — absolute overlay, drop-shadow on parent wraps both */}
+          <Box sx={{
+            position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 1000,
+            background: '#fff', borderRadius: '0 0 8px 8px',
+            borderTop: '1px solid #e7e7e7',
+            p: '22px', display: 'flex', flexDirection: 'column', gap: '22px',
+            opacity: guideMe ? 1 : 0,
+            transform: guideMe ? 'translateY(0)' : 'translateY(-8px)',
+            pointerEvents: guideMe ? 'auto' : 'none',
+            transition: 'opacity 0.25s cubic-bezier(0.4,0,0.2,1), transform 0.25s cubic-bezier(0.4,0,0.2,1)',
+          }}>
+            <Flex gap="16px">
+              <Box as="select" value={industry}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setIndustry(e.target.value)}
+                sx={{
+                  flex: 1, height: 62,
+                  background: 'rgba(0,0,0,0.05)', border: 'none', borderRadius: 8,
+                  px: '16px', py: '12px', fontFamily: CLARKSON, fontSize: '15px',
+                  color: industry ? '#0e0e0e' : '#898989',
+                  letterSpacing: '-0.015px', lineHeight: 1.4,
+                  appearance: 'none', cursor: 'pointer', outline: 'none',
+                }}
+              >
+                <option value="" disabled>Industry</option>
+                {['Retail', 'Food & Beverage', 'Health & Wellness', 'Creative Arts', 'Tech', 'Professional Services', 'Education', 'Travel', 'Real Estate', 'Non-profit'].map((o) => (
+                  <option key={o} value={o}>{o}</option>
+                ))}
+              </Box>
+              <Box
+                as="input" type="text" value={businessName}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBusinessName(e.target.value)}
+                placeholder="Business name (Optional)"
+                sx={{
+                  flex: 1, height: 62,
+                  background: 'rgba(0,0,0,0.05)', border: 'none', borderRadius: 8,
+                  px: '16px', py: '12px', fontFamily: CLARKSON, fontSize: '15px',
+                  color: businessName ? '#0e0e0e' : '#898989',
+                  letterSpacing: '-0.015px', lineHeight: 1.4,
+                  outline: 'none', boxSizing: 'border-box',
+                  '&::placeholder': { color: '#898989' },
+                }}
+              />
+            </Flex>
+            <Box>
+              <Box mb="16px">
+                <Box as="p" m={0} sx={{ fontFamily: CLARKSON, fontSize: '15px', color: '#0e0e0e', letterSpacing: '-0.015px', lineHeight: 1.4 }}>
+                  {"What's the vibe of your business?"}
+                </Box>
+                <Box as="p" m={0} sx={{ fontFamily: CLARKSON, fontSize: '15px', color: '#666', letterSpacing: '-0.015px', lineHeight: 1.4 }}>
+                  Select one or more.
+                </Box>
+              </Box>
+              <Flex flexWrap="wrap" gap="8px">
+                {['Professional', 'Friendly', 'Sophisticated', 'Playful', 'Modern', 'Informative'].map((vibe) => (
+                  <Box
+                    key={vibe} as="button" onClick={() => toggleVibe(vibe)}
+                    sx={{
+                      backdropFilter: 'blur(25px)',
+                      background: selectedVibes.includes(vibe) ? '#0e0e0e' : 'rgba(183,183,183,0.2)',
+                      border: '1px solid',
+                      borderColor: selectedVibes.includes(vibe) ? '#0e0e0e' : 'transparent',
+                      borderRadius: 30, px: '16px', py: '12px',
+                      fontFamily: CLARKSON, fontSize: '15px',
+                      color: selectedVibes.includes(vibe) ? '#fff' : '#0e0e0e',
+                      letterSpacing: '-0.015px', lineHeight: 1.4,
+                      cursor: 'pointer', whiteSpace: 'nowrap',
+                      transition: 'background 0.15s, color 0.15s',
+                    }}
+                  >
+                    {vibe}
+                  </Box>
+                ))}
+              </Flex>
             </Box>
+          </Box>
+        </Box>
+
+        {/* Featured cards */}
+        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px', mb: '64px' }}>
+          <FeaturedCard domain={exact} isExact added={cart.has(exact.id)} onToggle={() => toggleCart(exact.id)} />
+          {closeMatch && (
+            <FeaturedCard domain={closeMatch} isExact={false} added={cart.has(closeMatch.id)} onToggle={() => toggleCart(closeMatch.id)} />
           )}
+        </Box>
 
+        {/* Filter pills — no border */}
+        <Flex alignItems="center" justifyContent="space-between" mb="32px">
+          <Flex alignItems="center" gap="8px">
+            <FilterPill label="TLD type" chevron muted onClick={() => {}} />
+            {FILTERS.map((f) => (
+              <FilterPill key={f} label={f} active={activeFilter === f} onClick={() => setActiveFilter(activeFilter === f ? null : f)} />
+            ))}
+          </Flex>
+          <FilterPill label="Sort by: Recommended" chevron muted />
         </Flex>
-      </Box>
 
-      {/* Mobile mini cart */}
-      <Box sx={{ display: 'none', '@media (max-width: 767px)': { display: 'block' } }}>
-        <MobileMiniCart
-          items={cartItems}
-          results={results}
-          onRemove={removeFromCart}
-          onAdd={toggleCart}
-          onCheckout={() => navigate('/cart', { state: { items: cartItems } })}
-          lastAddedId={lastAddedId}
-        />
+        </Box>{/* end 16px inset */}
+
+        {/* Recommended */}
+        <Box mb="64px">
+          <ResultsSection
+            label="Recommended"
+            domains={recommended}
+            cart={cart}
+            onToggle={toggleCart}
+            showSeeWhy
+          />
+        </Box>
+
+        {/* More results */}
+        {more.length > 0 && (
+          <ResultsSection label="More results" domains={more} cart={cart} onToggle={toggleCart} />
+        )}
       </Box>
     </Box>
   )

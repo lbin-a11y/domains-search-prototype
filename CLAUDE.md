@@ -1,5 +1,11 @@
 @AGENTS.md
 
+## UI Components
+Use `@sqs/rosetta-primitives` for all layout and UI: `Box`, `Flex`, `Text`, `Button`, `Collapsible`, `Radio`, `Field`, `Fieldset`, `Touchable`, `VisuallyHidden`.
+Use `@sqs/rosetta-icons` for icons. Use `@sqs/rosetta-glyphs` for glyph icons.
+Spacing follows the Rosetta scale (n×4px): use numeric props (`pb={1}` = 4px, `p={2}` = 8px, etc). Avoid raw pixel values for spacing unless Figma demands exact override.
+Do not use plain HTML elements (`div`, `span`, `p`, `button`) when a Rosetta primitive covers the use case.
+
 ## Design Replication
 When an image or screenshot is attached, treat it as the pixel-level source of truth.
 Match layout, spacing, typography, colors, and component structure exactly unless
