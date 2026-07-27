@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Box, Flex, Text } from '@sqs/rosetta-primitives'
 import { LogoSquarespace, Search, ArrowRight } from '@sqs/rosetta-icons'
@@ -70,6 +70,7 @@ export default function Domains() {
   const [query, setQuery] = useState('')
   const [tab, setTab] = useState<'buy' | 'transfer'>('buy')
   const [searchFocused, setSearchFocused] = useState(false)
+  const [showSuggestions, setShowSuggestions] = useState(false)
   const [hintIndex, setHintIndex] = useState(0)
   const [guideMe, setGuideMe] = useState(false)
   const [selectedVibes, setSelectedVibes] = useState<string[]>([])
@@ -90,9 +91,27 @@ export default function Domains() {
     setSelectedVibes(prev => prev.includes(v) ? prev.filter(x => x !== v) : [...prev, v])
   }
 
+  const suggestionsBlurTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   function handleSearch() {
-    const trimmed = query.trim().toLowerCase().replace(/\s+/g, '').replace(/^\./, '')
-    if (trimmed) navigate(`/domain-search?q=${encodeURIComponent(trimmed)}`)
+    const trimmed = query.trim()
+    if (!trimmed) return
+    setShowSuggestions(false)
+    const stored = (() => { try { return JSON.parse(localStorage.getItem('domainRecentSearches') || '[]') } catch { return [] } })()
+    const updated = [trimmed, ...stored.filter((s: string) => s !== trimmed)].slice(0, 5)
+    localStorage.setItem('domainRecentSearches', JSON.stringify(updated))
+    navigate(`/domain-search?q=${encodeURIComponent(trimmed)}`)
+  }
+
+  function handleSearchFocus() {
+    setSearchFocused(true)
+    if (suggestionsBlurTimer.current) clearTimeout(suggestionsBlurTimer.current)
+    setShowSuggestions(true)
+  }
+
+  function handleSearchBlur() {
+    setSearchFocused(false)
+    suggestionsBlurTimer.current = setTimeout(() => setShowSuggestions(false), 150)
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
@@ -159,7 +178,7 @@ export default function Domains() {
         <Flex
           flexDirection="column"
           alignItems="center"
-          sx={{ position: 'absolute', left: 331, top: 70, width: 777, zIndex: 2, gap: '33px' }}
+          sx={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', top: 70, width: 'min(777px, calc(100vw - 40px))', zIndex: 2, gap: '33px' }}
         >
           {/* Buy / Transfer toggle */}
           <Box sx={{
@@ -274,11 +293,10 @@ export default function Domains() {
             }
           `}</style>
           {/* Search + Guide me card — single container, one shadow */}
+          <Box sx={{ position: 'relative', width: 'min(660px, calc(100vw - 40px))', flexShrink: 0 }}>
           <Box
-            onFocus={() => setSearchFocused(true)}
-            onBlur={() => setSearchFocused(false)}
             sx={{
-              width: 660,
+              width: '100%',
               borderRadius: 8,
               background: '#fff',
               boxShadow: searchFocused
@@ -335,6 +353,8 @@ export default function Domains() {
                   value={query}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)}
                   onKeyDown={handleKeyDown}
+                  onFocus={handleSearchFocus}
+                  onBlur={handleSearchBlur}
                   placeholder=""
                   sx={{
                     width: '100%', border: 'none', background: 'transparent', outline: 'none',
@@ -459,6 +479,65 @@ export default function Domains() {
               </Box>
             )}
           </Box>
+
+          {/* Suggestions dropdown */}
+          {showSuggestions && !guideMe && (
+            <Box sx={{
+              position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 999,
+              background: '#fff', borderRadius: 8,
+              boxShadow: '0px 4px 20px rgba(0,0,0,0.12)',
+              overflow: 'hidden', pb: '6px',
+            }}>
+              <Box sx={{ px: '16px', pt: '14px', pb: '4px' }}>
+                <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '11px', fontWeight: 500, color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                  Suggestions
+                </Box>
+              </Box>
+              {(['Fun domains for a pottery studio', 'Short, catchy names for a boutique brand'] as const).map((s) => (
+                <Box
+                  key={s} as="button"
+                  onMouseDown={() => { setQuery(s); setShowSuggestions(false) }}
+                  sx={{
+                    width: '100%', px: '16px', py: '10px', border: 'none', background: 'none',
+                    textAlign: 'left', cursor: 'pointer', fontFamily: CLARKSON, fontSize: '14px',
+                    color: '#0e0e0e', display: 'flex', alignItems: 'center', gap: '10px',
+                    '&:hover': { background: '#f5f5f5' },
+                  }}
+                >
+                  <Search sx={{ width: 14, height: 14, color: '#aaa', flexShrink: 0 }} />
+                  {s}
+                </Box>
+              ))}
+              {(() => {
+                const recents: string[] = (() => { try { return JSON.parse(localStorage.getItem('domainRecentSearches') || '[]') } catch { return [] } })()
+                return recents.length > 0 ? (
+                  <>
+                    <Box sx={{ px: '16px', pt: '12px', pb: '4px' }}>
+                      <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '11px', fontWeight: 500, color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                        Recent searches
+                      </Box>
+                    </Box>
+                    {recents.slice(0, 3).map((s: string) => (
+                      <Box
+                        key={s} as="button"
+                        onMouseDown={() => { setQuery(s); setShowSuggestions(false); navigate(`/domain-search?q=${encodeURIComponent(s)}`) }}
+                        sx={{
+                          width: '100%', px: '16px', py: '10px', border: 'none', background: 'none',
+                          textAlign: 'left', cursor: 'pointer', fontFamily: CLARKSON, fontSize: '14px',
+                          color: '#0e0e0e', display: 'flex', alignItems: 'center', gap: '10px',
+                          '&:hover': { background: '#f5f5f5' },
+                        }}
+                      >
+                        <Search sx={{ width: 14, height: 14, color: '#aaa', flexShrink: 0 }} />
+                        {s}
+                      </Box>
+                    ))}
+                  </>
+                ) : null
+              })()}
+            </Box>
+          )}
+          </Box>{/* end position:relative wrapper */}
         </Flex>
       </Box>
 

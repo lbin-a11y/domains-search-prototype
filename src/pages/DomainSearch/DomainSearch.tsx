@@ -23,6 +23,14 @@ const CLARKSON = '"Clarkson", Helvetica, sans-serif'
 const BLUE = '#0072F0'
 const BLUE_BG = '#D8E8FE'
 
+const TRUSTED_TLDS = new Set(['.com', '.net', '.org', '.co', '.me'])
+const TRENDING_TLDS = new Set(['.studio', '.live', '.store', '.shop', '.io', '.art', '.design', '.online', '.agency'])
+
+const PERSONALIZED_SUGGESTIONS = [
+  'Fun domains for a pottery studio',
+  'Short, catchy names for a boutique brand',
+]
+
 // ── Data ─────────────────────────────────────────────────────────────────────
 
 function hashStr(s: string): number {
@@ -403,6 +411,12 @@ export default function DomainSearch() {
   const [cart, setCart] = useState<Set<string>>(new Set())
   const [activeFilter, setActiveFilter] = useState<string | null>(null)
   const [searchFocused, setSearchFocused] = useState(false)
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [tldFilter, setTldFilter] = useState<null | 'trusted' | 'trending'>(null)
+  const [tldDropdownOpen, setTldDropdownOpen] = useState(false)
+  const [recentSearches, setRecentSearches] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem('domainRecentSearches') || '[]') } catch { return [] }
+  })
 
   const [guideMe, setGuideMe] = useState(false)
   const [industry, setIndustry] = useState('')
@@ -410,6 +424,9 @@ export default function DomainSearch() {
   const [selectedVibes, setSelectedVibes] = useState<string[]>([])
 
   const guideMeSummary = [businessName, industry, selectedVibes.join(', ')].filter(Boolean).join(' · ')
+
+  const tldDropdownRef = useRef<HTMLDivElement>(null)
+  const suggestionsBlurTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Sync input when URL query changes
   useEffect(() => { setSearchQuery(rawQuery) }, [rawQuery])
@@ -423,6 +440,18 @@ export default function DomainSearch() {
     prevGuideMeSummary.current = guideMeSummary
   }, [guideMeSummary])
 
+  // Close TLD dropdown on outside click
+  useEffect(() => {
+    if (!tldDropdownOpen) return
+    function handleOutside(e: MouseEvent) {
+      if (tldDropdownRef.current && !tldDropdownRef.current.contains(e.target as Node)) {
+        setTldDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleOutside)
+    return () => document.removeEventListener('mousedown', handleOutside)
+  }, [tldDropdownOpen])
+
   function toggleVibe(v: string) {
     setSelectedVibes((prev) => prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v])
   }
@@ -430,8 +459,19 @@ export default function DomainSearch() {
   const exact = results.find((r) => r.badges.includes('exact'))!
   const closeMatch = results.find((r) => !r.badges.includes('exact') && r.available)
   const available = results.filter((r) => r.available && !r.badges.includes('exact'))
-  const recommended = available.slice(0, 3)
-  const more = available.slice(5)
+
+  const FILTERS = [`Popular for ${industry || 'your industry'}`, 'Short', 'Bundle deals']
+
+  const filteredAvailable = available.filter((d) => {
+    if (tldFilter === 'trusted' && !TRUSTED_TLDS.has(d.tld)) return false
+    if (tldFilter === 'trending' && !TRENDING_TLDS.has(d.tld)) return false
+    if (activeFilter === FILTERS[0] && !d.badges.includes('promoted')) return false
+    if (activeFilter === 'Short' && d.name.replace(/\.[^.]+$/, '').length > 8) return false
+    if (activeFilter === 'Bundle deals' && d.salePrice === null) return false
+    return true
+  })
+  const recommended = filteredAvailable.slice(0, 3)
+  const more = filteredAvailable.slice(3)
 
   function toggleCart(id: string) {
     setCart((prev) => {
@@ -444,10 +484,24 @@ export default function DomainSearch() {
 
   function handleSearch() {
     const trimmed = searchQuery.trim()
-    if (trimmed) navigate(`/domain-search?q=${encodeURIComponent(trimmed)}`)
+    if (!trimmed) return
+    setShowSuggestions(false)
+    const updated = [trimmed, ...recentSearches.filter((s) => s !== trimmed)].slice(0, 5)
+    setRecentSearches(updated)
+    localStorage.setItem('domainRecentSearches', JSON.stringify(updated))
+    navigate(`/domain-search?q=${encodeURIComponent(trimmed)}`)
   }
 
-  const FILTERS = [`Popular for ${industry || 'your industry'}`, 'Short', 'Bundle deals']
+  function handleSearchFocus() {
+    setSearchFocused(true)
+    if (suggestionsBlurTimer.current) clearTimeout(suggestionsBlurTimer.current)
+    setShowSuggestions(true)
+  }
+
+  function handleSearchBlur() {
+    setSearchFocused(false)
+    suggestionsBlurTimer.current = setTimeout(() => setShowSuggestions(false), 150)
+  }
 
   return (
     <Box sx={{ minHeight: '100vh', background: '#fff' }}>
@@ -487,7 +541,7 @@ export default function DomainSearch() {
       </Box>
 
       {/* ── Content ── */}
-      <Box sx={{ maxWidth: 895, mx: 'auto', px: '40px', pb: '120px' }}>
+      <Box sx={{ maxWidth: 895, mx: 'auto', px: '40px', pb: '120px', '@media (max-width: 600px)': { px: '16px' } }}>
 
         {/* Header, search, cards, filters — 16px inset to align with row content */}
         <Box sx={{ mx: '16px' }}>
@@ -522,8 +576,6 @@ export default function DomainSearch() {
         }}>
           {/* Card */}
           <Box
-            onFocus={() => setSearchFocused(true)}
-            onBlur={() => setSearchFocused(false)}
             sx={{
               background: '#fff',
               borderRadius: guideMe ? '8px 8px 0 0' : 8,
@@ -538,6 +590,8 @@ export default function DomainSearch() {
                 as="input" value={searchQuery}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
                 onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => { if (e.key === 'Enter') handleSearch() }}
+                onFocus={handleSearchFocus}
+                onBlur={handleSearchBlur}
                 sx={{
                   flex: 1, border: 'none', background: 'transparent', outline: 'none',
                   fontSize: '15px', color: '#0e0e0e', fontFamily: CLARKSON,
@@ -568,6 +622,61 @@ export default function DomainSearch() {
               </Box>
             </Flex>
           </Box>
+
+          {/* Suggestions dropdown */}
+          {showSuggestions && !guideMe && (
+            <Box sx={{
+              position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 999,
+              background: '#fff', borderRadius: 8,
+              boxShadow: '0px 4px 20px rgba(0,0,0,0.12)',
+              overflow: 'hidden', pb: '6px',
+            }}>
+              <Box sx={{ px: '16px', pt: '14px', pb: '4px' }}>
+                <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '11px', fontWeight: 500, color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                  Suggestions
+                </Box>
+              </Box>
+              {PERSONALIZED_SUGGESTIONS.map((s) => (
+                <Box
+                  key={s} as="button"
+                  onMouseDown={() => { setSearchQuery(s); setShowSuggestions(false) }}
+                  sx={{
+                    width: '100%', px: '16px', py: '10px', border: 'none', background: 'none',
+                    textAlign: 'left', cursor: 'pointer', fontFamily: CLARKSON, fontSize: '14px',
+                    color: '#0e0e0e', display: 'flex', alignItems: 'center', gap: '10px',
+                    '&:hover': { background: '#f5f5f5' },
+                  }}
+                >
+                  <Search sx={{ width: 14, height: 14, color: '#aaa', flexShrink: 0 }} />
+                  {s}
+                </Box>
+              ))}
+              {recentSearches.length > 0 && (
+                <>
+                  <Box sx={{ px: '16px', pt: '12px', pb: '4px' }}>
+                    <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '11px', fontWeight: 500, color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                      Recent searches
+                    </Box>
+                  </Box>
+                  {recentSearches.slice(0, 3).map((s) => (
+                    <Box
+                      key={s} as="button"
+                      onMouseDown={() => { setSearchQuery(s); setShowSuggestions(false); navigate(`/domain-search?q=${encodeURIComponent(s)}`) }}
+                      sx={{
+                        width: '100%', px: '16px', py: '10px', border: 'none', background: 'none',
+                        textAlign: 'left', cursor: 'pointer', fontFamily: CLARKSON, fontSize: '14px',
+                        color: '#0e0e0e', display: 'flex', alignItems: 'center', gap: '10px',
+                        '&:hover': { background: '#f5f5f5' },
+                      }}
+                    >
+                      <Search sx={{ width: 14, height: 14, color: '#aaa', flexShrink: 0 }} />
+                      {s}
+                    </Box>
+                  ))}
+                </>
+              )}
+            </Box>
+          )}
 
           {/* Guide me panel — absolute overlay, drop-shadow on parent wraps both */}
           <Box sx={{
@@ -647,7 +756,7 @@ export default function DomainSearch() {
         </Box>
 
         {/* Featured cards */}
-        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px', mb: '64px' }}>
+        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px', mb: '64px', '@media (max-width: 600px)': { gridTemplateColumns: '1fr' } }}>
           <FeaturedCard domain={exact} isExact added={cart.has(exact.id)} onToggle={() => toggleCart(exact.id)} />
           {closeMatch && (
             <FeaturedCard domain={closeMatch} isExact={false} added={cart.has(closeMatch.id)} onToggle={() => toggleCart(closeMatch.id)} />
@@ -656,8 +765,42 @@ export default function DomainSearch() {
 
         {/* Filter pills — no border */}
         <Flex alignItems="center" justifyContent="space-between" mb="32px">
-          <Flex alignItems="center" gap="8px">
-            <FilterPill label="TLD type" chevron muted onClick={() => {}} />
+          <Flex alignItems="center" gap="8px" sx={{ flexWrap: 'nowrap', overflow: 'visible' }}>
+            {/* TLD type pill with dropdown */}
+            <div ref={tldDropdownRef} style={{ position: 'relative', flexShrink: 0 }}>
+              <FilterPill
+                label="TLD type"
+                chevron
+                active={tldFilter !== null}
+                onClick={() => setTldDropdownOpen((o) => !o)}
+              />
+              {tldDropdownOpen && (
+                <Box sx={{
+                  position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 300,
+                  background: '#fff', borderRadius: 8,
+                  boxShadow: '0px 4px 20px rgba(0,0,0,0.12)',
+                  minWidth: 160, overflow: 'hidden', py: '6px',
+                }}>
+                  {([
+                    { id: 'trusted' as const, label: 'Trusted', desc: '.com, .net, .org' },
+                    { id: 'trending' as const, label: 'Trending', desc: '.studio, .io, .art' },
+                  ]).map(({ id, label, desc }) => (
+                    <Box
+                      key={id} as="button"
+                      onClick={() => { setTldFilter(tldFilter === id ? null : id); setTldDropdownOpen(false) }}
+                      sx={{
+                        width: '100%', px: '16px', py: '10px', border: 'none', textAlign: 'left',
+                        cursor: 'pointer', fontFamily: CLARKSON, background: tldFilter === id ? '#f0f0f0' : 'transparent',
+                        '&:hover': { background: '#f5f5f5' },
+                      }}
+                    >
+                      <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '14px', color: '#0e0e0e', display: 'block' }}>{label}</Box>
+                      <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '12px', color: '#888', display: 'block' }}>{desc}</Box>
+                    </Box>
+                  ))}
+                </Box>
+              )}
+            </div>
             {FILTERS.map((f) => (
               <FilterPill key={f} label={f} active={activeFilter === f} onClick={() => setActiveFilter(activeFilter === f ? null : f)} />
             ))}
