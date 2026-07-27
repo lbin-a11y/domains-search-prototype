@@ -184,7 +184,7 @@ function AddBtn({ added, onClick }: { added: boolean; onClick: () => void }) {
       >
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
           {added
-            ? <path d="M2 7H12" stroke="white" strokeWidth="1.6" strokeLinecap="round" />
+            ? <path d="M2 7L5.5 10.5L12 3.5" stroke="white" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
             : <><path d="M7 2V12" stroke="white" strokeWidth="1.6" strokeLinecap="round" /><path d="M2 7H12" stroke="white" strokeWidth="1.6" strokeLinecap="round" /></>
           }
         </svg>
@@ -338,7 +338,7 @@ function ResultRow({ domain, added, onToggle, showLimitedTimeColumn, showRtb }: 
         {justAdded && <ConfettiBurst />}
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
           {added
-            ? <path d="M3 8H13" stroke="#0e0e0e" strokeWidth="1.5" strokeLinecap="round" />
+            ? <path d="M3 8.5L6.5 12L13 4" stroke="#0e0e0e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             : <><path d="M8 3V13" stroke="#0e0e0e" strokeWidth="1.5" strokeLinecap="round" /><path d="M3 8H13" stroke="#0e0e0e" strokeWidth="1.5" strokeLinecap="round" /></>
           }
         </svg>
@@ -431,6 +431,159 @@ function ResultsSection({ label, domains, cart, onToggle, showSeeWhy }: {
         {domains.map((d) => (
           <ResultRow key={d.id} domain={d} added={cart.has(d.id)} onToggle={() => onToggle(d.id)} showLimitedTimeColumn={hasAnyLimitedTime} showRtb={expanded} />
         ))}
+      </Box>
+    </Box>
+  )
+}
+
+// ── Mini cart ────────────────────────────────────────────────────────────────
+
+const SUGGEST_TLDS = [
+  { tld: '.info', price: 12 }, { tld: '.org', price: 12 }, { tld: '.ai', price: 12 },
+  { tld: '.co', price: 26 }, { tld: '.net', price: 14 }, { tld: '.io', price: 48 },
+]
+
+function MiniCart({ cartItems, allResults, onRemove, onAdd }: {
+  cartItems: DomainResult[]
+  allResults: DomainResult[]
+  onRemove: (id: string) => void
+  onAdd: (d: DomainResult) => void
+}) {
+  const [matchingOpen, setMatchingOpen] = useState(true)
+  const visible = cartItems.length > 0
+  const total = cartItems.reduce((sum, d) => sum + (d.salePrice ?? d.originalPrice), 0)
+
+  // Suggest TLDs not already in cart, based on first cart item's stem
+  const firstItem = cartItems[0]
+  const stem = firstItem ? firstItem.name.replace(/\.[^.]+$/, '') : ''
+  const cartTlds = new Set(cartItems.map(d => d.tld))
+  const suggestions = SUGGEST_TLDS
+    .filter(s => !cartTlds.has(s.tld))
+    .slice(0, 3)
+    .map(s => ({ id: `${stem}${s.tld}`, name: `${stem}${s.tld}`, tld: s.tld, price: s.price }))
+
+  return (
+    <Box sx={{
+      position: 'fixed', top: 0, right: 0, bottom: 0, zIndex: 200,
+      width: 320, background: '#fff',
+      boxShadow: '-4px 0 24px rgba(0,0,0,0.10)',
+      display: 'flex', flexDirection: 'column',
+      transform: visible ? 'translateX(0)' : 'translateX(100%)',
+      transition: 'transform 0.32s cubic-bezier(0.4,0,0.2,1)',
+      pointerEvents: visible ? 'auto' : 'none',
+    }}>
+      {/* Header */}
+      <Box sx={{ px: '24px', pt: '32px', pb: '16px', borderBottom: '1px solid #f0f0f0' }}>
+        <Box sx={{ fontFamily: CLARKSON, fontSize: '18px', fontWeight: 500, color: '#0e0e0e', letterSpacing: '-0.3px', mb: '4px' }}>
+          Cart Overview
+        </Box>
+        <Box sx={{ fontFamily: CLARKSON, fontSize: '13px', color: '#888' }}>
+          {`Domain (${cartItems.length})`}
+        </Box>
+      </Box>
+
+      {/* Items */}
+      <Box sx={{ flex: 1, overflowY: 'auto', px: '24px', pt: '16px' }}>
+        {cartItems.map((d) => (
+          <Flex key={d.id} alignItems="center" justifyContent="space-between" sx={{ mb: '12px' }}>
+            <Box sx={{ fontFamily: CLARKSON, fontSize: '14px', color: '#0e0e0e', letterSpacing: '-0.01em', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {d.name}
+            </Box>
+            <Flex alignItems="center" gap="10px" sx={{ flexShrink: 0 }}>
+              <Box sx={{ fontFamily: CLARKSON, fontSize: '13px', color: '#555' }}>
+                ${d.salePrice ?? d.originalPrice}/yr
+              </Box>
+              <Box as="button" onClick={() => onRemove(d.id)} sx={{
+                background: 'none', border: 'none', cursor: 'pointer', p: '2px',
+                display: 'flex', alignItems: 'center', opacity: 0.4,
+                '&:hover': { opacity: 1 }, transition: 'opacity 0.15s',
+              }}>
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                  <path d="M2 3.5h10M5.5 3.5V2.5h3v1M6 6v4M8 6v4M3 3.5l.7 7.5h6.6l.7-7.5" stroke="#0e0e0e" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </Box>
+            </Flex>
+          </Flex>
+        ))}
+
+        {/* Add matching domains */}
+        {suggestions.length > 0 && (
+          <Box sx={{ mt: '16px', border: '1px solid #f0f0f0', borderRadius: 8, overflow: 'hidden' }}>
+            <Flex as="button" alignItems="center" justifyContent="space-between"
+              onClick={() => setMatchingOpen(o => !o)}
+              sx={{ width: '100%', px: '14px', py: '10px', background: 'none', border: 'none', cursor: 'pointer' }}
+            >
+              <Flex alignItems="center" gap="6px">
+                <Box sx={{ fontFamily: CLARKSON, fontSize: '13px', color: '#0e0e0e' }}>Add matching domains</Box>
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                  <circle cx="7" cy="7" r="5.5" stroke="#aaa" strokeWidth="1.2"/>
+                  <path d="M7 6.5v4M7 4.5v.5" stroke="#aaa" strokeWidth="1.2" strokeLinecap="round"/>
+                </svg>
+              </Flex>
+              {matchingOpen
+                ? <ChevronSmallUp sx={{ width: 16, height: 16, color: '#888' }} />
+                : <ChevronSmallDown sx={{ width: 16, height: 16, color: '#888' }} />}
+            </Flex>
+            {matchingOpen && suggestions.map(s => {
+              const alreadyInCart = cartItems.some(c => c.id === s.id)
+              const existing = allResults.find(r => r.id === s.id)
+              return (
+                <Flex key={s.id} alignItems="center" justifyContent="space-between"
+                  sx={{ px: '14px', py: '9px', borderTop: '1px solid #f5f5f5' }}
+                >
+                  <Box sx={{ fontFamily: CLARKSON, fontSize: '13px', color: '#0e0e0e' }}>{s.name}</Box>
+                  <Flex alignItems="center" gap="10px">
+                    <Box sx={{ fontFamily: CLARKSON, fontSize: '13px', color: '#555' }}>${s.price}/yr</Box>
+                    {alreadyInCart ? (
+                      <Box sx={{ fontFamily: CLARKSON, fontSize: '12px', fontWeight: 500, color: '#aaa' }}>ADDED</Box>
+                    ) : (
+                      <Box as="button" onClick={() => {
+                        const d: DomainResult = existing ?? {
+                          id: s.id, name: s.name, tld: s.tld, badges: [], originalPrice: s.price, salePrice: null, available: true,
+                        }
+                        onAdd(d)
+                      }} sx={{
+                        background: 'none', border: 'none', cursor: 'pointer', p: 0,
+                        fontFamily: CLARKSON, fontSize: '12px', fontWeight: 500, color: BLUE,
+                        letterSpacing: '0.02em',
+                      }}>
+                        ADD
+                      </Box>
+                    )}
+                  </Flex>
+                </Flex>
+              )
+            })}
+          </Box>
+        )}
+      </Box>
+
+      {/* Footer */}
+      <Box sx={{ borderTop: '1px solid #f0f0f0', px: '24px', pt: '16px', pb: '24px' }}>
+        <Flex alignItems="center" justifyContent="space-between" mb="14px">
+          <Flex alignItems="center" gap="8px">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M1.5 2h1.8l2.1 8h7l1.6-5.5H4.5" stroke="#0e0e0e" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+              <circle cx="6.5" cy="12.5" r="1" fill="#0e0e0e"/>
+              <circle cx="11.5" cy="12.5" r="1" fill="#0e0e0e"/>
+            </svg>
+            <Box sx={{ fontFamily: CLARKSON, fontSize: '14px', color: '#0e0e0e' }}>
+              {cartItems.length} {cartItems.length === 1 ? 'item' : 'items'}
+            </Box>
+          </Flex>
+          <Box sx={{ fontFamily: CLARKSON, fontSize: '16px', fontWeight: 500, color: '#0e0e0e', letterSpacing: '-0.3px' }}>
+            ${total}
+          </Box>
+        </Flex>
+        <Box as="button" sx={{
+          width: '100%', height: 48, background: '#0e0e0e', border: 'none',
+          borderRadius: 8, cursor: 'pointer', fontFamily: CLARKSON,
+          fontSize: '13px', fontWeight: 500, color: '#fff', letterSpacing: '0.06em',
+          textTransform: 'uppercase', transition: 'background 0.15s',
+          '&:hover': { background: '#222' },
+        }}>
+          Checkout
+        </Box>
       </Box>
     </Box>
   )
@@ -587,14 +740,32 @@ export default function DomainSearch() {
   const recommended = sortedAvailable.slice(0, 3)
   const more = sortedAvailable.slice(3)
 
+  const [cartDomains, setCartDomains] = useState<Map<string, DomainResult>>(new Map())
+
   function toggleCart(id: string) {
+    const domain = results.find(r => r.id === id)
     setCart((prev) => {
       const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
+      if (next.has(id)) { next.delete(id); setCartDomains(m => { const n = new Map(m); n.delete(id); return n }) }
+      else {
+        next.add(id)
+        if (domain) setCartDomains(m => new Map(m).set(id, domain))
+      }
       return next
     })
   }
+
+  function addToCartDirect(domain: DomainResult) {
+    setCart(prev => new Set(prev).add(domain.id))
+    setCartDomains(m => new Map(m).set(domain.id, domain))
+  }
+
+  function removeFromCart(id: string) {
+    setCart(prev => { const n = new Set(prev); n.delete(id); return n })
+    setCartDomains(m => { const n = new Map(m); n.delete(id); return n })
+  }
+
+  const cartItems = [...cartDomains.values()]
 
   function handleSearch() {
     const trimmed = searchQuery.trim()
@@ -620,6 +791,7 @@ export default function DomainSearch() {
 
   return (
     <Box sx={{ minHeight: '100vh', background: '#fff' }}>
+      <MiniCart cartItems={cartItems} allResults={results} onRemove={removeFromCart} onAdd={addToCartDirect} />
       <style>{`
         @keyframes guideMeExpand {
           from { opacity: 0; transform: translateY(-6px); }
@@ -635,16 +807,16 @@ export default function DomainSearch() {
           animation: shimmer 1.4s ease-in-out infinite;
           border-radius: 8px;
         }
-        @keyframes confetti-1 { 0% { opacity:1; transform: translate(0,0) rotate(0deg) scale(1); } 40% { opacity:1; transform: translate(-14px,-26px) rotate(-40deg) scale(1); } 100% { opacity:0; transform: translate(-10px,14px) rotate(-90deg) scale(0.4); } }
-        @keyframes confetti-2 { 0% { opacity:1; transform: translate(0,0) rotate(0deg) scale(1); } 40% { opacity:1; transform: translate(2px,-32px) rotate(30deg) scale(1); } 100% { opacity:0; transform: translate(6px,12px) rotate(70deg) scale(0.5); } }
-        @keyframes confetti-3 { 0% { opacity:1; transform: translate(0,0) rotate(0deg) scale(1); } 40% { opacity:1; transform: translate(16px,-24px) rotate(60deg) scale(1); } 100% { opacity:0; transform: translate(14px,16px) rotate(110deg) scale(0.4); } }
-        @keyframes confetti-4 { 0% { opacity:1; transform: translate(0,0) rotate(0deg) scale(1); } 40% { opacity:1; transform: translate(-8px,-34px) rotate(-20deg) scale(1); } 100% { opacity:0; transform: translate(-4px,10px) rotate(-50deg) scale(0.6); } }
-        @keyframes confetti-5 { 0% { opacity:1; transform: translate(0,0) rotate(0deg) scale(1); } 40% { opacity:1; transform: translate(10px,-36px) rotate(90deg) scale(1); } 100% { opacity:0; transform: translate(12px,14px) rotate(140deg) scale(0.4); } }
-        .confetti-1 { animation: confetti-1 0.7s cubic-bezier(0.25,0.46,0.45,0.94) forwards; }
-        .confetti-2 { animation: confetti-2 0.75s cubic-bezier(0.25,0.46,0.45,0.94) forwards 0.03s; }
-        .confetti-3 { animation: confetti-3 0.7s cubic-bezier(0.25,0.46,0.45,0.94) forwards 0.06s; }
-        .confetti-4 { animation: confetti-4 0.8s cubic-bezier(0.25,0.46,0.45,0.94) forwards 0.01s; }
-        .confetti-5 { animation: confetti-5 0.75s cubic-bezier(0.25,0.46,0.45,0.94) forwards 0.04s; }
+        @keyframes confetti-1 { 0% { opacity:1; transform: translate(0,0) rotate(0deg); } 45% { opacity:1; transform: translate(-16px,-28px) rotate(-50deg); } 100% { opacity:0; transform: translate(-12px,16px) rotate(-100deg); } }
+        @keyframes confetti-2 { 0% { opacity:1; transform: translate(0,0) rotate(0deg); } 45% { opacity:1; transform: translate(2px,-34px) rotate(35deg); } 100% { opacity:0; transform: translate(8px,14px) rotate(80deg); } }
+        @keyframes confetti-3 { 0% { opacity:1; transform: translate(0,0) rotate(0deg); } 45% { opacity:1; transform: translate(18px,-26px) rotate(65deg); } 100% { opacity:0; transform: translate(16px,18px) rotate(120deg); } }
+        @keyframes confetti-4 { 0% { opacity:1; transform: translate(0,0) rotate(0deg); } 45% { opacity:1; transform: translate(-9px,-36px) rotate(-25deg); } 100% { opacity:0; transform: translate(-5px,12px) rotate(-60deg); } }
+        @keyframes confetti-5 { 0% { opacity:1; transform: translate(0,0) rotate(0deg); } 45% { opacity:1; transform: translate(12px,-38px) rotate(95deg); } 100% { opacity:0; transform: translate(14px,16px) rotate(150deg); } }
+        .confetti-1 { animation: confetti-1 0.55s linear forwards; }
+        .confetti-2 { animation: confetti-2 0.55s linear forwards 0.03s; }
+        .confetti-3 { animation: confetti-3 0.55s linear forwards 0.06s; }
+        .confetti-4 { animation: confetti-4 0.55s linear forwards 0.01s; }
+        .confetti-5 { animation: confetti-5 0.55s linear forwards 0.04s; }
       `}</style>
 
       {/* ── Nav ── */}
