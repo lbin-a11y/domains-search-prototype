@@ -134,7 +134,7 @@ function Tooltip({ children, text }: { children: React.ReactNode; text: string }
         transform: 'translateX(-50%)', background: '#0e0e0e', color: '#fff',
         fontFamily: CLARKSON, fontSize: '12px', px: '10px', py: '6px',
         borderRadius: 6, whiteSpace: 'nowrap', opacity: 0,
-        pointerEvents: 'none', transition: 'opacity 0.15s', zIndex: 20,
+        pointerEvents: 'none', transition: 'opacity 0.15s', zIndex: 500,
       }}>
         {text}
       </Box>
@@ -236,13 +236,22 @@ function ResultRow({ domain, added, onToggle, showLimitedTimeColumn, showRtb }: 
   const price = domain.salePrice ?? domain.originalPrice
   const hasDiscount = domain.salePrice !== null && domain.salePrice < domain.originalPrice
   const isPromoted = domain.badges.includes('promoted')
+  const [justAdded, setJustAdded] = useState(false)
+
+  function handleToggle() {
+    if (!added) {
+      setJustAdded(true)
+      setTimeout(() => setJustAdded(false), 600)
+    }
+    onToggle()
+  }
 
   return (
-    <Box sx={{ borderRadius: 8, overflow: 'hidden' }}>
+    <Box sx={{ borderRadius: 8, position: 'relative' }}>
     <Flex
       alignItems="center"
       gap="12px"
-      onClick={onToggle}
+      onClick={handleToggle}
       sx={{
         height: 62, px: '16px', cursor: 'pointer',
         borderRadius: showRtb ? '8px 8px 0 0' : 8,
@@ -295,9 +304,9 @@ function ResultRow({ domain, added, onToggle, showLimitedTimeColumn, showRtb }: 
         </Box>
       </Flex>
 
-      {/* Plain + */}
-      <Box as="span" onClick={(e: React.MouseEvent) => e.stopPropagation()}
-        sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: 24, height: 24 }}
+      {/* Plain + with sparkle */}
+      <Box as="span" onClick={(e: React.MouseEvent) => { e.stopPropagation(); handleToggle() }}
+        sx={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: 24, height: 24 }}
       >
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
           {added
@@ -305,6 +314,12 @@ function ResultRow({ domain, added, onToggle, showLimitedTimeColumn, showRtb }: 
             : <><path d="M8 3V13" stroke="#0e0e0e" strokeWidth="1.5" strokeLinecap="round" /><path d="M3 8H13" stroke="#0e0e0e" strokeWidth="1.5" strokeLinecap="round" /></>
           }
         </svg>
+        {justAdded && (
+          <svg className="sparkle-anim" width="28" height="28" viewBox="0 0 28 28" fill="none"
+            style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }}>
+            <path d="M14 4L15.2 11L22 8.5L17 14L22 19.5L15.2 17L14 24L12.8 17L6 19.5L11 14L6 8.5L12.8 11Z" fill="#0072F0" fillOpacity="0.85"/>
+          </svg>
+        )}
       </Box>
     </Flex>
     {/* RTB panel */}
@@ -527,6 +542,7 @@ export default function DomainSearch() {
     const trimmed = searchQuery.trim()
     if (!trimmed) return
     setShowSuggestions(false)
+    setGuideMe(false)
     const updated = [trimmed, ...recentSearches.filter((s) => s !== trimmed)].slice(0, 5)
     setRecentSearches(updated)
     localStorage.setItem('domainRecentSearches', JSON.stringify(updated))
@@ -560,6 +576,15 @@ export default function DomainSearch() {
           background-size: 200% 100%;
           animation: shimmer 1.4s ease-in-out infinite;
           border-radius: 8px;
+        }
+        @keyframes sparkle-burst {
+          0%   { opacity: 1; transform: scale(0.4) rotate(0deg); }
+          60%  { opacity: 1; transform: scale(1.3) rotate(20deg); }
+          100% { opacity: 0; transform: scale(1.6) rotate(35deg); }
+        }
+        .sparkle-anim {
+          animation: sparkle-burst 0.55s ease-out forwards;
+          pointer-events: none;
         }
       `}</style>
 
@@ -602,7 +627,7 @@ export default function DomainSearch() {
           <Box as="p" m={0} mb="8px" sx={{
             fontFamily: CLARKSON,
             fontSize: '28px',
-            fontWeight: 300,
+            fontWeight: 400,
             letterSpacing: '-1px',
             color: '#0e0e0e',
             lineHeight: 1.1,
@@ -610,7 +635,7 @@ export default function DomainSearch() {
             Buy your dream domain
           </Box>
           <Box as="p" m={0} sx={{
-            fontFamily: CLARKSON, fontSize: '15px', color: '#666',
+            fontFamily: CLARKSON, fontSize: '15px', fontWeight: 300, color: '#666',
             letterSpacing: '-0.01px', lineHeight: 1.5, maxWidth: 480,
           }}>
             Each domain name registration comes with free suite of tools including WHOIS privacy and SSL certificate.
@@ -657,11 +682,11 @@ export default function DomainSearch() {
                   background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0,
                   color: '#666', fontFamily: CLARKSON, fontSize: '15px',
                   letterSpacing: '-0.015px', lineHeight: 1.4, p: 0,
-                  display: 'flex', alignItems: 'center',
+                  display: 'flex', alignItems: 'center', gap: '4px',
                 }}
               >
                 Guide me
-                <svg width="10" height="7" viewBox="0 0 10 7" fill="none" style={{ marginLeft: '2px', transition: 'transform 0.25s cubic-bezier(0.4,0,0.2,1)', transform: guideMe ? 'rotate(180deg)' : 'rotate(0deg)', flexShrink: 0 }}>
+                <svg width="10" height="7" viewBox="0 0 10 7" fill="none" style={{ transition: 'transform 0.25s cubic-bezier(0.4,0,0.2,1)', transform: guideMe ? 'rotate(180deg)' : 'rotate(0deg)', flexShrink: 0 }}>
                   <path d="M1 1L5 5L9 1" stroke="#666" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </Box>
@@ -700,7 +725,10 @@ export default function DomainSearch() {
                     '&:hover': { background: 'rgba(0,0,0,0.03)' },
                   }}
                 >
-                  <Search sx={{ width: 16, height: 16, color: '#aaa', flexShrink: 0 }} />
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
+                    <path d="M8 1.5C5.515 1.5 3.5 3.515 3.5 6c0 1.657.898 3.105 2.23 3.88V11.5h4.54V9.88C11.602 9.105 12.5 7.657 12.5 6c0-2.485-2.015-4.5-4.5-4.5Z" stroke="#aaa" strokeWidth="1.3" strokeLinejoin="round"/>
+                    <path d="M5.75 13h4.5M6.5 14.5h3" stroke="#aaa" strokeWidth="1.3" strokeLinecap="round"/>
+                  </svg>
                   {s}
                 </Box>
               ))}
@@ -894,18 +922,17 @@ export default function DomainSearch() {
               sx={{
                 height: 40, px: '16px', py: '10px',
                 backdropFilter: 'blur(25px)',
-                background: sortBy !== 'recommended' ? '#0e0e0e' : 'rgba(183,183,183,0.2)',
+                background: 'rgba(183,183,183,0.2)',
                 border: 'none', borderRadius: 30,
                 cursor: 'pointer', fontFamily: CLARKSON, fontSize: '14px',
                 letterSpacing: '-0.01px', whiteSpace: 'nowrap', flexShrink: 0,
-                transition: 'background 0.15s',
               }}
             >
-              <Box as="span" sx={{ color: sortBy !== 'recommended' ? '#fff' : '#666' }}>Sort by: </Box>
-              <Box as="span" sx={{ color: sortBy !== 'recommended' ? '#fff' : '#0e0e0e', fontWeight: 400 }}>
+              <Box as="span" sx={{ color: '#666' }}>Sort by: </Box>
+              <Box as="span" sx={{ color: '#0e0e0e', fontWeight: 400 }}>
                 {sortBy === 'price' ? 'Price' : 'Recommended'}
               </Box>
-              <ChevronSmallDown sx={{ width: 12, height: 12, color: sortBy !== 'recommended' ? '#fff' : '#0e0e0e', ml: '2px' }} />
+              <ChevronSmallDown sx={{ width: 12, height: 12, color: '#0e0e0e', ml: '2px' }} />
             </Flex>
             {sortDropdownOpen && (
               <Box sx={{
