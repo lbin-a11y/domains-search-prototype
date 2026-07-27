@@ -101,10 +101,6 @@ function readVariant(): MyrVariant {
   return 'divider'
 }
 
-function writeVariant(v: MyrVariant) {
-  try { localStorage.setItem(VARIANT_KEY, v) } catch {}
-}
-
 // ── Breadcrumb ─────────────────────────────────────────────────────────────
 
 function Breadcrumb() {
@@ -148,87 +144,6 @@ function Breadcrumb() {
           ))}
         </Flex>
       </Flex>
-    </Box>
-  )
-}
-
-// ── Variant nav ────────────────────────────────────────────────────────────
-
-const VARIANT_LABELS: Record<MyrVariant, string> = {
-  divider: 'Divider',
-  label: 'Label',
-  subtext: 'Subtext',
-}
-
-const VARIANT_FIGMA: Record<MyrVariant, string> = {
-  divider: 'https://www.figma.com/design/LRN00J69dEcl5X5BHvhQJ6/Multi-year-term-discount?node-id=196-11538',
-  label:   'https://www.figma.com/design/LRN00J69dEcl5X5BHvhQJ6/Multi-year-term-discount?node-id=196-10572',
-  subtext: 'https://www.figma.com/design/LRN00J69dEcl5X5BHvhQJ6/Multi-year-term-discount?node-id=200-14480',
-}
-
-function VariantNav({ variant, onChange }: { variant: MyrVariant; onChange: (v: MyrVariant) => void }) {
-  return (
-    <Box
-      sx={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        zIndex: 500,
-        background: '#f5f5f5',
-        borderBottom: '1px solid #e2e2e2',
-        height: 44,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: '6px',
-        px: 4,
-      }}
-    >
-      <Text.Caption m={0} color="fg.muted" sx={{ fontSize: '11px', letterSpacing: '0.06em', textTransform: 'uppercase', mr: 2, flexShrink: 0 }}>
-        Dropdown variant
-      </Text.Caption>
-      {(['divider', 'label', 'subtext'] as MyrVariant[]).map((v) => {
-        const active = variant === v
-        return (
-          <Flex key={v} alignItems="center" gap={1}>
-            <Box
-              as="button"
-              onClick={() => { onChange(v); writeVariant(v) }}
-              sx={{
-                px: '12px',
-                py: '5px',
-                borderRadius: 20,
-                border: '1px solid',
-                borderColor: active ? 'fg.default' : '#d0d0d0',
-                background: active ? 'var(--colors-fg-default)' : '#fff',
-                color: active ? '#fff' : 'var(--colors-fg-muted)',
-                cursor: 'pointer',
-                fontSize: '12px',
-                fontWeight: active ? 600 : 400,
-                letterSpacing: '0.02em',
-                transition: 'all 0.15s ease',
-                '&:hover': {
-                  borderColor: 'fg.default',
-                  background: active ? 'var(--colors-fg-default)' : '#f0f0f0',
-                },
-              }}
-            >
-              {VARIANT_LABELS[v]}
-            </Box>
-            <Box
-              as="a"
-              href={VARIANT_FIGMA[v]}
-              target="_blank"
-              rel="noopener noreferrer"
-              title="Figma reference"
-              sx={{ color: '#aaa', fontSize: '10px', textDecoration: 'none', display: 'flex', alignItems: 'center', '&:hover': { color: '#0862d1' } }}
-            >
-              ↗
-            </Box>
-          </Flex>
-        )
-      })}
     </Box>
   )
 }
@@ -822,8 +737,6 @@ function OrderSummary({ items, terms }: { items: DomainResult[]; terms: Record<s
 
 // ── Page ───────────────────────────────────────────────────────────────────
 
-const VARIANT_NAV_HEIGHT = 44
-
 export default function Cart() {
   const location = useLocation()
   const navigate = useNavigate()
@@ -832,7 +745,7 @@ export default function Cart() {
     try { return JSON.parse(localStorage.getItem('domains-cart-items') ?? '[]') } catch { return [] }
   })()
 
-  const [variant, setVariant] = useState<MyrVariant>(readVariant)
+  const [variant] = useState<MyrVariant>(readVariant)
   const [items, setItems] = useState<DomainResult[]>(initialItems)
   const [terms, setTerms] = useState<Record<string, number>>(() => {
     let saved: Record<string, number> = {}
@@ -870,8 +783,7 @@ export default function Cart() {
   const subtotal = items.reduce((s, r) => s + (r.salePrice ?? r.originalPrice), 0)
 
   return (
-    <Box sx={{ minHeight: '100vh', background: '#fff', pt: `${VARIANT_NAV_HEIGHT}px` }}>
-      <VariantNav variant={variant} onChange={setVariant} />
+    <Box sx={{ minHeight: '100vh', background: '#fff' }}>
       <Breadcrumb />
 
       <Box sx={{ maxWidth: 960, mx: 'auto', px: 6, pt: 7, pb: 8, '@media (max-width: 767px)': { px: 4, pt: 5, pb: 6 } }}>

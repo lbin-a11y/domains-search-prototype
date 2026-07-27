@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
-import { Box, Flex } from '@sqs/rosetta-primitives'
-import { LogoSquarespace, Search, ArrowRight, ChevronSmallDown, ChevronSmallUp, Sparkles, Checkmark } from '@sqs/rosetta-icons'
+import { Box, Flex, Text } from '@sqs/rosetta-primitives'
+import { LogoSquarespace, Search, ArrowRight, ChevronSmallDown, ChevronSmallUp, Sparkles, Checkmark, Trash } from '@sqs/rosetta-icons'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -132,7 +132,7 @@ function Tooltip({ children, text }: { children: React.ReactNode; text: string }
       <Box className="tt" sx={{
         position: 'absolute', bottom: 'calc(100% + 8px)', left: '50%',
         transform: 'translateX(-50%)', background: '#0e0e0e', color: '#fff',
-        fontFamily: CLARKSON, fontSize: '12px', px: '10px', py: '6px',
+        fontFamily: CLARKSON, fontSize: '12px', px: '10px', py: '6px', minWidth: '120px', textAlign: 'center',
         borderRadius: 6, whiteSpace: 'nowrap', opacity: 0,
         pointerEvents: 'none', transition: 'opacity 0.15s', zIndex: 500,
       }}>
@@ -142,20 +142,31 @@ function Tooltip({ children, text }: { children: React.ReactNode; text: string }
   )
 }
 
-// ── Confetti burst ────────────────────────────────────────────────────────────
+// ── Instagram-style confetti burst ───────────────────────────────────────────
 
-function ConfettiBurst() {
-  const shapes = [
-    { cls: 'confetti-1', w: 6, h: 4, rx: 1 },
-    { cls: 'confetti-2', w: 4, h: 4, rx: 2 },
-    { cls: 'confetti-3', w: 5, h: 3, rx: 1 },
-    { cls: 'confetti-4', w: 3, h: 5, rx: 1 },
-    { cls: 'confetti-5', w: 4, h: 4, rx: 2 },
-  ]
+const IG_PARTICLES = [
+  { tx:  0,   ty: -32 }, { tx:  16,  ty: -28 }, { tx:  28,  ty: -16 },
+  { tx:  32,  ty:   0 }, { tx:  28,  ty:  16 }, { tx:  16,  ty:  28 },
+  { tx:  0,   ty:  32 }, { tx: -16,  ty:  28 }, { tx: -28,  ty:  16 },
+  { tx: -32,  ty:   0 }, { tx: -28,  ty: -16 }, { tx: -16,  ty: -28 },
+]
+const IG_SIZES = [5, 4, 6, 4, 5, 3, 5, 4, 6, 3, 5, 4]
+
+function IgBurst({ color = '#0e0e0e' }: { color?: string }) {
   return (
     <Box sx={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', pointerEvents: 'none', zIndex: 999, overflow: 'visible' }}>
-      {shapes.map(({ cls, w, h, rx }, i) => (
-        <Box key={i} className={cls} sx={{ position: 'absolute', top: 0, left: 0, width: w, height: h, borderRadius: rx, background: BLUE, opacity: 1 }} />
+      {IG_PARTICLES.map(({ tx, ty }, i) => (
+        <Box
+          key={i}
+          className="ig-particle"
+          style={{ '--tx': `${tx}px`, '--ty': `${ty}px`, animationDelay: `${i * 0.012}s` } as React.CSSProperties}
+          sx={{
+            position: 'absolute', top: 0, left: 0,
+            width: IG_SIZES[i], height: IG_SIZES[i],
+            borderRadius: '50%',
+            background: color,
+          }}
+        />
       ))}
     </Box>
   )
@@ -166,20 +177,26 @@ function ConfettiBurst() {
 function AddBtn({ added, onClick }: { added: boolean; onClick: () => void }) {
   const [burst, setBurst] = useState(false)
   const burstKey = useRef(0)
+  const [popping, setPopping] = useState(false)
+
   function handleClick(e: React.MouseEvent) {
     e.stopPropagation()
     if (!added) {
       burstKey.current += 1
       setBurst(true)
-      setTimeout(() => setBurst(false), 800)
+      setPopping(true)
+      setTimeout(() => setBurst(false), 650)
+      setTimeout(() => setPopping(false), 450)
     }
     onClick()
   }
+
   return (
     <Box sx={{ position: 'relative', display: 'inline-flex', overflow: 'visible' }}>
-      {burst && <ConfettiBurst key={burstKey.current} />}
+      {burst && <IgBurst key={burstKey.current} color="#fff" />}
       <Box
         as="button" onClick={handleClick}
+        className={popping ? 'btn-pop' : ''}
         sx={{
           width: 46, height: 46, borderRadius: 8, border: 'none',
           background: added ? '#444' : '#0e0e0e',
@@ -199,6 +216,54 @@ function AddBtn({ added, onClick }: { added: boolean; onClick: () => void }) {
   )
 }
 
+// ── Heart button (favorites) ──────────────────────────────────────────────────
+
+function HeartBtn({ favorited, onClick }: { favorited: boolean; onClick: (e: React.MouseEvent) => void }) {
+  const [burst, setBurst] = useState(false)
+  const [popping, setPopping] = useState(false)
+  const burstKey = useRef(0)
+
+  function handleClick(e: React.MouseEvent) {
+    e.stopPropagation()
+    if (!favorited) {
+      burstKey.current += 1
+      setBurst(true)
+      setPopping(true)
+      setTimeout(() => setBurst(false), 650)
+      setTimeout(() => setPopping(false), 450)
+    }
+    onClick(e)
+  }
+
+  return (
+    <Box sx={{ position: 'relative', display: 'inline-flex', overflow: 'visible' }}>
+      {burst && <IgBurst key={burstKey.current} color="#0e0e0e" />}
+      <Box
+        as="button"
+        onClick={handleClick}
+        className={popping ? 'btn-pop' : ''}
+        sx={{
+          background: 'none', border: 'none', cursor: 'pointer', p: '4px',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          flexShrink: 0, color: favorited ? '#0e0e0e' : '#aaa', borderRadius: 4,
+          transition: 'color 0.15s',
+          '&:hover': { color: '#0e0e0e' },
+        }}
+      >
+        {favorited ? (
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M8 13.5C8 13.5 1.5 9 1.5 5.25C1.5 3.179 3.179 1.5 5.25 1.5C6.412 1.5 7.447 2.068 8 2.96C8.553 2.068 9.588 1.5 10.75 1.5C12.821 1.5 14.5 3.179 14.5 5.25C14.5 9 8 13.5 8 13.5Z" />
+          </svg>
+        ) : (
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M8 13.5C8 13.5 1.5 9 1.5 5.25C1.5 3.179 3.179 1.5 5.25 1.5C6.412 1.5 7.447 2.068 8 2.96C8.553 2.068 9.588 1.5 10.75 1.5C12.821 1.5 14.5 3.179 14.5 5.25C14.5 9 8 13.5 8 13.5Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+          </svg>
+        )}
+      </Box>
+    </Box>
+  )
+}
+
 // ── Featured card ─────────────────────────────────────────────────────────────
 
 function FeaturedCard({ domain, isExact, added, onToggle }: {
@@ -208,7 +273,7 @@ function FeaturedCard({ domain, isExact, added, onToggle }: {
   const hasDiscount = domain.salePrice !== null && domain.salePrice < domain.originalPrice
 
   return (
-    <Box onClick={onToggle} sx={{
+    <Box onClick={onToggle} className={isExact ? 'exact-border-glow' : ''} sx={{
       border: isExact ? '1px solid' : 'none', borderColor: '#a8cff8',
       borderRadius: 12, p: '28px',
       display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
@@ -261,18 +326,24 @@ function FeaturedCard({ domain, isExact, added, onToggle }: {
 
 // ── Result row ────────────────────────────────────────────────────────────────
 
-function ResultRow({ domain, added, onToggle, showLimitedTimeColumn, showRtb }: {
-  domain: DomainResult; added: boolean; onToggle: () => void; showLimitedTimeColumn: boolean; showRtb?: boolean
+function ResultRow({ domain, added, onToggle, showLimitedTimeColumn, showRtb, favorited, onFavorite }: {
+  domain: DomainResult; added: boolean; onToggle: () => void; showLimitedTimeColumn: boolean; showRtb?: boolean; favorited?: boolean; onFavorite?: (e: React.MouseEvent) => void
 }) {
   const price = domain.salePrice ?? domain.originalPrice
   const hasDiscount = domain.salePrice !== null && domain.salePrice < domain.originalPrice
   const isPromoted = domain.badges.includes('promoted')
-  const [justAdded, setJustAdded] = useState(false)
+  const [popping, setPopping] = useState(false)
+  const [burst, setBurst] = useState(false)
+  const burstKey = useRef(0)
+  const [hovered, setHovered] = useState(false)
 
   function handleToggle() {
     if (!added) {
-      setJustAdded(true)
-      setTimeout(() => setJustAdded(false), 600)
+      burstKey.current += 1
+      setPopping(true)
+      setBurst(true)
+      setTimeout(() => setPopping(false), 450)
+      setTimeout(() => setBurst(false), 650)
     }
     onToggle()
   }
@@ -283,10 +354,12 @@ function ResultRow({ domain, added, onToggle, showLimitedTimeColumn, showRtb }: 
       alignItems="center"
       gap="12px"
       onClick={handleToggle}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
       sx={{
         height: 62, px: '16px', cursor: 'pointer',
         borderRadius: showRtb ? '8px 8px 0 0' : 8,
-        '&:hover': { background: '#f5f5f5' },
+        background: hovered ? '#f5f5f5' : 'transparent',
         transition: 'background 0.1s',
       }}
     >
@@ -305,6 +378,13 @@ function ResultRow({ domain, added, onToggle, showLimitedTimeColumn, showRtb }: 
             <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '13px', fontWeight: 400, color: BLUE }}>Popular</Box>
           </Flex>
         </Tooltip>
+      )}
+
+      {/* Heart — visible on row hover or when favorited */}
+      {onFavorite && (
+        <Box sx={{ opacity: (hovered || favorited) ? 1 : 0, transition: 'opacity 0.12s', flexShrink: 0 }}>
+          <HeartBtn favorited={!!favorited} onClick={onFavorite} />
+        </Box>
       )}
 
       {/* Spacer pushes remaining items right */}
@@ -335,17 +415,22 @@ function ResultRow({ domain, added, onToggle, showLimitedTimeColumn, showRtb }: 
         </Box>
       </Flex>
 
-      {/* Plain + with confetti */}
-      <Box as="span" onClick={(e: React.MouseEvent) => { e.stopPropagation(); handleToggle() }}
-        sx={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: 24, height: 24 }}
-      >
-        {justAdded && <ConfettiBurst />}
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-          {added
-            ? <path d="M3 8.5L6.5 12L13 4" stroke="#0e0e0e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            : <><path d="M8 3V13" stroke="#0e0e0e" strokeWidth="1.5" strokeLinecap="round" /><path d="M3 8H13" stroke="#0e0e0e" strokeWidth="1.5" strokeLinecap="round" /></>
-          }
-        </svg>
+      {/* + / ✓ with pop + burst */}
+      <Box sx={{ position: 'relative', display: 'inline-flex', overflow: 'visible' }}>
+        {burst && <IgBurst key={burstKey.current} />}
+        <Box
+          as="span"
+          onClick={(e: React.MouseEvent) => { e.stopPropagation(); handleToggle() }}
+          className={popping ? 'btn-pop' : ''}
+          sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: 24, height: 24, cursor: 'pointer' }}
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            {added
+              ? <path d="M3 8.5L6.5 12L13 4" stroke="#0e0e0e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              : <><path d="M8 3V13" stroke="#0e0e0e" strokeWidth="1.5" strokeLinecap="round" /><path d="M3 8H13" stroke="#0e0e0e" strokeWidth="1.5" strokeLinecap="round" /></>
+            }
+          </svg>
+        </Box>
       </Box>
     </Flex>
     {/* RTB panel */}
@@ -405,8 +490,8 @@ function FilterPill({ label, active, onClick, chevron, muted }: {
 
 // ── Results section ───────────────────────────────────────────────────────────
 
-function ResultsSection({ label, domains, cart, onToggle, showSeeWhy }: {
-  label: string; domains: DomainResult[]; cart: Set<string>; onToggle: (id: string) => void; showSeeWhy?: boolean
+function ResultsSection({ label, domains, cart, onToggle, showSeeWhy, favorites, onFavorite }: {
+  label: string; domains: DomainResult[]; cart: Set<string>; onToggle: (id: string) => void; showSeeWhy?: boolean; favorites?: Map<string, DomainResult>; onFavorite?: (d: DomainResult, e: React.MouseEvent) => void
 }) {
   const [expanded, setExpanded] = useState(false)
   const hasAnyLimitedTime = domains.some((d) => d.limitedTime)
@@ -433,8 +518,74 @@ function ResultsSection({ label, domains, cart, onToggle, showSeeWhy }: {
       </Flex>
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
         {domains.map((d) => (
-          <ResultRow key={d.id} domain={d} added={cart.has(d.id)} onToggle={() => onToggle(d.id)} showLimitedTimeColumn={hasAnyLimitedTime} showRtb={expanded} />
+          <ResultRow
+            key={d.id} domain={d} added={cart.has(d.id)} onToggle={() => onToggle(d.id)}
+            showLimitedTimeColumn={hasAnyLimitedTime} showRtb={expanded}
+            favorited={favorites?.has(d.id)}
+            onFavorite={onFavorite ? (e) => onFavorite(d, e) : undefined}
+          />
         ))}
+      </Box>
+    </Box>
+  )
+}
+
+// ── Favorites matching accordion ─────────────────────────────────────────────
+
+function FavMatchingAccordion({ domain, allResults, cart, setCart }: {
+  domain: DomainResult; allResults: DomainResult[]; cart: Set<string>; setCart: React.Dispatch<React.SetStateAction<Set<string>>>
+}) {
+  const [open, setOpen] = useState(false)
+  const sld = getSld(domain.name)
+  const matching = allResults.filter((r) => getSld(r.name) === sld && r.available && !cart.has(r.id) && r.id !== domain.id).slice(0, 3)
+
+  return (
+    <Box sx={{ background: '#f5f5f5', borderRadius: open ? '6px 6px 0 0' : 6 }}>
+      <Flex
+        as="button"
+        alignItems="center"
+        onClick={() => setOpen((v) => !v)}
+        sx={{
+          width: '100%', background: 'none', border: 'none', cursor: 'pointer',
+          px: '14px', py: '10px', borderRadius: open ? '6px 6px 0 0' : 6,
+          textAlign: 'left',
+        }}
+      >
+        <Text.Caption m={0} sx={{ fontSize: '13px', color: '#555', flex: 1, lineHeight: 1 }}>
+          Add matching domains to secure your brand
+        </Text.Caption>
+        {open
+          ? <ChevronSmallUp sx={{ width: 14, height: 14, color: '#888', flexShrink: 0 }} />
+          : <ChevronSmallDown sx={{ width: 14, height: 14, color: '#888', flexShrink: 0 }} />
+        }
+      </Flex>
+      <Box sx={{ display: 'grid', gridTemplateRows: open ? '1fr' : '0fr', transition: 'grid-template-rows 0.3s cubic-bezier(0.4,0,0.2,1)' }}>
+        <Box sx={{ minHeight: 0, overflow: 'hidden' }}>
+          <Box sx={{ background: '#f5f5f5', borderRadius: '0 0 6px 6px', px: '14px', pb: '10px' }}>
+            {matching.length === 0 ? (
+              <Box sx={{ fontFamily: CLARKSON, fontSize: '13px', color: '#aaa', py: '6px' }}>No matching domains available</Box>
+            ) : matching.map((m) => {
+              const ext = m.name.slice(getSld(m.name).length)
+              const price = m.salePrice ?? m.originalPrice
+              return (
+                <Flex key={m.id} alignItems="center" gap={2} sx={{ py: '5px', cursor: 'pointer', '&:hover': { opacity: 0.7 }, transition: 'opacity 0.1s' }}
+                  onClick={() => setCart((prev) => new Set([...prev, m.id]))}
+                >
+                  <Box sx={{ flex: 1, minWidth: 0, fontFamily: CLARKSON, fontSize: '13px', color: '#0e0e0e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <Box as="span" sx={{ color: '#888' }}>{sld}</Box>{ext}
+                  </Box>
+                  <Box sx={{ fontFamily: CLARKSON, fontSize: '13px', color: '#555', flexShrink: 0 }}>${price}/yr</Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', color: '#0e0e0e', flexShrink: 0 }}>
+                    <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+                      <path d="M7 2V12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                      <path d="M2 7H12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                    </svg>
+                  </Box>
+                </Flex>
+              )
+            })}
+          </Box>
+        </Box>
       </Box>
     </Box>
   )
@@ -442,10 +593,11 @@ function ResultsSection({ label, domains, cart, onToggle, showSeeWhy }: {
 
 // ── Mini cart ────────────────────────────────────────────────────────────────
 
-const SUGGEST_TLDS = [
-  { tld: '.info', price: 12 }, { tld: '.org', price: 12 }, { tld: '.ai', price: 12 },
-  { tld: '.co', price: 26 }, { tld: '.net', price: 14 }, { tld: '.io', price: 48 },
-]
+
+function getSld(name: string): string {
+  const dot = name.lastIndexOf('.')
+  return dot > 0 ? name.slice(0, dot) : name
+}
 
 function MiniCart({ cartItems, allResults, onRemove, onAdd }: {
   cartItems: DomainResult[]
@@ -453,155 +605,274 @@ function MiniCart({ cartItems, allResults, onRemove, onAdd }: {
   onRemove: (id: string) => void
   onAdd: (d: DomainResult) => void
 }) {
-  const [matchingOpen, setMatchingOpen] = useState(true)
-  const visible = cartItems.length > 0
-  const total = cartItems.reduce((sum, d) => sum + (d.salePrice ?? d.originalPrice), 0)
+  const navigate = useNavigate()
+  const [matchingOpen, setMatchingOpen] = useState<Record<string, boolean>>({})
+  const prevItemIdsRef = useRef<Set<string>>(new Set())
+  const [removingIds, setRemovingIds] = useState<Set<string>>(new Set())
+  const [burstingIds, setBurstingIds] = useState<Set<string>>(new Set())
+  const [burstKeys, setBurstKeys] = useState<Record<string, number>>({})
+  const [removingCartIds, setRemovingCartIds] = useState<Set<string>>(new Set())
+  const [newCartIds, setNewCartIds] = useState<Set<string>>(new Set())
+  const prevCartIdsRef = useRef<Set<string>>(new Set())
 
-  const firstItem = cartItems[0]
-  const stem = firstItem ? firstItem.name.replace(/\.[^.]+$/, '') : ''
-  const cartTlds = new Set(cartItems.map(d => d.tld))
-  const suggestions = SUGGEST_TLDS
-    .filter(s => !cartTlds.has(s.tld))
-    .slice(0, 3)
-    .map(s => ({ id: `${stem}${s.tld}`, name: `${stem}${s.tld}`, tld: s.tld, price: s.price }))
+  useEffect(() => {
+    const currentIds = new Set(cartItems.map((i) => i.id))
+    const added = cartItems.filter((i) => !prevCartIdsRef.current.has(i.id)).map((i) => i.id)
+    if (added.length > 0) {
+      setNewCartIds((prev) => new Set([...prev, ...added]))
+      setTimeout(() => setNewCartIds((prev) => { const s = new Set(prev); added.forEach((id) => s.delete(id)); return s }), 350)
+    }
+    prevCartIdsRef.current = currentIds
+  }, [cartItems])
+
+  function handleRemoveCart(id: string) {
+    if (removingCartIds.has(id)) return
+    setRemovingCartIds((prev) => new Set([...prev, id]))
+    setTimeout(() => {
+      onRemove(id)
+      setRemovingCartIds((prev) => { const s = new Set(prev); s.delete(id); return s })
+    }, 300)
+  }
+
+  function handleMatchingAdd(m: DomainResult, e?: React.MouseEvent) {
+    e?.stopPropagation()
+    if (removingIds.has(m.id)) return
+    setRemovingIds((prev) => new Set([...prev, m.id]))
+    setBurstingIds((prev) => new Set([...prev, m.id]))
+    setBurstKeys((prev) => ({ ...prev, [m.id]: (prev[m.id] ?? 0) + 1 }))
+    setTimeout(() => {
+      onAdd(m)
+      setBurstingIds((prev) => { const s = new Set(prev); s.delete(m.id); return s })
+      setRemovingIds((prev) => { const s = new Set(prev); s.delete(m.id); return s })
+    }, 650)
+  }
+
+  const visible = cartItems.length > 0
+  const subtotal = cartItems.reduce((sum, r) => sum + (r.salePrice ?? r.originalPrice), 0)
+  const cartIds = new Set(cartItems.map((i) => i.id))
+
+  useEffect(() => {
+    const currentIds = new Set(cartItems.map((i) => i.id))
+    const newItems = cartItems.filter((i) => !prevItemIdsRef.current.has(i.id))
+    if (newItems.length > 0) {
+      setMatchingOpen((prev) => {
+        const next = { ...prev }
+        for (const item of newItems) {
+          const sld = getSld(item.name)
+          const hasMatching = allResults.some((r) => getSld(r.name) === sld && r.available && !currentIds.has(r.id))
+          if (hasMatching) next[sld] = true
+        }
+        return next
+      })
+    }
+    prevItemIdsRef.current = currentIds
+  }, [cartItems, allResults])
+
+  const sldOrder: string[] = []
+  const groups: Record<string, DomainResult[]> = {}
+  for (const item of cartItems) {
+    const sld = getSld(item.name)
+    if (!groups[sld]) { groups[sld] = []; sldOrder.push(sld) }
+    groups[sld].push(item)
+  }
+
+  function getMatching(sld: string): DomainResult[] {
+    return allResults.filter((r) => getSld(r.name) === sld && r.available && !cartIds.has(r.id)).slice(0, 3)
+  }
 
   return (
     <Box sx={{
-      width: visible ? 320 : 0,
+      width: visible ? 420 : 0,
       flexShrink: 0,
-      overflow: 'hidden',
+      overflow: 'visible',
       transition: 'width 0.32s cubic-bezier(0.4,0,0.2,1)',
       position: 'relative',
     }}>
-    <Box sx={{
-      width: 320,
-      position: 'sticky',
-      top: '24px',
-    }}>
-    <Box sx={{
-      border: '1px solid #e8e8e8',
-      borderRadius: 12,
-      background: '#fff',
-      boxShadow: '0px 4px 24px rgba(0,0,0,0.08)',
-      display: 'flex', flexDirection: 'column',
-      opacity: visible ? 1 : 0,
-      transition: 'opacity 0.2s ease',
-    }}>
-      {/* Header */}
-      <Box sx={{ px: '24px', pt: '32px', pb: '16px', borderBottom: '1px solid #f0f0f0' }}>
-        <Box sx={{ fontFamily: CLARKSON, fontSize: '18px', fontWeight: 500, color: '#0e0e0e', letterSpacing: '-0.3px', mb: '4px' }}>
-          Cart Overview
-        </Box>
-        <Box sx={{ fontFamily: CLARKSON, fontSize: '13px', color: '#888' }}>
-          {`Domain (${cartItems.length})`}
-        </Box>
-      </Box>
-
-      {/* Items */}
-      <Box sx={{ flex: 1, overflowY: 'auto', px: '24px', pt: '16px' }}>
-        {cartItems.map((d) => (
-          <Flex key={d.id} alignItems="center" justifyContent="space-between" sx={{ mb: '12px' }}>
-            <Box sx={{ fontFamily: CLARKSON, fontSize: '14px', color: '#0e0e0e', letterSpacing: '-0.01em', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {d.name}
+      <Box sx={{ width: 380, overflow: 'visible' }}>
+        <Box sx={{
+          background: '#fff',
+          borderRadius: 12,
+          boxShadow: '0 218px 61px 0 transparent, 0 139px 56px 0 rgba(0,0,0,0.01), 0 78px 47px 0 rgba(0,0,0,0.05), 0 -1px 35px 0 rgba(0,0,0,0.09), 0 4px 19px 0 rgba(0,0,0,0.1)',
+          height: 'calc(100vh - 160px)',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+          opacity: visible ? 1 : 0,
+          transition: 'opacity 0.2s ease',
+        }}>
+          <Box px={6} pt={6} pb={4}>
+            <Box sx={{ fontFamily: CLARKSON, fontSize: '18px', fontWeight: 500, color: '#0e0e0e', letterSpacing: '-0.3px' }}>
+              Cart ({cartItems.length})
             </Box>
-            <Flex alignItems="center" gap="10px" sx={{ flexShrink: 0 }}>
-              <Box sx={{ fontFamily: CLARKSON, fontSize: '13px', color: '#555' }}>
-                ${d.salePrice ?? d.originalPrice}/yr
-              </Box>
-              <Box as="button" onClick={() => onRemove(d.id)} sx={{
-                background: 'none', border: 'none', cursor: 'pointer', p: '2px',
-                display: 'flex', alignItems: 'center', opacity: 0.4,
-                '&:hover': { opacity: 1 }, transition: 'opacity 0.15s',
-              }}>
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                  <path d="M2 3.5h10M5.5 3.5V2.5h3v1M6 6v4M8 6v4M3 3.5l.7 7.5h6.6l.7-7.5" stroke="#0e0e0e" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </Box>
-            </Flex>
-          </Flex>
-        ))}
+          </Box>
 
-        {/* Add matching domains */}
-        {suggestions.length > 0 && (
-          <Box sx={{ mt: '16px', border: '1px solid #f0f0f0', borderRadius: 8, overflow: 'hidden' }}>
-            <Flex as="button" alignItems="center" justifyContent="space-between"
-              onClick={() => setMatchingOpen(o => !o)}
-              sx={{ width: '100%', px: '14px', py: '10px', background: 'none', border: 'none', cursor: 'pointer' }}
-            >
-              <Flex alignItems="center" gap="6px">
-                <Box sx={{ fontFamily: CLARKSON, fontSize: '13px', color: '#0e0e0e' }}>Add matching domains</Box>
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                  <circle cx="7" cy="7" r="5.5" stroke="#aaa" strokeWidth="1.2"/>
-                  <path d="M7 6.5v4M7 4.5v.5" stroke="#aaa" strokeWidth="1.2" strokeLinecap="round"/>
-                </svg>
-              </Flex>
-              {matchingOpen
-                ? <ChevronSmallUp sx={{ width: 16, height: 16, color: '#888' }} />
-                : <ChevronSmallDown sx={{ width: 16, height: 16, color: '#888' }} />}
-            </Flex>
-            {matchingOpen && suggestions.map(s => {
-              const alreadyInCart = cartItems.some(c => c.id === s.id)
-              const existing = allResults.find(r => r.id === s.id)
+          <Box sx={{ flex: '1 1 0', overflowY: 'auto', px: 6, pb: 4 }}>
+            {sldOrder.map((sld) => {
+              const groupItems = groups[sld]
+              const matching = getMatching(sld)
+              const isOpen = matchingOpen[sld] ?? false
+
               return (
-                <Flex key={s.id} alignItems="center" justifyContent="space-between"
-                  sx={{ px: '14px', py: '9px', borderTop: '1px solid #f5f5f5' }}
+                <Box
+                  key={sld}
                 >
-                  <Box sx={{ fontFamily: CLARKSON, fontSize: '13px', color: '#0e0e0e' }}>{s.name}</Box>
-                  <Flex alignItems="center" gap="10px">
-                    <Box sx={{ fontFamily: CLARKSON, fontSize: '13px', color: '#555' }}>${s.price}/yr</Box>
-                    {alreadyInCart ? (
-                      <Box sx={{ fontFamily: CLARKSON, fontSize: '12px', fontWeight: 500, color: '#aaa' }}>ADDED</Box>
-                    ) : (
-                      <Box as="button" onClick={() => {
-                        const d: DomainResult = existing ?? {
-                          id: s.id, name: s.name, tld: s.tld, badges: [], originalPrice: s.price, salePrice: null, available: true,
-                        }
-                        onAdd(d)
-                      }} sx={{
-                        background: 'none', border: 'none', cursor: 'pointer', p: 0,
-                        fontFamily: CLARKSON, fontSize: '12px', fontWeight: 500, color: BLUE,
-                        letterSpacing: '0.02em',
-                      }}>
-                        ADD
+                  {groupItems.map((item) => {
+                    const price = item.salePrice ?? item.originalPrice
+                    const isRemoving = removingCartIds.has(item.id)
+                    const isNew = newCartIds.has(item.id)
+                    return (
+                      <Box
+                        key={item.id}
+                        className={isNew ? 'cart-item-in' : ''}
+                        sx={{
+                          maxHeight: isRemoving ? 0 : '64px',
+                          opacity: isRemoving ? 0 : 1,
+                          overflow: 'hidden',
+                          transition: isRemoving ? 'max-height 0.28s cubic-bezier(0.4,0,0.2,1), opacity 0.22s ease' : 'none',
+                        }}
+                      >
+                      <Flex
+                        alignItems="center"
+                        gap={3}
+                        sx={{ minHeight: 40, mb: 1 }}
+                      >
+                        <Text.Body
+                          m={0}
+                          sx={{ flex: '1 1 0', minWidth: 0, fontSize: '15px', fontWeight: 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#0e0e0e' }}
+                        >
+                          {item.name}
+                        </Text.Body>
+                        <Text.Body m={0} sx={{ fontSize: '14px', flexShrink: 0, color: '#555' }}>
+                          ${price}/yr
+                        </Text.Body>
+                        <Box
+                          as="button"
+                          onClick={() => handleRemoveCart(item.id)}
+                          aria-label={`Remove ${item.name} from cart`}
+                          sx={{
+                            background: 'none', border: 'none', cursor: 'pointer', p: '4px',
+                            display: 'flex', alignItems: 'center', flexShrink: 0, color: '#aaa',
+                            borderRadius: 4, transition: 'color 0.12s', '&:hover': { color: '#555' },
+                          }}
+                        >
+                          <Trash sx={{ width: 14, height: 14 }} />
+                        </Box>
+                      </Flex>
                       </Box>
-                    )}
-                  </Flex>
-                </Flex>
+                    )
+                  })}
+
+                  {matching.length > 0 && (
+                    <Box mt={2}>
+                      <Box
+                        as="button"
+                        onClick={() => setMatchingOpen((prev) => ({ ...prev, [sld]: !isOpen }))}
+                        sx={{
+                          width: '100%', background: '#f5f5f5', border: 'none', cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', px: '20px', py: '14px',
+                          borderRadius: isOpen ? '6px 6px 0 0' : 6, textAlign: 'left',
+                          transition: 'background 0.12s',
+                        }}
+                      >
+                        <Text.Caption m={0} sx={{ fontSize: '13px', color: '#555', flex: 1, lineHeight: 1 }}>
+                          Add matching domains to secure your brand
+                        </Text.Caption>
+                        {isOpen
+                          ? <ChevronSmallUp sx={{ width: 14, height: 14, color: '#888', flexShrink: 0 }} />
+                          : <ChevronSmallDown sx={{ width: 14, height: 14, color: '#888', flexShrink: 0 }} />
+                        }
+                      </Box>
+                      <Box sx={{ display: 'grid', gridTemplateRows: isOpen ? '1fr' : '0fr', transition: 'grid-template-rows 0.3s cubic-bezier(0.4,0,0.2,1)' }}>
+                        <Box sx={{ minHeight: 0, overflow: 'hidden' }}>
+                          <Box sx={{ background: '#f5f5f5', borderRadius: '0 0 6px 6px', px: '20px', pb: '14px', display: 'flex', flexDirection: 'column' }}>
+                            {matching.map((m) => {
+                              const stem = getSld(m.name)
+                              const ext = m.name.slice(stem.length + 1)
+                              const price = m.salePrice ?? m.originalPrice
+                              const isRemoving = removingIds.has(m.id)
+                              return (
+                                <Box
+                                  key={m.id}
+                                  sx={{
+                                    maxHeight: isRemoving ? 0 : '52px',
+                                    opacity: isRemoving ? 0 : 1,
+                                    overflow: 'hidden',
+                                    transition: 'max-height 0.38s cubic-bezier(0.4,0,0.2,1), opacity 0.28s ease',
+                                  }}
+                                >
+                                  <Flex
+                                    alignItems="center"
+                                    gap={3}
+                                    onClick={(e: React.MouseEvent) => handleMatchingAdd(m, e)}
+                                    sx={{
+                                      minHeight: 40, py: '6px',
+                                      cursor: 'pointer',
+                                    }}
+                                  >
+                                    <Box sx={{ flex: '1 1 0', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                      <Text.Body as="span" m={0} sx={{ fontSize: '14px', color: '#555' }}>{stem}.</Text.Body>
+                                      <Text.Body as="span" m={0} fontWeight="semibold" sx={{ fontSize: '14px', color: '#0e0e0e' }}>{ext}</Text.Body>
+                                    </Box>
+                                    <Text.Body m={0} sx={{ fontSize: '13px', color: '#555', flexShrink: 0 }}>
+                                      ${price}/yr
+                                    </Text.Body>
+                                    <Box sx={{ position: 'relative', display: 'inline-flex', overflow: 'visible' }}>
+                                      {burstingIds.has(m.id) && <IgBurst key={burstKeys[m.id]} color="#0e0e0e" />}
+                                      <Box
+                                        as="button"
+                                        onClick={(e: React.MouseEvent) => handleMatchingAdd(m, e)}
+                                        sx={{
+                                          background: 'none', border: 'none', cursor: 'pointer', p: '2px',
+                                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                          flexShrink: 0, color: '#0e0e0e', borderRadius: 4,
+                                          transition: 'opacity 0.12s', '&:hover': { opacity: 0.6 },
+                                        }}
+                                      >
+                                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                                          <path d="M7 2V12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                                          <path d="M2 7H12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                                        </svg>
+                                      </Box>
+                                    </Box>
+                                  </Flex>
+                                </Box>
+                              )
+                            })}
+                          </Box>
+                        </Box>
+                      </Box>
+                    </Box>
+                  )}
+                </Box>
               )
             })}
           </Box>
-        )}
-      </Box>
 
-      {/* Footer */}
-      <Box sx={{ borderTop: '1px solid #f0f0f0', px: '24px', pt: '16px', pb: '24px' }}>
-        <Flex alignItems="center" justifyContent="space-between" mb="14px">
-          <Flex alignItems="center" gap="8px">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path d="M1.5 2h1.8l2.1 8h7l1.6-5.5H4.5" stroke="#0e0e0e" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
-              <circle cx="6.5" cy="12.5" r="1" fill="#0e0e0e"/>
-              <circle cx="11.5" cy="12.5" r="1" fill="#0e0e0e"/>
-            </svg>
-            <Box sx={{ fontFamily: CLARKSON, fontSize: '14px', color: '#0e0e0e' }}>
-              {cartItems.length} {cartItems.length === 1 ? 'item' : 'items'}
+          <Box sx={{ borderTop: '1px solid #e8e8e8', flexShrink: 0, px: 5, pt: 4, pb: 5 }}>
+            <Flex alignItems="center" justifyContent="space-between" mb={4}>
+              <Text.Body m={0} sx={{ fontFamily: CLARKSON, fontSize: '14px', color: '#555' }}>
+                First-year total
+              </Text.Body>
+              <Text.Body m={0} sx={{ fontFamily: CLARKSON, fontSize: '15px', fontWeight: 500, color: '#0e0e0e' }}>
+                ${subtotal}
+              </Text.Body>
+            </Flex>
+            <Box
+              as="button"
+              onClick={() => navigate('/cart', { state: { items: cartItems } })}
+              sx={{
+                width: '100%', background: '#0e0e0e', color: '#fff',
+                border: 'none', borderRadius: 6, height: 52, cursor: 'pointer',
+                fontFamily: CLARKSON, fontSize: '13px', fontWeight: 500, letterSpacing: '0.08em',
+                textTransform: 'uppercase', transition: 'opacity 0.15s ease',
+                '&:hover': { opacity: 0.82 },
+              }}
+            >
+              Checkout
             </Box>
-          </Flex>
-          <Box sx={{ fontFamily: CLARKSON, fontSize: '16px', fontWeight: 500, color: '#0e0e0e', letterSpacing: '-0.3px' }}>
-            ${total}
           </Box>
-        </Flex>
-        <Box as="button" sx={{
-          width: '100%', height: 48, background: '#0e0e0e', border: 'none',
-          borderRadius: 8, cursor: 'pointer', fontFamily: CLARKSON,
-          fontSize: '13px', fontWeight: 500, color: '#fff', letterSpacing: '0.06em',
-          textTransform: 'uppercase', transition: 'background 0.15s',
-          '&:hover': { background: '#222' },
-        }}>
-          Checkout
         </Box>
       </Box>
-    </Box>
-    </Box>
     </Box>
   )
 }
@@ -616,6 +887,12 @@ export default function DomainSearch() {
   const [searchQuery, setSearchQuery] = useState(rawQuery)
   const results = useMemo(() => generateResults(rawQuery), [rawQuery])
   const [cart, setCart] = useState<Set<string>>(new Set())
+  const [favorites, setFavorites] = useState<Map<string, DomainResult>>(new Map())
+  const [favoritesOpen, setFavoritesOpen] = useState(false)
+  const [navHeartPop, setNavHeartPop] = useState(false)
+  const [navHeartDrop, setNavHeartDrop] = useState(false)
+  const navHeartDropKey = useRef(0)
+  const favoritesRef = useRef<HTMLDivElement>(null)
   const [activeFilters, setActiveFilters] = useState<Set<string>>(new Set())
   const [searchFocused, setSearchFocused] = useState(false)
   const [showSuggestions, setShowSuggestions] = useState(false)
@@ -690,10 +967,32 @@ export default function DomainSearch() {
       if (sortDropdownOpen && sortDropdownRef.current && !sortDropdownRef.current.contains(e.target as Node)) {
         setSortDropdownOpen(false)
       }
+      if (favoritesOpen && favoritesRef.current && !favoritesRef.current.contains(e.target as Node)) {
+        setFavoritesOpen(false)
+      }
     }
     document.addEventListener('mousedown', handleOutside)
     return () => document.removeEventListener('mousedown', handleOutside)
-  }, [tldDropdownOpen, sortDropdownOpen])
+  }, [tldDropdownOpen, sortDropdownOpen, favoritesOpen])
+
+  function toggleFavorite(domain: DomainResult, e: React.MouseEvent) {
+    e.stopPropagation()
+    const isAdding = !favorites.has(domain.id)
+    setFavorites((prev) => {
+      const next = new Map(prev)
+      if (next.has(domain.id)) { next.delete(domain.id) } else { next.set(domain.id, domain) }
+      return next
+    })
+    if (isAdding) {
+      navHeartDropKey.current += 1
+      setNavHeartDrop(true)
+      setTimeout(() => setNavHeartDrop(false), 600)
+      setTimeout(() => {
+        setNavHeartPop(true)
+        setTimeout(() => setNavHeartPop(false), 450)
+      }, 420)
+    }
+  }
 
   function toggleVibe(v: string) {
     setSelectedVibes((prev) => prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v])
@@ -823,16 +1122,59 @@ export default function DomainSearch() {
           animation: shimmer 1.4s ease-in-out infinite;
           border-radius: 8px;
         }
-        @keyframes confetti-1 { 0% { opacity:1; transform: translate(0,0) rotate(0deg); } 45% { opacity:1; transform: translate(-16px,-28px) rotate(-50deg); } 100% { opacity:0; transform: translate(-12px,16px) rotate(-100deg); } }
-        @keyframes confetti-2 { 0% { opacity:1; transform: translate(0,0) rotate(0deg); } 45% { opacity:1; transform: translate(2px,-34px) rotate(35deg); } 100% { opacity:0; transform: translate(8px,14px) rotate(80deg); } }
-        @keyframes confetti-3 { 0% { opacity:1; transform: translate(0,0) rotate(0deg); } 45% { opacity:1; transform: translate(18px,-26px) rotate(65deg); } 100% { opacity:0; transform: translate(16px,18px) rotate(120deg); } }
-        @keyframes confetti-4 { 0% { opacity:1; transform: translate(0,0) rotate(0deg); } 45% { opacity:1; transform: translate(-9px,-36px) rotate(-25deg); } 100% { opacity:0; transform: translate(-5px,12px) rotate(-60deg); } }
-        @keyframes confetti-5 { 0% { opacity:1; transform: translate(0,0) rotate(0deg); } 45% { opacity:1; transform: translate(12px,-38px) rotate(95deg); } 100% { opacity:0; transform: translate(14px,16px) rotate(150deg); } }
-        .confetti-1 { animation: confetti-1 0.55s linear forwards; }
-        .confetti-2 { animation: confetti-2 0.55s linear forwards 0.03s; }
-        .confetti-3 { animation: confetti-3 0.55s linear forwards 0.06s; }
-        .confetti-4 { animation: confetti-4 0.55s linear forwards 0.01s; }
-        .confetti-5 { animation: confetti-5 0.55s linear forwards 0.04s; }
+        @keyframes btn-pop {
+          0%   { transform: scale(1); }
+          25%  { transform: scale(1.45); }
+          55%  { transform: scale(0.88); }
+          75%  { transform: scale(1.1); }
+          100% { transform: scale(1); }
+        }
+        .btn-pop { animation: btn-pop 0.42s cubic-bezier(0.36,0.07,0.19,0.97) forwards; }
+        @keyframes ig-particle {
+          0%   { transform: translate(0,0) scale(1); opacity: 1; }
+          70%  { opacity: 1; }
+          100% { transform: translate(var(--tx), var(--ty)) scale(0.2); opacity: 0; }
+        }
+        .ig-particle { animation: ig-particle 0.58s ease-out forwards; }
+        @keyframes nav-heart-pop {
+          0%   { transform: scale(1); }
+          25%  { transform: scale(1.5); }
+          55%  { transform: scale(0.85); }
+          75%  { transform: scale(1.15); }
+          100% { transform: scale(1); }
+        }
+        .nav-heart-pop { animation: nav-heart-pop 0.42s cubic-bezier(0.36,0.07,0.19,0.97) forwards; }
+        @keyframes badge-pop {
+          0%   { transform: scale(0); opacity: 0; }
+          60%  { transform: scale(1.3); opacity: 1; }
+          100% { transform: scale(1); opacity: 1; }
+        }
+        .badge-pop { animation: badge-pop 0.3s cubic-bezier(0.36,0.07,0.19,0.97) forwards; }
+        @keyframes drop-into-heart {
+          0%   { transform: translateY(-18px) scale(1); opacity: 0; }
+          15%  { opacity: 1; }
+          70%  { transform: translateY(0px) scale(0.7); opacity: 0.9; }
+          100% { transform: translateY(4px) scale(0.3); opacity: 0; }
+        }
+        .drop-into-heart { animation: drop-into-heart 0.48s cubic-bezier(0.4,0,0.6,1) forwards; }
+        @keyframes cart-item-in {
+          0%   { max-height: 0; opacity: 0; }
+          100% { max-height: 64px; opacity: 1; }
+        }
+        .cart-item-in { animation: cart-item-in 0.28s cubic-bezier(0.4,0,0.2,1) forwards; }
+        @keyframes fav-popover-in {
+          0%   { opacity: 0; transform: translateY(-6px) scale(0.98); }
+          100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .fav-popover-in { animation: fav-popover-in 0.18s cubic-bezier(0.4,0,0.2,1) forwards; }
+        @keyframes exact-border-glow {
+          0%   { box-shadow: 0px 4px 20px 0px rgba(0,0,0,0.10); border-color: #a8cff8; }
+          12%  { box-shadow: 0px 4px 20px 0px rgba(0,0,0,0.10), 0 0 0 3px rgba(168,207,248,0.7), 0 0 28px 4px rgba(168,207,248,0.55); border-color: #6baed6; }
+          35%  { box-shadow: 0px 4px 20px 0px rgba(0,0,0,0.10), 0 0 0 2px rgba(168,207,248,0.35), 0 0 14px rgba(168,207,248,0.25); border-color: #a8cff8; }
+          75%  { box-shadow: 0px 4px 20px 0px rgba(0,0,0,0.10), 0 0 0 1px rgba(168,207,248,0.1); }
+          100% { box-shadow: 0px 4px 20px 0px rgba(0,0,0,0.10); border-color: #a8cff8; }
+        }
+        .exact-border-glow { animation: exact-border-glow 2.4s cubic-bezier(0.4,0,0.2,1) 0s 1 both; }
       `}</style>
 
       {/* ── Nav ── */}
@@ -859,13 +1201,117 @@ export default function DomainSearch() {
             <Box as="span" sx={{ fontFamily: CLARKSON, fontWeight: 500, fontSize: '14px', textTransform: 'uppercase', letterSpacing: '0.02em', color: '#0e0e0e', cursor: 'pointer', '&:hover': { opacity: 0.7 } }}>
               Log in
             </Box>
+            {/* Favorites heart icon */}
+            <Box ref={favoritesRef} sx={{ position: 'relative' }}>
+              <Box
+                as="button"
+                onClick={() => setFavoritesOpen((v) => !v)}
+                className={navHeartPop ? 'nav-heart-pop' : ''}
+                sx={{
+                  position: 'relative', background: 'none', border: 'none', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  width: 36, height: 36, borderRadius: 8, color: '#0e0e0e',
+                  '&:hover': { opacity: 0.7 }, overflow: 'visible',
+                }}
+              >
+                {navHeartDrop && (
+                  <Box
+                    key={navHeartDropKey.current}
+                    className="drop-into-heart"
+                    sx={{ position: 'absolute', top: '-4px', left: '50%', marginLeft: '-5px', width: 10, height: 10, borderRadius: '50%', background: '#0e0e0e', pointerEvents: 'none', zIndex: 10 }}
+                  />
+                )}
+                <svg width="20" height="20" viewBox="0 0 16 16" fill="none">
+                  <path d="M8 13.5C8 13.5 1.5 9 1.5 5.25C1.5 3.179 3.179 1.5 5.25 1.5C6.412 1.5 7.447 2.068 8 2.96C8.553 2.068 9.588 1.5 10.75 1.5C12.821 1.5 14.5 3.179 14.5 5.25C14.5 9 8 13.5 8 13.5Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+                </svg>
+                {favorites.size > 0 && (
+                  <Box
+                    className="badge-pop"
+                    key={favorites.size}
+                    sx={{
+                      position: 'absolute', top: '-5px', right: '-5px',
+                      background: '#0e0e0e', color: '#fff', borderRadius: '50%',
+                      width: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontFamily: CLARKSON, fontSize: '10px', fontWeight: 600, lineHeight: 1,
+                    }}
+                  >
+                    {favorites.size}
+                  </Box>
+                )}
+              </Box>
+
+              {/* Favorites popover */}
+              {favoritesOpen && (
+                <Box
+                  className="fav-popover-in"
+                  sx={{
+                    position: 'absolute', top: 'calc(100% + 12px)', right: 0, zIndex: 200,
+                    width: 380, background: '#fff', borderRadius: 12,
+                    boxShadow: '0 218px 61px 0 transparent, 0 139px 56px 0 rgba(0,0,0,0.01), 0 78px 47px 0 rgba(0,0,0,0.05), 0 -1px 35px 0 rgba(0,0,0,0.09), 0 4px 19px 0 rgba(0,0,0,0.1)',
+                  }}
+                >
+                  <Box sx={{ px: '20px', pt: '20px', pb: '16px' }}>
+                    <Box sx={{ fontFamily: CLARKSON, fontSize: '18px', fontWeight: 500, color: '#0e0e0e', letterSpacing: '-0.3px' }}>
+                      Favorites ({favorites.size})
+                    </Box>
+                  </Box>
+                  {favorites.size === 0 ? (
+                    <Box sx={{ px: '20px', pb: '20px', fontFamily: CLARKSON, fontSize: '14px', color: '#aaa' }}>
+                      No saved domains yet
+                    </Box>
+                  ) : (
+                    <Box sx={{ maxHeight: 400, overflowY: 'auto', px: '20px', pb: '16px' }}>
+                      {Array.from(favorites.values()).map((d) => {
+                        const price = d.salePrice ?? d.originalPrice
+                        const inCart = cart.has(d.id)
+                        return (
+                          <Box key={d.id} sx={{ mb: '12px' }}>
+                            <Flex alignItems="center" gap="10px" sx={{ mb: '8px' }}>
+                              <Box sx={{ flex: 1, minWidth: 0, fontFamily: CLARKSON, fontSize: '15px', fontWeight: 500, color: '#0e0e0e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {d.name}
+                              </Box>
+                              <Box sx={{ fontFamily: CLARKSON, fontSize: '14px', color: '#888', flexShrink: 0 }}>
+                                ${price}/yr
+                              </Box>
+                              <Box
+                                as="button"
+                                onClick={() => { if (!inCart) setCart((prev) => new Set([...prev, d.id])) }}
+                                sx={{
+                                  background: 'none', border: 'none', cursor: inCart ? 'default' : 'pointer',
+                                  p: '2px', display: 'flex', alignItems: 'center', flexShrink: 0,
+                                  color: inCart ? '#bbb' : '#0e0e0e',
+                                  transition: 'opacity 0.12s', '&:hover': { opacity: inCart ? 1 : 0.6 },
+                                }}
+                              >
+                                {inCart ? (
+                                  <svg width="16" height="16" viewBox="0 0 14 14" fill="none">
+                                    <path d="M2 7L5.5 10.5L12 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                  </svg>
+                                ) : (
+                                  <svg width="16" height="16" viewBox="0 0 14 14" fill="none">
+                                    <path d="M7 2V12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                                    <path d="M2 7H12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                                  </svg>
+                                )}
+                              </Box>
+                            </Flex>
+                            {/* Matching accordion */}
+                            <FavMatchingAccordion domain={d} allResults={results} cart={cart} setCart={setCart} />
+                          </Box>
+                        )
+                      })}
+                    </Box>
+                  )}
+                </Box>
+              )}
+            </Box>
           </Flex>
         </Flex>
       </Box>
 
       {/* ── Content + Cart ── */}
-      <Flex sx={{ maxWidth: 1280, mx: 'auto', px: '40px', alignItems: 'flex-start', gap: '32px', '@media (max-width: 600px)': { px: '16px' } }}>
-      <Box sx={{ flex: 1, minWidth: 0, pb: '120px' }}>
+      <Flex sx={{ justifyContent: 'center', alignItems: 'flex-start', gap: '56px', px: '40px', pr: '60px', '@media (max-width: 600px)': { px: '16px', pr: '16px' } }}>
+      <Box sx={{ flex: '0 1 810px', minWidth: 0, pb: '120px' }}>
 
         {/* Header, search, cards, filters — 16px inset to align with row content */}
         <Box sx={{ mx: '16px' }}>
@@ -953,14 +1399,8 @@ export default function DomainSearch() {
               position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 999,
               background: '#fff', borderRadius: '0 0 8px 8px',
               borderTop: '1px solid #e7e7e7',
-              overflow: 'hidden', pb: '8px',
+              overflow: 'hidden', py: '8px',
             }}>
-              {/* Personalized suggestions */}
-              <Box sx={{ px: '22px', pt: '16px', pb: '6px' }}>
-                <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '11px', fontWeight: 500, color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-                  Suggestions
-                </Box>
-              </Box>
               {PERSONALIZED_SUGGESTIONS.map((s) => (
                 <Box
                   key={s} as="button"
@@ -982,11 +1422,7 @@ export default function DomainSearch() {
               ))}
               {recentSearches.length > 0 && (
                 <>
-                  <Box sx={{ px: '22px', pt: '16px', pb: '6px' }}>
-                    <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '11px', fontWeight: 500, color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-                      Recent searches
-                    </Box>
-                  </Box>
+                  <Box sx={{ height: '1px', background: '#f0f0f0', mx: '22px', my: '8px' }} />
                   {recentSearches.slice(0, 3).map((s) => (
                     <Box
                       key={s} as="button"
@@ -1108,8 +1544,8 @@ export default function DomainSearch() {
         </Box>
 
         {/* Filter pills */}
-        <Flex alignItems="center" justifyContent="space-between" mb="32px">
-          <Flex alignItems="center" gap="8px" sx={{ flexWrap: 'nowrap', overflow: 'visible' }}>
+        <Flex alignItems="center" justifyContent="space-between" mb="32px" sx={{ flexWrap: 'wrap', gap: '8px' }}>
+          <Flex alignItems="center" gap="8px" sx={{ flexWrap: 'wrap' }}>
             {/* TLD type — multi-select with checkboxes */}
             <div ref={tldDropdownRef} style={{ position: 'relative', flexShrink: 0 }}>
               <FilterPill
@@ -1247,13 +1683,15 @@ export default function DomainSearch() {
                 cart={cart}
                 onToggle={toggleCart}
                 showSeeWhy
+                favorites={favorites}
+                onFavorite={toggleFavorite}
               />
             </Box>
 
             {/* More results with infinite scroll */}
             {more.length > 0 && (
               <>
-                <ResultsSection label="More results" domains={more.slice(0, visibleMoreCount)} cart={cart} onToggle={toggleCart} />
+                <ResultsSection label="More results" domains={more.slice(0, visibleMoreCount)} cart={cart} onToggle={toggleCart} favorites={favorites} onFavorite={toggleFavorite} />
                 {visibleMoreCount < more.length && (
                   <Box>
                     <div ref={sentinelRef} style={{ height: 1 }} />
@@ -1272,7 +1710,7 @@ export default function DomainSearch() {
         )}
       </Box>{/* end main content */}
       {/* Cart column */}
-      <Box sx={{ pt: '48px', pb: '120px', flexShrink: 0 }}>
+      <Box sx={{ pt: '24px', flexShrink: 0, pr: '20px', position: 'sticky', top: '88px', alignSelf: 'flex-start' }}>
         <MiniCart cartItems={cartItems} allResults={results} onRemove={removeFromCart} onAdd={addToCartDirect} />
       </Box>
       </Flex>{/* end content+cart row */}
