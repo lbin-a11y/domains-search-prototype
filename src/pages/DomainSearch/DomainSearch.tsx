@@ -153,7 +153,7 @@ function ConfettiBurst() {
     { cls: 'confetti-5', w: 4, h: 4, rx: 2 },
   ]
   return (
-    <Box sx={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', pointerEvents: 'none', zIndex: 10 }}>
+    <Box sx={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', pointerEvents: 'none', zIndex: 999, overflow: 'visible' }}>
       {shapes.map(({ cls, w, h, rx }, i) => (
         <Box key={i} className={cls} sx={{ position: 'absolute', top: 0, left: 0, width: w, height: h, borderRadius: rx, background: BLUE, opacity: 1 }} />
       ))}
@@ -165,13 +165,19 @@ function ConfettiBurst() {
 
 function AddBtn({ added, onClick }: { added: boolean; onClick: () => void }) {
   const [burst, setBurst] = useState(false)
-  function handleClick() {
-    if (!added) { setBurst(true); setTimeout(() => setBurst(false), 750) }
+  const burstKey = useRef(0)
+  function handleClick(e: React.MouseEvent) {
+    e.stopPropagation()
+    if (!added) {
+      burstKey.current += 1
+      setBurst(true)
+      setTimeout(() => setBurst(false), 800)
+    }
     onClick()
   }
   return (
-    <Box sx={{ position: 'relative', display: 'inline-flex' }}>
-      {burst && <ConfettiBurst />}
+    <Box sx={{ position: 'relative', display: 'inline-flex', overflow: 'visible' }}>
+      {burst && <ConfettiBurst key={burstKey.current} />}
       <Box
         as="button" onClick={handleClick}
         sx={{
@@ -247,9 +253,7 @@ function FeaturedCard({ domain, isExact, added, onToggle }: {
             {domain.premiumFee ? `per year + $${domain.premiumFee.toLocaleString()} one-time fee` : 'per year'}
           </Box>
         </Box>
-        <Box onClick={(e: React.MouseEvent) => e.stopPropagation()}>
-          <AddBtn added={added} onClick={onToggle} />
-        </Box>
+        <AddBtn added={added} onClick={onToggle} />
       </Flex>
     </Box>
   )
@@ -453,7 +457,6 @@ function MiniCart({ cartItems, allResults, onRemove, onAdd }: {
   const visible = cartItems.length > 0
   const total = cartItems.reduce((sum, d) => sum + (d.salePrice ?? d.originalPrice), 0)
 
-  // Suggest TLDs not already in cart, based on first cart item's stem
   const firstItem = cartItems[0]
   const stem = firstItem ? firstItem.name.replace(/\.[^.]+$/, '') : ''
   const cartTlds = new Set(cartItems.map(d => d.tld))
@@ -464,13 +467,25 @@ function MiniCart({ cartItems, allResults, onRemove, onAdd }: {
 
   return (
     <Box sx={{
-      position: 'fixed', top: 0, right: 0, bottom: 0, zIndex: 200,
-      width: 320, background: '#fff',
-      boxShadow: '-4px 0 24px rgba(0,0,0,0.10)',
+      width: visible ? 320 : 0,
+      flexShrink: 0,
+      overflow: 'hidden',
+      transition: 'width 0.32s cubic-bezier(0.4,0,0.2,1)',
+      position: 'relative',
+    }}>
+    <Box sx={{
+      width: 320,
+      position: 'sticky',
+      top: '24px',
+    }}>
+    <Box sx={{
+      border: '1px solid #e8e8e8',
+      borderRadius: 12,
+      background: '#fff',
+      boxShadow: '0px 4px 24px rgba(0,0,0,0.08)',
       display: 'flex', flexDirection: 'column',
-      transform: visible ? 'translateX(0)' : 'translateX(100%)',
-      transition: 'transform 0.32s cubic-bezier(0.4,0,0.2,1)',
-      pointerEvents: visible ? 'auto' : 'none',
+      opacity: visible ? 1 : 0,
+      transition: 'opacity 0.2s ease',
     }}>
       {/* Header */}
       <Box sx={{ px: '24px', pt: '32px', pb: '16px', borderBottom: '1px solid #f0f0f0' }}>
@@ -585,6 +600,8 @@ function MiniCart({ cartItems, allResults, onRemove, onAdd }: {
           Checkout
         </Box>
       </Box>
+    </Box>
+    </Box>
     </Box>
   )
 }
@@ -791,7 +808,6 @@ export default function DomainSearch() {
 
   return (
     <Box sx={{ minHeight: '100vh', background: '#fff' }}>
-      <MiniCart cartItems={cartItems} allResults={results} onRemove={removeFromCart} onAdd={addToCartDirect} />
       <style>{`
         @keyframes guideMeExpand {
           from { opacity: 0; transform: translateY(-6px); }
@@ -847,8 +863,9 @@ export default function DomainSearch() {
         </Flex>
       </Box>
 
-      {/* ── Content ── */}
-      <Box sx={{ maxWidth: 895, mx: 'auto', px: '40px', pb: '120px', '@media (max-width: 600px)': { px: '16px' } }}>
+      {/* ── Content + Cart ── */}
+      <Flex sx={{ maxWidth: 1280, mx: 'auto', px: '40px', alignItems: 'flex-start', gap: '32px', '@media (max-width: 600px)': { px: '16px' } }}>
+      <Box sx={{ flex: 1, minWidth: 0, pb: '120px' }}>
 
         {/* Header, search, cards, filters — 16px inset to align with row content */}
         <Box sx={{ mx: '16px' }}>
@@ -1253,7 +1270,12 @@ export default function DomainSearch() {
             )}
           </>
         )}
+      </Box>{/* end main content */}
+      {/* Cart column */}
+      <Box sx={{ pt: '48px', pb: '120px', flexShrink: 0 }}>
+        <MiniCart cartItems={cartItems} allResults={results} onRemove={removeFromCart} onAdd={addToCartDirect} />
       </Box>
+      </Flex>{/* end content+cart row */}
     </Box>
   )
 }
