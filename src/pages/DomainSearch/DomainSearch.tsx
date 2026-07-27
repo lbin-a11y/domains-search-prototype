@@ -48,9 +48,9 @@ const TLD_CATALOG: Array<{
   { tld: '.co', base: 36, sale: 26 },
   { tld: '.io', base: 60, sale: 48 },
   { tld: '.me', base: 26, sale: 18 },
-  { tld: '.live', base: 20, sale: 10, promoted: true, limitedTime: true },
-  { tld: '.store', base: 20, sale: 12, promoted: true },
-  { tld: '.studio', base: 28, sale: 10, promoted: true, limitedTime: true },
+  { tld: '.live', base: 160, sale: 120, promoted: true, limitedTime: true },
+  { tld: '.store', base: 140, sale: 110, promoted: true },
+  { tld: '.studio', base: 180, sale: 130, promoted: true, limitedTime: true },
   { tld: '.art', base: 24, sale: 18 },
   { tld: '.shop', base: 30, sale: 20 },
   { tld: '.online', base: 20, sale: 8 },
@@ -142,26 +142,53 @@ function Tooltip({ children, text }: { children: React.ReactNode; text: string }
   )
 }
 
+// ── Confetti burst ────────────────────────────────────────────────────────────
+
+function ConfettiBurst() {
+  const shapes = [
+    { cls: 'confetti-1', w: 6, h: 4, rx: 1 },
+    { cls: 'confetti-2', w: 4, h: 4, rx: 2 },
+    { cls: 'confetti-3', w: 5, h: 3, rx: 1 },
+    { cls: 'confetti-4', w: 3, h: 5, rx: 1 },
+    { cls: 'confetti-5', w: 4, h: 4, rx: 2 },
+  ]
+  return (
+    <Box sx={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', pointerEvents: 'none', zIndex: 10 }}>
+      {shapes.map(({ cls, w, h, rx }, i) => (
+        <Box key={i} className={cls} sx={{ position: 'absolute', top: 0, left: 0, width: w, height: h, borderRadius: rx, background: BLUE, opacity: 1 }} />
+      ))}
+    </Box>
+  )
+}
+
 // ── Add button (cards) ────────────────────────────────────────────────────────
 
 function AddBtn({ added, onClick }: { added: boolean; onClick: () => void }) {
+  const [burst, setBurst] = useState(false)
+  function handleClick() {
+    if (!added) { setBurst(true); setTimeout(() => setBurst(false), 750) }
+    onClick()
+  }
   return (
-    <Box
-      as="button" onClick={onClick}
-      sx={{
-        width: 46, height: 46, borderRadius: 8, border: 'none',
-        background: added ? '#444' : '#0e0e0e',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        cursor: 'pointer', flexShrink: 0, transition: 'background 0.15s',
-        '&:hover': { background: '#333' },
-      }}
-    >
-      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-        {added
-          ? <path d="M2 7H12" stroke="white" strokeWidth="1.6" strokeLinecap="round" />
-          : <><path d="M7 2V12" stroke="white" strokeWidth="1.6" strokeLinecap="round" /><path d="M2 7H12" stroke="white" strokeWidth="1.6" strokeLinecap="round" /></>
-        }
-      </svg>
+    <Box sx={{ position: 'relative', display: 'inline-flex' }}>
+      {burst && <ConfettiBurst />}
+      <Box
+        as="button" onClick={handleClick}
+        sx={{
+          width: 46, height: 46, borderRadius: 8, border: 'none',
+          background: added ? '#444' : '#0e0e0e',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          cursor: 'pointer', flexShrink: 0, transition: 'background 0.15s',
+          '&:hover': { background: '#333' },
+        }}
+      >
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          {added
+            ? <path d="M2 7H12" stroke="white" strokeWidth="1.6" strokeLinecap="round" />
+            : <><path d="M7 2V12" stroke="white" strokeWidth="1.6" strokeLinecap="round" /><path d="M2 7H12" stroke="white" strokeWidth="1.6" strokeLinecap="round" /></>
+          }
+        </svg>
+      </Box>
     </Box>
   )
 }
@@ -266,7 +293,7 @@ function ResultRow({ domain, added, onToggle, showLimitedTimeColumn, showRtb }: 
 
       {/* Popular badge — directly right of domain name, then flex spacer */}
       {isPromoted && (
-        <Tooltip text="Trending for this category">
+        <Tooltip text="These domains are short, memorable, and in high demand, making your business easier to find and remember.">
           <Flex alignItems="center" gap="5px" sx={{
             background: BLUE_BG, borderRadius: 20, px: '12px', py: '6px', flexShrink: 0,
           }}>
@@ -283,7 +310,7 @@ function ResultRow({ domain, added, onToggle, showLimitedTimeColumn, showRtb }: 
       {showLimitedTimeColumn && (
         <Box sx={{ width: 92, flexShrink: 0, display: 'flex', justifyContent: 'flex-end' }}>
           {domain.limitedTime && (
-            <Tooltip text="Discounted for a limited time">
+            <Tooltip text="Get this promotional rate for your first year when registered by Jun 20, 2026.">
               <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '13px', color: BLUE, whiteSpace: 'nowrap', cursor: 'default' }}>
                 Limited time
               </Box>
@@ -304,22 +331,17 @@ function ResultRow({ domain, added, onToggle, showLimitedTimeColumn, showRtb }: 
         </Box>
       </Flex>
 
-      {/* Plain + with sparkle */}
+      {/* Plain + with confetti */}
       <Box as="span" onClick={(e: React.MouseEvent) => { e.stopPropagation(); handleToggle() }}
         sx={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: 24, height: 24 }}
       >
+        {justAdded && <ConfettiBurst />}
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
           {added
             ? <path d="M3 8H13" stroke="#0e0e0e" strokeWidth="1.5" strokeLinecap="round" />
             : <><path d="M8 3V13" stroke="#0e0e0e" strokeWidth="1.5" strokeLinecap="round" /><path d="M3 8H13" stroke="#0e0e0e" strokeWidth="1.5" strokeLinecap="round" /></>
           }
         </svg>
-        {justAdded && (
-          <svg className="sparkle-anim" width="28" height="28" viewBox="0 0 28 28" fill="none"
-            style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }}>
-            <path d="M14 4L15.2 11L22 8.5L17 14L22 19.5L15.2 17L14 24L12.8 17L6 19.5L11 14L6 8.5L12.8 11Z" fill="#0072F0" fillOpacity="0.85"/>
-          </svg>
-        )}
       </Box>
     </Flex>
     {/* RTB panel */}
@@ -424,14 +446,14 @@ export default function DomainSearch() {
   const [searchQuery, setSearchQuery] = useState(rawQuery)
   const results = useMemo(() => generateResults(rawQuery), [rawQuery])
   const [cart, setCart] = useState<Set<string>>(new Set())
-  const [activeFilter, setActiveFilter] = useState<string | null>(null)
+  const [activeFilters, setActiveFilters] = useState<Set<string>>(new Set())
   const [searchFocused, setSearchFocused] = useState(false)
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [tldFilters, setTldFilters] = useState<Set<'trusted' | 'trending'>>(new Set())
   const [tldDropdownOpen, setTldDropdownOpen] = useState(false)
   const [sortBy, setSortBy] = useState<'recommended' | 'price'>('recommended')
   const [sortDropdownOpen, setSortDropdownOpen] = useState(false)
-  const [loading, setLoading] = useState(true)
+  const [loadingStage, setLoadingStage] = useState(0) // 0=all skeleton, 1=cards ready, 2=all ready
   const [recentSearches, setRecentSearches] = useState<string[]>(() => {
     try { return JSON.parse(localStorage.getItem('domainRecentSearches') || '[]') } catch { return [] }
   })
@@ -451,12 +473,18 @@ export default function DomainSearch() {
   // Sync input when URL query changes
   useEffect(() => { setSearchQuery(rawQuery) }, [rawQuery])
 
-  // Skeleton loading on new query
+  // Staggered skeleton loading: cards reveal first (~900ms), results after (~2-2.8s)
+  const stage1Timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
-    setLoading(true)
+    setLoadingStage(0)
     if (loadingTimer.current) clearTimeout(loadingTimer.current)
-    loadingTimer.current = setTimeout(() => setLoading(false), 2000 + Math.random() * 800)
-    return () => { if (loadingTimer.current) clearTimeout(loadingTimer.current) }
+    if (stage1Timer.current) clearTimeout(stage1Timer.current)
+    stage1Timer.current = setTimeout(() => setLoadingStage(1), 900)
+    loadingTimer.current = setTimeout(() => setLoadingStage(2), 2000 + Math.random() * 800)
+    return () => {
+      if (loadingTimer.current) clearTimeout(loadingTimer.current)
+      if (stage1Timer.current) clearTimeout(stage1Timer.current)
+    }
   }, [rawQuery])
 
   // Feed guide me fields directly into search bar, overwriting previous input
@@ -517,9 +545,9 @@ export default function DomainSearch() {
       if (tldFilters.has('trending')) TRENDING_TLDS.forEach((t) => allowed.add(t))
       if (!allowed.has(d.tld)) return false
     }
-    if (activeFilter === FILTERS[0] && !d.badges.includes('promoted')) return false
-    if (activeFilter === 'Short' && d.name.replace(/\.[^.]+$/, '').length > 8) return false
-    if (activeFilter === 'Bundle deals' && d.salePrice === null) return false
+    if (activeFilters.has(FILTERS[0]) && !d.badges.includes('promoted')) return false
+    if (activeFilters.has('Short') && d.name.replace(/\.[^.]+$/, '').length > 8) return false
+    if (activeFilters.has('Bundle deals') && d.salePrice === null) return false
     return true
   })
 
@@ -577,15 +605,16 @@ export default function DomainSearch() {
           animation: shimmer 1.4s ease-in-out infinite;
           border-radius: 8px;
         }
-        @keyframes sparkle-burst {
-          0%   { opacity: 1; transform: scale(0.4) rotate(0deg); }
-          60%  { opacity: 1; transform: scale(1.3) rotate(20deg); }
-          100% { opacity: 0; transform: scale(1.6) rotate(35deg); }
-        }
-        .sparkle-anim {
-          animation: sparkle-burst 0.55s ease-out forwards;
-          pointer-events: none;
-        }
+        @keyframes confetti-1 { 0% { opacity:1; transform: translate(0,0) rotate(0deg) scale(1); } 100% { opacity:0; transform: translate(-18px,-32px) rotate(-60deg) scale(0.5); } }
+        @keyframes confetti-2 { 0% { opacity:1; transform: translate(0,0) rotate(0deg) scale(1); } 100% { opacity:0; transform: translate(4px,-38px) rotate(40deg) scale(0.6); } }
+        @keyframes confetti-3 { 0% { opacity:1; transform: translate(0,0) rotate(0deg) scale(1); } 100% { opacity:0; transform: translate(20px,-30px) rotate(80deg) scale(0.4); } }
+        @keyframes confetti-4 { 0% { opacity:1; transform: translate(0,0) rotate(0deg) scale(1); } 100% { opacity:0; transform: translate(-10px,-42px) rotate(-30deg) scale(0.7); } }
+        @keyframes confetti-5 { 0% { opacity:1; transform: translate(0,0) rotate(0deg) scale(1); } 100% { opacity:0; transform: translate(14px,-44px) rotate(120deg) scale(0.5); } }
+        .confetti-1 { animation: confetti-1 0.6s ease-out forwards; }
+        .confetti-2 { animation: confetti-2 0.65s ease-out forwards 0.03s; }
+        .confetti-3 { animation: confetti-3 0.6s ease-out forwards 0.06s; }
+        .confetti-4 { animation: confetti-4 0.7s ease-out forwards 0.01s; }
+        .confetti-5 { animation: confetti-5 0.65s ease-out forwards 0.04s; }
       `}</style>
 
       {/* ── Nav ── */}
@@ -734,9 +763,7 @@ export default function DomainSearch() {
               ))}
               {recentSearches.length > 0 && (
                 <>
-                  {/* Divider */}
-                  <Box sx={{ height: '1px', background: '#e7e7e7', mx: '22px', my: '8px' }} />
-                  <Box sx={{ px: '22px', pb: '6px' }}>
+                  <Box sx={{ px: '22px', pt: '16px', pb: '6px' }}>
                     <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '11px', fontWeight: 500, color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
                       Recent searches
                     </Box>
@@ -753,7 +780,13 @@ export default function DomainSearch() {
                         '&:hover': { background: 'rgba(0,0,0,0.03)' },
                       }}
                     >
-                      <Search sx={{ width: 16, height: 16, color: '#aaa', flexShrink: 0 }} />
+                      {/* Clock with arrow icon */}
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
+                        <circle cx="8" cy="8" r="6.25" stroke="#aaa" strokeWidth="1.3"/>
+                        <path d="M8 5v3.5l2 1.5" stroke="#aaa" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M3.5 12.5l-2 1.5" stroke="#aaa" strokeWidth="1.3" strokeLinecap="round"/>
+                        <path d="M1.5 14l1.8-0.2-0.2-1.8" stroke="#aaa" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
                       {s}
                     </Box>
                   ))}
@@ -841,7 +874,7 @@ export default function DomainSearch() {
 
         {/* Featured cards */}
         <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px', mb: '64px', '@media (max-width: 600px)': { gridTemplateColumns: '1fr' } }}>
-          {loading ? (
+          {loadingStage < 1 ? (
             <>
               <Box className="skeleton" sx={{ height: 190 }} />
               <Box className="skeleton" sx={{ height: 190 }} />
@@ -910,7 +943,11 @@ export default function DomainSearch() {
               )}
             </div>
             {FILTERS.map((f) => (
-              <FilterPill key={f} label={f} active={activeFilter === f} onClick={() => setActiveFilter(activeFilter === f ? null : f)} />
+              <FilterPill key={f} label={f} active={activeFilters.has(f)} onClick={() => setActiveFilters((prev) => {
+                const next = new Set(prev)
+                if (next.has(f)) next.delete(f); else next.add(f)
+                return next
+              })} />
             ))}
           </Flex>
 
@@ -969,7 +1006,7 @@ export default function DomainSearch() {
 
         </Box>{/* end 16px inset */}
 
-        {loading ? (
+        {loadingStage < 2 ? (
           /* Skeleton results */
           <Box>
             <Flex alignItems="center" justifyContent="space-between" sx={{ height: 62, px: '16px' }}>
@@ -978,7 +1015,7 @@ export default function DomainSearch() {
             </Flex>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
               {[0,1,2].map((i) => (
-                <Box key={i} className="skeleton" sx={{ height: 62, animationDelay: `${i * 0.08}s` }} />
+                <Box key={i} className="skeleton" sx={{ height: 62, animationDelay: `${i * 0.1}s` }} />
               ))}
             </Box>
           </Box>
