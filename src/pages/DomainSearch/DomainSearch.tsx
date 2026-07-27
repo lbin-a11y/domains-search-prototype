@@ -465,13 +465,28 @@ export default function DomainSearch() {
 
   const guideMeSummary = [businessName, industry, selectedVibes.join(', ')].filter(Boolean).join(' · ')
 
+  const [visibleMoreCount, setVisibleMoreCount] = useState(8)
   const tldDropdownRef = useRef<HTMLDivElement>(null)
   const sortDropdownRef = useRef<HTMLDivElement>(null)
   const suggestionsBlurTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const loadingTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const sentinelRef = useRef<HTMLDivElement>(null)
 
   // Sync input when URL query changes
-  useEffect(() => { setSearchQuery(rawQuery) }, [rawQuery])
+  useEffect(() => {
+    setSearchQuery(rawQuery)
+    setVisibleMoreCount(8)
+  }, [rawQuery])
+
+  // Infinite scroll sentinel
+  useEffect(() => {
+    if (loadingStage < 2 || !sentinelRef.current) return
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) setVisibleMoreCount((n) => n + 8)
+    }, { threshold: 0.1 })
+    observer.observe(sentinelRef.current)
+    return () => observer.disconnect()
+  }, [loadingStage])
 
   // Staggered skeleton loading: cards reveal first (~900ms), results after (~2-2.8s)
   const stage1Timer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -551,9 +566,24 @@ export default function DomainSearch() {
     return true
   })
 
+  function spreadSpecial(arr: DomainResult[]): DomainResult[] {
+    if (sortBy === 'price') return arr
+    const special = arr.filter(d => d.badges.includes('promoted') || d.limitedTime)
+    const regular = arr.filter(d => !d.badges.includes('promoted') && !d.limitedTime)
+    const out: DomainResult[] = []
+    let si = 0, ri = 0
+    while (ri < regular.length || si < special.length) {
+      const chunk = regular.slice(ri, ri + 3)
+      out.push(...chunk)
+      ri += chunk.length
+      if (si < special.length) out.push(special[si++])
+    }
+    return out
+  }
+
   const sortedAvailable = sortBy === 'price'
     ? [...filteredAvailable].sort((a, b) => (a.salePrice ?? a.originalPrice) - (b.salePrice ?? b.originalPrice))
-    : filteredAvailable
+    : spreadSpecial(filteredAvailable)
   const recommended = sortedAvailable.slice(0, 3)
   const more = sortedAvailable.slice(3)
 
@@ -605,16 +635,16 @@ export default function DomainSearch() {
           animation: shimmer 1.4s ease-in-out infinite;
           border-radius: 8px;
         }
-        @keyframes confetti-1 { 0% { opacity:1; transform: translate(0,0) rotate(0deg) scale(1); } 100% { opacity:0; transform: translate(-18px,-32px) rotate(-60deg) scale(0.5); } }
-        @keyframes confetti-2 { 0% { opacity:1; transform: translate(0,0) rotate(0deg) scale(1); } 100% { opacity:0; transform: translate(4px,-38px) rotate(40deg) scale(0.6); } }
-        @keyframes confetti-3 { 0% { opacity:1; transform: translate(0,0) rotate(0deg) scale(1); } 100% { opacity:0; transform: translate(20px,-30px) rotate(80deg) scale(0.4); } }
-        @keyframes confetti-4 { 0% { opacity:1; transform: translate(0,0) rotate(0deg) scale(1); } 100% { opacity:0; transform: translate(-10px,-42px) rotate(-30deg) scale(0.7); } }
-        @keyframes confetti-5 { 0% { opacity:1; transform: translate(0,0) rotate(0deg) scale(1); } 100% { opacity:0; transform: translate(14px,-44px) rotate(120deg) scale(0.5); } }
-        .confetti-1 { animation: confetti-1 0.6s ease-out forwards; }
-        .confetti-2 { animation: confetti-2 0.65s ease-out forwards 0.03s; }
-        .confetti-3 { animation: confetti-3 0.6s ease-out forwards 0.06s; }
-        .confetti-4 { animation: confetti-4 0.7s ease-out forwards 0.01s; }
-        .confetti-5 { animation: confetti-5 0.65s ease-out forwards 0.04s; }
+        @keyframes confetti-1 { 0% { opacity:1; transform: translate(0,0) rotate(0deg) scale(1); } 40% { opacity:1; transform: translate(-14px,-26px) rotate(-40deg) scale(1); } 100% { opacity:0; transform: translate(-10px,14px) rotate(-90deg) scale(0.4); } }
+        @keyframes confetti-2 { 0% { opacity:1; transform: translate(0,0) rotate(0deg) scale(1); } 40% { opacity:1; transform: translate(2px,-32px) rotate(30deg) scale(1); } 100% { opacity:0; transform: translate(6px,12px) rotate(70deg) scale(0.5); } }
+        @keyframes confetti-3 { 0% { opacity:1; transform: translate(0,0) rotate(0deg) scale(1); } 40% { opacity:1; transform: translate(16px,-24px) rotate(60deg) scale(1); } 100% { opacity:0; transform: translate(14px,16px) rotate(110deg) scale(0.4); } }
+        @keyframes confetti-4 { 0% { opacity:1; transform: translate(0,0) rotate(0deg) scale(1); } 40% { opacity:1; transform: translate(-8px,-34px) rotate(-20deg) scale(1); } 100% { opacity:0; transform: translate(-4px,10px) rotate(-50deg) scale(0.6); } }
+        @keyframes confetti-5 { 0% { opacity:1; transform: translate(0,0) rotate(0deg) scale(1); } 40% { opacity:1; transform: translate(10px,-36px) rotate(90deg) scale(1); } 100% { opacity:0; transform: translate(12px,14px) rotate(140deg) scale(0.4); } }
+        .confetti-1 { animation: confetti-1 0.7s cubic-bezier(0.25,0.46,0.45,0.94) forwards; }
+        .confetti-2 { animation: confetti-2 0.75s cubic-bezier(0.25,0.46,0.45,0.94) forwards 0.03s; }
+        .confetti-3 { animation: confetti-3 0.7s cubic-bezier(0.25,0.46,0.45,0.94) forwards 0.06s; }
+        .confetti-4 { animation: confetti-4 0.8s cubic-bezier(0.25,0.46,0.45,0.94) forwards 0.01s; }
+        .confetti-5 { animation: confetti-5 0.75s cubic-bezier(0.25,0.46,0.45,0.94) forwards 0.04s; }
       `}</style>
 
       {/* ── Nav ── */}
@@ -780,12 +810,11 @@ export default function DomainSearch() {
                         '&:hover': { background: 'rgba(0,0,0,0.03)' },
                       }}
                     >
-                      {/* Clock with arrow icon */}
+                      {/* History icon */}
                       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
-                        <circle cx="8" cy="8" r="6.25" stroke="#aaa" strokeWidth="1.3"/>
-                        <path d="M8 5v3.5l2 1.5" stroke="#aaa" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
-                        <path d="M3.5 12.5l-2 1.5" stroke="#aaa" strokeWidth="1.3" strokeLinecap="round"/>
-                        <path d="M1.5 14l1.8-0.2-0.2-1.8" stroke="#aaa" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M2.5 8A5.5 5.5 0 1 0 8 2.5" stroke="#aaa" strokeWidth="1.3" strokeLinecap="round"/>
+                        <path d="M2.5 4.5V8H6" stroke="#aaa" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M8 5.5V8.5l2 1.2" stroke="#aaa" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
                       </svg>
                       {s}
                     </Box>
@@ -1032,9 +1061,23 @@ export default function DomainSearch() {
               />
             </Box>
 
-            {/* More results */}
+            {/* More results with infinite scroll */}
             {more.length > 0 && (
-              <ResultsSection label="More results" domains={more} cart={cart} onToggle={toggleCart} />
+              <>
+                <ResultsSection label="More results" domains={more.slice(0, visibleMoreCount)} cart={cart} onToggle={toggleCart} />
+                {visibleMoreCount < more.length && (
+                  <Box>
+                    <div ref={sentinelRef} style={{ height: 1 }} />
+                    <Flex justifyContent="center" sx={{ py: '32px' }}>
+                      <Box sx={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                        {[0,1,2].map(i => (
+                          <Box key={i} className="skeleton" sx={{ width: 6, height: 6, borderRadius: '50%', animationDelay: `${i * 0.15}s` }} />
+                        ))}
+                      </Box>
+                    </Flex>
+                  </Box>
+                )}
+              </>
             )}
           </>
         )}
