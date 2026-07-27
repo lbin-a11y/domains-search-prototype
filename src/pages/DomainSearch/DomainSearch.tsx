@@ -412,8 +412,11 @@ export default function DomainSearch() {
   const [activeFilter, setActiveFilter] = useState<string | null>(null)
   const [searchFocused, setSearchFocused] = useState(false)
   const [showSuggestions, setShowSuggestions] = useState(false)
-  const [tldFilter, setTldFilter] = useState<null | 'trusted' | 'trending'>(null)
+  const [tldFilters, setTldFilters] = useState<Set<'trusted' | 'trending'>>(new Set())
   const [tldDropdownOpen, setTldDropdownOpen] = useState(false)
+  const [sortBy, setSortBy] = useState<'recommended' | 'price'>('recommended')
+  const [sortDropdownOpen, setSortDropdownOpen] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [recentSearches, setRecentSearches] = useState<string[]>(() => {
     try { return JSON.parse(localStorage.getItem('domainRecentSearches') || '[]') } catch { return [] }
   })
@@ -426,10 +429,20 @@ export default function DomainSearch() {
   const guideMeSummary = [businessName, industry, selectedVibes.join(', ')].filter(Boolean).join(' · ')
 
   const tldDropdownRef = useRef<HTMLDivElement>(null)
+  const sortDropdownRef = useRef<HTMLDivElement>(null)
   const suggestionsBlurTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const loadingTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Sync input when URL query changes
   useEffect(() => { setSearchQuery(rawQuery) }, [rawQuery])
+
+  // Skeleton loading on new query
+  useEffect(() => {
+    setLoading(true)
+    if (loadingTimer.current) clearTimeout(loadingTimer.current)
+    loadingTimer.current = setTimeout(() => setLoading(false), 2000 + Math.random() * 800)
+    return () => { if (loadingTimer.current) clearTimeout(loadingTimer.current) }
+  }, [rawQuery])
 
   // Feed guide me fields directly into search bar, overwriting previous input
   const prevGuideMeSummary = useRef('')
@@ -440,20 +453,40 @@ export default function DomainSearch() {
     prevGuideMeSummary.current = guideMeSummary
   }, [guideMeSummary])
 
-  // Close TLD dropdown on outside click
+  // Close dropdowns on outside click
   useEffect(() => {
-    if (!tldDropdownOpen) return
     function handleOutside(e: MouseEvent) {
-      if (tldDropdownRef.current && !tldDropdownRef.current.contains(e.target as Node)) {
+      if (tldDropdownOpen && tldDropdownRef.current && !tldDropdownRef.current.contains(e.target as Node)) {
         setTldDropdownOpen(false)
+      }
+      if (sortDropdownOpen && sortDropdownRef.current && !sortDropdownRef.current.contains(e.target as Node)) {
+        setSortDropdownOpen(false)
       }
     }
     document.addEventListener('mousedown', handleOutside)
     return () => document.removeEventListener('mousedown', handleOutside)
-  }, [tldDropdownOpen])
+  }, [tldDropdownOpen, sortDropdownOpen])
 
   function toggleVibe(v: string) {
     setSelectedVibes((prev) => prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v])
+  }
+
+  function toggleTldFilter(id: 'trusted' | 'trending') {
+    setTldFilters((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) { next.delete(id) } else { next.add(id) }
+      return next
+    })
+  }
+
+  function searchSuggestion(s: string) {
+    const trimmed = s.trim()
+    setSearchQuery(trimmed)
+    setShowSuggestions(false)
+    const updated = [trimmed, ...recentSearches.filter((r) => r !== trimmed)].slice(0, 5)
+    setRecentSearches(updated)
+    localStorage.setItem('domainRecentSearches', JSON.stringify(updated))
+    navigate(`/domain-search?q=${encodeURIComponent(trimmed)}`)
   }
 
   const exact = results.find((r) => r.badges.includes('exact'))!
@@ -463,15 +496,23 @@ export default function DomainSearch() {
   const FILTERS = [`Popular for ${industry || 'your industry'}`, 'Short', 'Bundle deals']
 
   const filteredAvailable = available.filter((d) => {
-    if (tldFilter === 'trusted' && !TRUSTED_TLDS.has(d.tld)) return false
-    if (tldFilter === 'trending' && !TRENDING_TLDS.has(d.tld)) return false
+    if (tldFilters.size > 0) {
+      const allowed = new Set<string>()
+      if (tldFilters.has('trusted')) TRUSTED_TLDS.forEach((t) => allowed.add(t))
+      if (tldFilters.has('trending')) TRENDING_TLDS.forEach((t) => allowed.add(t))
+      if (!allowed.has(d.tld)) return false
+    }
     if (activeFilter === FILTERS[0] && !d.badges.includes('promoted')) return false
     if (activeFilter === 'Short' && d.name.replace(/\.[^.]+$/, '').length > 8) return false
     if (activeFilter === 'Bundle deals' && d.salePrice === null) return false
     return true
   })
-  const recommended = filteredAvailable.slice(0, 3)
-  const more = filteredAvailable.slice(3)
+
+  const sortedAvailable = sortBy === 'price'
+    ? [...filteredAvailable].sort((a, b) => (a.salePrice ?? a.originalPrice) - (b.salePrice ?? b.originalPrice))
+    : filteredAvailable
+  const recommended = sortedAvailable.slice(0, 3)
+  const more = sortedAvailable.slice(3)
 
   function toggleCart(id: string) {
     setCart((prev) => {
@@ -509,6 +550,16 @@ export default function DomainSearch() {
         @keyframes guideMeExpand {
           from { opacity: 0; transform: translateY(-6px); }
           to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes shimmer {
+          0% { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
+        }
+        .skeleton {
+          background: linear-gradient(90deg, #f0f0f0 25%, #e6e6e6 50%, #f0f0f0 75%);
+          background-size: 200% 100%;
+          animation: shimmer 1.4s ease-in-out infinite;
+          border-radius: 8px;
         }
       `}</style>
 
@@ -569,7 +620,7 @@ export default function DomainSearch() {
         {/* Search bar — filter: drop-shadow when active, border when idle */}
         <Box sx={{
           position: 'relative', zIndex: 50, mb: '32px',
-          filter: (searchFocused || guideMe)
+          filter: (searchFocused || guideMe || showSuggestions)
             ? 'drop-shadow(0px 2px 8px rgba(0,0,0,0.10)) drop-shadow(0px 0px 1px rgba(0,0,0,0.04))'
             : 'none',
           transition: 'filter 0.2s ease',
@@ -578,8 +629,8 @@ export default function DomainSearch() {
           <Box
             sx={{
               background: '#fff',
-              borderRadius: guideMe ? '8px 8px 0 0' : 8,
-              border: (searchFocused || guideMe) ? '1px solid transparent' : '1px solid #e2e2e2',
+              borderRadius: (guideMe || showSuggestions) ? '8px 8px 0 0' : 8,
+              border: (searchFocused || guideMe || showSuggestions) ? '1px solid transparent' : '1px solid #e2e2e2',
               transition: 'border-color 0.2s ease',
             }}
           >
@@ -623,15 +674,16 @@ export default function DomainSearch() {
             </Flex>
           </Box>
 
-          {/* Suggestions dropdown */}
+          {/* Suggestions dropdown — connected to search bar, matching guide me style */}
           {showSuggestions && !guideMe && (
             <Box sx={{
-              position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 999,
-              background: '#fff', borderRadius: 8,
-              boxShadow: '0px 4px 20px rgba(0,0,0,0.12)',
-              overflow: 'hidden', pb: '6px',
+              position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 999,
+              background: '#fff', borderRadius: '0 0 8px 8px',
+              borderTop: '1px solid #e7e7e7',
+              overflow: 'hidden', pb: '8px',
             }}>
-              <Box sx={{ px: '16px', pt: '14px', pb: '4px' }}>
+              {/* Personalized suggestions */}
+              <Box sx={{ px: '22px', pt: '16px', pb: '6px' }}>
                 <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '11px', fontWeight: 500, color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
                   Suggestions
                 </Box>
@@ -639,21 +691,24 @@ export default function DomainSearch() {
               {PERSONALIZED_SUGGESTIONS.map((s) => (
                 <Box
                   key={s} as="button"
-                  onMouseDown={() => { setSearchQuery(s); setShowSuggestions(false) }}
+                  onMouseDown={() => searchSuggestion(s)}
                   sx={{
-                    width: '100%', px: '16px', py: '10px', border: 'none', background: 'none',
-                    textAlign: 'left', cursor: 'pointer', fontFamily: CLARKSON, fontSize: '14px',
-                    color: '#0e0e0e', display: 'flex', alignItems: 'center', gap: '10px',
-                    '&:hover': { background: '#f5f5f5' },
+                    width: '100%', px: '22px', py: '10px', border: 'none', background: 'none',
+                    textAlign: 'left', cursor: 'pointer', fontFamily: CLARKSON, fontSize: '15px',
+                    color: '#0e0e0e', display: 'flex', alignItems: 'center', gap: '12px',
+                    letterSpacing: '-0.015px', lineHeight: 1.4, boxSizing: 'border-box',
+                    '&:hover': { background: 'rgba(0,0,0,0.03)' },
                   }}
                 >
-                  <Search sx={{ width: 14, height: 14, color: '#aaa', flexShrink: 0 }} />
+                  <Search sx={{ width: 16, height: 16, color: '#aaa', flexShrink: 0 }} />
                   {s}
                 </Box>
               ))}
               {recentSearches.length > 0 && (
                 <>
-                  <Box sx={{ px: '16px', pt: '12px', pb: '4px' }}>
+                  {/* Divider */}
+                  <Box sx={{ height: '1px', background: '#e7e7e7', mx: '22px', my: '8px' }} />
+                  <Box sx={{ px: '22px', pb: '6px' }}>
                     <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '11px', fontWeight: 500, color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
                       Recent searches
                     </Box>
@@ -661,15 +716,16 @@ export default function DomainSearch() {
                   {recentSearches.slice(0, 3).map((s) => (
                     <Box
                       key={s} as="button"
-                      onMouseDown={() => { setSearchQuery(s); setShowSuggestions(false); navigate(`/domain-search?q=${encodeURIComponent(s)}`) }}
+                      onMouseDown={() => searchSuggestion(s)}
                       sx={{
-                        width: '100%', px: '16px', py: '10px', border: 'none', background: 'none',
-                        textAlign: 'left', cursor: 'pointer', fontFamily: CLARKSON, fontSize: '14px',
-                        color: '#0e0e0e', display: 'flex', alignItems: 'center', gap: '10px',
-                        '&:hover': { background: '#f5f5f5' },
+                        width: '100%', px: '22px', py: '10px', border: 'none', background: 'none',
+                        textAlign: 'left', cursor: 'pointer', fontFamily: CLARKSON, fontSize: '15px',
+                        color: '#0e0e0e', display: 'flex', alignItems: 'center', gap: '12px',
+                        letterSpacing: '-0.015px', lineHeight: 1.4, boxSizing: 'border-box',
+                        '&:hover': { background: 'rgba(0,0,0,0.03)' },
                       }}
                     >
-                      <Search sx={{ width: 14, height: 14, color: '#aaa', flexShrink: 0 }} />
+                      <Search sx={{ width: 16, height: 16, color: '#aaa', flexShrink: 0 }} />
                       {s}
                     </Box>
                   ))}
@@ -757,21 +813,30 @@ export default function DomainSearch() {
 
         {/* Featured cards */}
         <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px', mb: '64px', '@media (max-width: 600px)': { gridTemplateColumns: '1fr' } }}>
-          <FeaturedCard domain={exact} isExact added={cart.has(exact.id)} onToggle={() => toggleCart(exact.id)} />
-          {closeMatch && (
-            <FeaturedCard domain={closeMatch} isExact={false} added={cart.has(closeMatch.id)} onToggle={() => toggleCart(closeMatch.id)} />
+          {loading ? (
+            <>
+              <Box className="skeleton" sx={{ height: 190 }} />
+              <Box className="skeleton" sx={{ height: 190 }} />
+            </>
+          ) : (
+            <>
+              <FeaturedCard domain={exact} isExact added={cart.has(exact.id)} onToggle={() => toggleCart(exact.id)} />
+              {closeMatch && (
+                <FeaturedCard domain={closeMatch} isExact={false} added={cart.has(closeMatch.id)} onToggle={() => toggleCart(closeMatch.id)} />
+              )}
+            </>
           )}
         </Box>
 
-        {/* Filter pills — no border */}
+        {/* Filter pills */}
         <Flex alignItems="center" justifyContent="space-between" mb="32px">
           <Flex alignItems="center" gap="8px" sx={{ flexWrap: 'nowrap', overflow: 'visible' }}>
-            {/* TLD type pill with dropdown */}
+            {/* TLD type — multi-select with checkboxes */}
             <div ref={tldDropdownRef} style={{ position: 'relative', flexShrink: 0 }}>
               <FilterPill
                 label="TLD type"
                 chevron
-                active={tldFilter !== null}
+                active={tldFilters.size > 0}
                 onClick={() => setTldDropdownOpen((o) => !o)}
               />
               {tldDropdownOpen && (
@@ -779,24 +844,39 @@ export default function DomainSearch() {
                   position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 300,
                   background: '#fff', borderRadius: 8,
                   boxShadow: '0px 4px 20px rgba(0,0,0,0.12)',
-                  minWidth: 160, overflow: 'hidden', py: '6px',
+                  minWidth: 180, overflow: 'hidden', py: '6px',
                 }}>
                   {([
                     { id: 'trusted' as const, label: 'Trusted', desc: '.com, .net, .org' },
                     { id: 'trending' as const, label: 'Trending', desc: '.studio, .io, .art' },
                   ]).map(({ id, label, desc }) => (
-                    <Box
-                      key={id} as="button"
-                      onClick={() => { setTldFilter(tldFilter === id ? null : id); setTldDropdownOpen(false) }}
+                    <Flex
+                      key={id} as="button" alignItems="center" gap="12px"
+                      onClick={() => toggleTldFilter(id)}
                       sx={{
-                        width: '100%', px: '16px', py: '10px', border: 'none', textAlign: 'left',
-                        cursor: 'pointer', fontFamily: CLARKSON, background: tldFilter === id ? '#f0f0f0' : 'transparent',
+                        width: '100%', px: '14px', py: '10px', border: 'none', textAlign: 'left',
+                        cursor: 'pointer', background: 'transparent',
                         '&:hover': { background: '#f5f5f5' },
                       }}
                     >
-                      <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '14px', color: '#0e0e0e', display: 'block' }}>{label}</Box>
-                      <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '12px', color: '#888', display: 'block' }}>{desc}</Box>
-                    </Box>
+                      {/* Checkbox */}
+                      <Box sx={{
+                        width: 16, height: 16, borderRadius: '3px', flexShrink: 0,
+                        border: tldFilters.has(id) ? 'none' : '1.5px solid #ccc',
+                        background: tldFilters.has(id) ? BLUE : '#fff',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}>
+                        {tldFilters.has(id) && (
+                          <svg width="9" height="7" viewBox="0 0 9 7" fill="none">
+                            <path d="M1 3.5L3.5 6L8 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        )}
+                      </Box>
+                      <Box>
+                        <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '14px', color: '#0e0e0e', display: 'block' }}>{label}</Box>
+                        <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '12px', color: '#888', display: 'block' }}>{desc}</Box>
+                      </Box>
+                    </Flex>
                   ))}
                 </Box>
               )}
@@ -805,25 +885,94 @@ export default function DomainSearch() {
               <FilterPill key={f} label={f} active={activeFilter === f} onClick={() => setActiveFilter(activeFilter === f ? null : f)} />
             ))}
           </Flex>
-          <FilterPill label="Sort by: Recommended" chevron muted />
+
+          {/* Sort by — custom pill with black value text */}
+          <div ref={sortDropdownRef} style={{ position: 'relative', flexShrink: 0 }}>
+            <Flex
+              as="button" alignItems="center" gap="3px"
+              onClick={() => setSortDropdownOpen((o) => !o)}
+              sx={{
+                height: 40, px: '16px', py: '10px',
+                backdropFilter: 'blur(25px)',
+                background: sortBy !== 'recommended' ? '#0e0e0e' : 'rgba(183,183,183,0.2)',
+                border: 'none', borderRadius: 30,
+                cursor: 'pointer', fontFamily: CLARKSON, fontSize: '14px',
+                letterSpacing: '-0.01px', whiteSpace: 'nowrap', flexShrink: 0,
+                transition: 'background 0.15s',
+              }}
+            >
+              <Box as="span" sx={{ color: sortBy !== 'recommended' ? '#fff' : '#666' }}>Sort by: </Box>
+              <Box as="span" sx={{ color: sortBy !== 'recommended' ? '#fff' : '#0e0e0e', fontWeight: 400 }}>
+                {sortBy === 'price' ? 'Price' : 'Recommended'}
+              </Box>
+              <ChevronSmallDown sx={{ width: 12, height: 12, color: sortBy !== 'recommended' ? '#fff' : '#0e0e0e', ml: '2px' }} />
+            </Flex>
+            {sortDropdownOpen && (
+              <Box sx={{
+                position: 'absolute', top: 'calc(100% + 4px)', right: 0, zIndex: 300,
+                background: '#fff', borderRadius: 8,
+                boxShadow: '0px 4px 20px rgba(0,0,0,0.12)',
+                minWidth: 160, overflow: 'hidden', py: '6px',
+              }}>
+                {([
+                  { id: 'recommended' as const, label: 'Recommended', icon: null },
+                  { id: 'price' as const, label: 'Price', icon: (
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ marginLeft: 4 }}>
+                      <path d="M6 2V10M6 2L3 5M6 2L9 5" stroke="#0e0e0e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  )},
+                ]).map(({ id, label, icon }) => (
+                  <Flex
+                    key={id} as="button" alignItems="center"
+                    onClick={() => { setSortBy(id); setSortDropdownOpen(false) }}
+                    sx={{
+                      width: '100%', px: '16px', py: '10px', border: 'none', textAlign: 'left',
+                      cursor: 'pointer', fontFamily: CLARKSON, fontSize: '14px', color: '#0e0e0e',
+                      background: sortBy === id ? '#f0f0f0' : 'transparent',
+                      '&:hover': { background: '#f5f5f5' },
+                    }}
+                  >
+                    {label}{icon}
+                  </Flex>
+                ))}
+              </Box>
+            )}
+          </div>
         </Flex>
 
         </Box>{/* end 16px inset */}
 
-        {/* Recommended */}
-        <Box mb="64px">
-          <ResultsSection
-            label="Recommended"
-            domains={recommended}
-            cart={cart}
-            onToggle={toggleCart}
-            showSeeWhy
-          />
-        </Box>
+        {loading ? (
+          /* Skeleton results */
+          <Box>
+            <Flex alignItems="center" justifyContent="space-between" sx={{ height: 62, px: '16px' }}>
+              <Box className="skeleton" sx={{ width: 140, height: 18 }} />
+              <Box className="skeleton" sx={{ width: 80, height: 18 }} />
+            </Flex>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              {[0,1,2].map((i) => (
+                <Box key={i} className="skeleton" sx={{ height: 62, animationDelay: `${i * 0.08}s` }} />
+              ))}
+            </Box>
+          </Box>
+        ) : (
+          <>
+            {/* Recommended */}
+            <Box mb="64px">
+              <ResultsSection
+                label="Recommended"
+                domains={recommended}
+                cart={cart}
+                onToggle={toggleCart}
+                showSeeWhy
+              />
+            </Box>
 
-        {/* More results */}
-        {more.length > 0 && (
-          <ResultsSection label="More results" domains={more} cart={cart} onToggle={toggleCart} />
+            {/* More results */}
+            {more.length > 0 && (
+              <ResultsSection label="More results" domains={more} cart={cart} onToggle={toggleCart} />
+            )}
+          </>
         )}
       </Box>
     </Box>
