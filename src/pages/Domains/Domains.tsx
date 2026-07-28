@@ -297,12 +297,12 @@ export default function Domains() {
           <Box
             sx={{
               width: '100%',
-              borderRadius: 8,
+              borderRadius: (showSuggestions && !guideMe) ? '8px 8px 0 0' : 8,
               background: '#fff',
               boxShadow: searchFocused
                 ? '0px 0px 2px 0px rgba(0,0,0,0.14), 0px 12px 40px 0px rgba(0,0,0,0.18)'
                 : '0px 0px 1px 0px rgba(0,0,0,0.04), 0px 2px 8px 0px rgba(0,0,0,0.06)',
-              transition: 'box-shadow 0.2s ease',
+              transition: 'box-shadow 0.2s ease, border-radius 0.1s ease',
               overflow: 'hidden',
               flexShrink: 0,
             }}
@@ -483,28 +483,27 @@ export default function Domains() {
           {/* Suggestions dropdown */}
           {showSuggestions && !guideMe && (
             <Box sx={{
-              position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 999,
-              background: '#fff', borderRadius: 8,
-              boxShadow: '0px 4px 20px rgba(0,0,0,0.12)',
-              overflow: 'hidden', pb: '6px',
+              position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 999,
+              background: '#fff', borderRadius: '0 0 8px 8px',
+              borderTop: '1px solid #e7e7e7',
+              overflow: 'hidden', py: '8px',
             }}>
-              <Box sx={{ px: '16px', pt: '14px', pb: '4px' }}>
-                <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '11px', fontWeight: 500, color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-                  Suggestions
-                </Box>
-              </Box>
               {(['Fun domains for a pottery studio', 'Short, catchy names for a boutique brand'] as const).map((s) => (
                 <Box
                   key={s} as="button"
                   onMouseDown={() => { setQuery(s); setShowSuggestions(false) }}
                   sx={{
-                    width: '100%', px: '16px', py: '10px', border: 'none', background: 'none',
-                    textAlign: 'left', cursor: 'pointer', fontFamily: CLARKSON, fontSize: '14px',
-                    color: '#0e0e0e', display: 'flex', alignItems: 'center', gap: '10px',
-                    '&:hover': { background: '#f5f5f5' },
+                    width: '100%', px: '22px', py: '10px', border: 'none', background: 'none',
+                    textAlign: 'left', cursor: 'pointer', fontFamily: CLARKSON, fontSize: '15px',
+                    color: '#0e0e0e', display: 'flex', alignItems: 'center', gap: '12px',
+                    letterSpacing: '-0.015px', lineHeight: 1.4, boxSizing: 'border-box',
+                    '&:hover': { background: 'rgba(0,0,0,0.03)' },
                   }}
                 >
-                  <Search sx={{ width: 14, height: 14, color: '#aaa', flexShrink: 0 }} />
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
+                    <path d="M8 1.5C5.515 1.5 3.5 3.515 3.5 6c0 1.657.898 3.105 2.23 3.88V11.5h4.54V9.88C11.602 9.105 12.5 7.657 12.5 6c0-2.485-2.015-4.5-4.5-4.5Z" stroke="#aaa" strokeWidth="1.3" strokeLinejoin="round"/>
+                    <path d="M5.75 13h4.5M6.5 14.5h3" stroke="#aaa" strokeWidth="1.3" strokeLinecap="round"/>
+                  </svg>
                   {s}
                 </Box>
               ))}
@@ -512,23 +511,24 @@ export default function Domains() {
                 const recents: string[] = (() => { try { return JSON.parse(localStorage.getItem('domainRecentSearches') || '[]') } catch { return [] } })()
                 return recents.length > 0 ? (
                   <>
-                    <Box sx={{ px: '16px', pt: '12px', pb: '4px' }}>
-                      <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '11px', fontWeight: 500, color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-                        Recent searches
-                      </Box>
-                    </Box>
+                    <Box sx={{ height: '1px', background: '#f0f0f0', mx: '22px', my: '8px' }} />
                     {recents.slice(0, 3).map((s: string) => (
                       <Box
                         key={s} as="button"
                         onMouseDown={() => { setQuery(s); setShowSuggestions(false); navigate(`/domain-search?q=${encodeURIComponent(s)}`) }}
                         sx={{
-                          width: '100%', px: '16px', py: '10px', border: 'none', background: 'none',
-                          textAlign: 'left', cursor: 'pointer', fontFamily: CLARKSON, fontSize: '14px',
-                          color: '#0e0e0e', display: 'flex', alignItems: 'center', gap: '10px',
-                          '&:hover': { background: '#f5f5f5' },
+                          width: '100%', px: '22px', py: '10px', border: 'none', background: 'none',
+                          textAlign: 'left', cursor: 'pointer', fontFamily: CLARKSON, fontSize: '15px',
+                          color: '#0e0e0e', display: 'flex', alignItems: 'center', gap: '12px',
+                          letterSpacing: '-0.015px', lineHeight: 1.4, boxSizing: 'border-box',
+                          '&:hover': { background: 'rgba(0,0,0,0.03)' },
                         }}
                       >
-                        <Search sx={{ width: 14, height: 14, color: '#aaa', flexShrink: 0 }} />
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
+                          <path d="M2.5 8A5.5 5.5 0 1 0 8 2.5" stroke="#aaa" strokeWidth="1.3" strokeLinecap="round"/>
+                          <path d="M2.5 4.5V8H6" stroke="#aaa" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                          <path d="M8 5.5V8.5l2 1.2" stroke="#aaa" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
                         {s}
                       </Box>
                     ))}

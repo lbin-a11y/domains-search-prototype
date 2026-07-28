@@ -26,6 +26,28 @@ const BLUE_BG = '#D8E8FE'
 const TRUSTED_TLDS = new Set(['.com', '.net', '.org', '.co', '.me'])
 const TRENDING_TLDS = new Set(['.studio', '.live', '.store', '.shop', '.io', '.art', '.design', '.online', '.agency'])
 
+const TLD_UPSELL_OPTIONS = [
+  { ext: '.net', price: 14 }, { ext: '.org', price: 9 }, { ext: '.co', price: 26 },
+  { ext: '.io', price: 39 }, { ext: '.info', price: 12 }, { ext: '.ai', price: 65 },
+  { ext: '.app', price: 14 }, { ext: '.me', price: 18 }, { ext: '.studio', price: 25 },
+  { ext: '.design', price: 29 }, { ext: '.xyz', price: 10 }, { ext: '.shop', price: 26 },
+]
+
+function pickTldsForDomain(name: string, exclude: Set<string>, count = 3): { ext: string; price: number }[] {
+  let h = 0
+  for (let i = 0; i < name.length; i++) h = (Math.imul(31, h) + name.charCodeAt(i)) | 0
+  const pool = TLD_UPSELL_OPTIONS.filter((t) => !exclude.has(name + t.ext))
+  const result: typeof pool = []
+  let seed = Math.abs(h)
+  const arr = [...pool]
+  for (let i = 0; i < count && arr.length > 0; i++) {
+    const idx = seed % arr.length
+    result.push(arr.splice(idx, 1)[0])
+    seed = (seed * 1664525 + 1013904223) >>> 0
+  }
+  return result
+}
+
 const PERSONALIZED_SUGGESTIONS = [
   'Fun domains for a pottery studio',
   'Short, catchy names for a boutique brand',
@@ -607,6 +629,7 @@ function MiniCart({ cartItems, allResults, onRemove, onAdd }: {
 }) {
   const navigate = useNavigate()
   const [matchingOpen, setMatchingOpen] = useState<Record<string, boolean>>({})
+  const [tldRows, setTldRows] = useState<Record<string, { ext: string; price: number }[]>>({})
   const prevItemIdsRef = useRef<Set<string>>(new Set())
   const [removingIds, setRemovingIds] = useState<Set<string>>(new Set())
   const [burstingIds, setBurstingIds] = useState<Set<string>>(new Set())
@@ -653,6 +676,7 @@ function MiniCart({ cartItems, allResults, onRemove, onAdd }: {
 
   useEffect(() => {
     const currentIds = new Set(cartItems.map((i) => i.id))
+    const currentNames = new Set(cartItems.map((i) => i.name))
     const newItems = cartItems.filter((i) => !prevItemIdsRef.current.has(i.id))
     if (newItems.length > 0) {
       setMatchingOpen((prev) => {
@@ -661,6 +685,17 @@ function MiniCart({ cartItems, allResults, onRemove, onAdd }: {
           const sld = getSld(item.name)
           const hasMatching = allResults.some((r) => getSld(r.name) === sld && r.available && !currentIds.has(r.id))
           if (hasMatching) next[sld] = true
+        }
+        return next
+      })
+      setTldRows((prev) => {
+        const next = { ...prev }
+        for (const item of newItems) {
+          if (!next[item.id]) {
+            const sld = getSld(item.name)
+            const tlds = pickTldsForDomain(sld, currentNames)
+            if (tlds.length > 0) next[item.id] = tlds
+          }
         }
         return next
       })
@@ -720,44 +755,134 @@ function MiniCart({ cartItems, allResults, onRemove, onAdd }: {
                     const price = item.salePrice ?? item.originalPrice
                     const isRemoving = removingCartIds.has(item.id)
                     const isNew = newCartIds.has(item.id)
+                    const tlds = tldRows[item.id]
+                    const bundleTotal = tlds ? tlds.reduce((s, t) => s + t.price, 0) : 0
+                    const bundleDiscounted = Math.round(bundleTotal * 0.85)
+                    const sld = getSld(item.name)
                     return (
-                      <Box
-                        key={item.id}
-                        className={isNew ? 'cart-item-in' : ''}
-                        sx={{
-                          maxHeight: isRemoving ? 0 : '64px',
-                          opacity: isRemoving ? 0 : 1,
-                          overflow: 'hidden',
-                          transition: isRemoving ? 'max-height 0.28s cubic-bezier(0.4,0,0.2,1), opacity 0.22s ease' : 'none',
-                        }}
-                      >
-                      <Flex
-                        alignItems="center"
-                        gap={3}
-                        sx={{ minHeight: 40, mb: 1 }}
-                      >
-                        <Text.Body
-                          m={0}
-                          sx={{ flex: '1 1 0', minWidth: 0, fontSize: '15px', fontWeight: 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#0e0e0e' }}
-                        >
-                          {item.name}
-                        </Text.Body>
-                        <Text.Body m={0} sx={{ fontSize: '14px', flexShrink: 0, color: '#555' }}>
-                          ${price}/yr
-                        </Text.Body>
+                      <Box key={item.id}>
                         <Box
-                          as="button"
-                          onClick={() => handleRemoveCart(item.id)}
-                          aria-label={`Remove ${item.name} from cart`}
+                          className={isNew ? 'cart-item-in' : ''}
                           sx={{
-                            background: 'none', border: 'none', cursor: 'pointer', p: '4px',
-                            display: 'flex', alignItems: 'center', flexShrink: 0, color: '#aaa',
-                            borderRadius: 4, transition: 'color 0.12s', '&:hover': { color: '#555' },
+                            maxHeight: isRemoving ? 0 : '64px',
+                            opacity: isRemoving ? 0 : 1,
+                            overflow: 'hidden',
+                            transition: isRemoving ? 'max-height 0.28s cubic-bezier(0.4,0,0.2,1), opacity 0.22s ease' : 'none',
                           }}
                         >
-                          <Trash sx={{ width: 14, height: 14 }} />
+                          <Flex alignItems="center" gap={3} sx={{ minHeight: 40, mb: 1 }}>
+                            <Text.Body
+                              m={0}
+                              sx={{ flex: '1 1 0', minWidth: 0, fontSize: '15px', fontWeight: 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#0e0e0e' }}
+                            >
+                              {item.name}
+                            </Text.Body>
+                            <Text.Body m={0} sx={{ fontSize: '14px', flexShrink: 0, color: '#555' }}>
+                              ${price}/yr
+                            </Text.Body>
+                            <Box
+                              as="button"
+                              onClick={() => handleRemoveCart(item.id)}
+                              aria-label={`Remove ${item.name} from cart`}
+                              sx={{
+                                background: 'none', border: 'none', cursor: 'pointer', p: '4px',
+                                display: 'flex', alignItems: 'center', flexShrink: 0, color: '#aaa',
+                                borderRadius: 4, transition: 'color 0.12s', '&:hover': { color: '#555' },
+                              }}
+                            >
+                              <Trash sx={{ width: 14, height: 14 }} />
+                            </Box>
+                          </Flex>
                         </Box>
-                      </Flex>
+                        {/* TLD upsell row */}
+                        {tlds && tlds.length > 0 && (
+                          <Box sx={{
+                            display: 'grid',
+                            gridTemplateRows: isRemoving ? '0fr' : '1fr',
+                            opacity: isRemoving ? 0 : 1,
+                            transition: 'grid-template-rows 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.22s ease',
+                          }}>
+                            <Box sx={{ minHeight: 0, overflow: 'hidden' }}>
+                              <Box sx={{ pb: '10px' }}>
+                                <Flex gap="6px" sx={{ overflowX: 'auto', flexWrap: 'nowrap', pb: '2px' }}>
+                                  {tlds.map((t) => {
+                                    const tldId = `${sld}${t.ext}`
+                                    const alreadyAdded = cartIds.has(tldId)
+                                    return (
+                                      <Box
+                                        key={t.ext}
+                                        onClick={() => !alreadyAdded && onAdd({
+                                          id: tldId, name: tldId, tld: t.ext,
+                                          badges: [], originalPrice: t.price,
+                                          salePrice: null, available: true,
+                                        })}
+                                        sx={{
+                                          background: alreadyAdded ? '#e0e0e0' : '#f2f2f2',
+                                          borderRadius: '24px', px: '12px', py: '8px',
+                                          display: 'flex', alignItems: 'center', gap: '6px',
+                                          flexShrink: 0, cursor: alreadyAdded ? 'default' : 'pointer',
+                                          transition: 'background 0.12s',
+                                          '&:hover': { background: alreadyAdded ? '#e0e0e0' : '#e8e8e8' },
+                                        }}
+                                      >
+                                        <Box sx={{ fontFamily: CLARKSON, fontSize: '14px', fontWeight: 500, color: '#0e0e0e', letterSpacing: '-0.015px', whiteSpace: 'nowrap' }}>
+                                          {t.ext}
+                                        </Box>
+                                        <Flex alignItems="center" gap="3px">
+                                          <Box sx={{ fontFamily: CLARKSON, fontSize: '14px', color: '#0e0e0e', letterSpacing: '-0.015px', whiteSpace: 'nowrap' }}>
+                                            ${t.price}
+                                          </Box>
+                                          {!alreadyAdded && (
+                                            <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+                                              <path d="M5.5 1v9M1 5.5h9" stroke="#0e0e0e" strokeWidth="1.4" strokeLinecap="round"/>
+                                            </svg>
+                                          )}
+                                        </Flex>
+                                      </Box>
+                                    )
+                                  })}
+                                  <Box sx={{ width: '1px', background: '#ddd', flexShrink: 0, alignSelf: 'stretch', my: '4px' }} />
+                                  <Box
+                                    onClick={() => {
+                                      tlds.forEach((t) => {
+                                        const tid = `${sld}${t.ext}`
+                                        if (!cartIds.has(tid)) {
+                                          onAdd({
+                                            id: tid, name: tid, tld: t.ext,
+                                            badges: [], originalPrice: t.price,
+                                            salePrice: Math.round(t.price * 0.85),
+                                            available: true,
+                                          })
+                                        }
+                                      })
+                                    }}
+                                    sx={{
+                                      background: '#f2f2f2', borderRadius: '24px', px: '12px', py: '8px',
+                                      display: 'flex', alignItems: 'center', gap: '6px',
+                                      flexShrink: 0, cursor: 'pointer', transition: 'background 0.12s',
+                                      '&:hover': { background: '#e8e8e8' },
+                                    }}
+                                  >
+                                    <Box sx={{ fontFamily: CLARKSON, fontSize: '14px', fontWeight: 500, color: '#0e0e0e', letterSpacing: '-0.015px', whiteSpace: 'nowrap' }}>
+                                      Bundle & save 15%
+                                    </Box>
+                                    <Flex alignItems="center" gap="4px">
+                                      <Box sx={{ fontFamily: CLARKSON, fontSize: '14px', color: '#888', textDecoration: 'line-through', letterSpacing: '-0.015px', whiteSpace: 'nowrap' }}>
+                                        ${bundleTotal}
+                                      </Box>
+                                      <Box sx={{ fontFamily: CLARKSON, fontSize: '14px', color: '#0e0e0e', letterSpacing: '-0.015px', whiteSpace: 'nowrap' }}>
+                                        ${bundleDiscounted}
+                                      </Box>
+                                      <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+                                        <path d="M5.5 1v9M1 5.5h9" stroke="#0e0e0e" strokeWidth="1.4" strokeLinecap="round"/>
+                                      </svg>
+                                    </Flex>
+                                  </Box>
+                                </Flex>
+                              </Box>
+                            </Box>
+                          </Box>
+                        )}
                       </Box>
                     )
                   })}
@@ -1169,12 +1294,13 @@ export default function DomainSearch() {
         .fav-popover-in { animation: fav-popover-in 0.18s cubic-bezier(0.4,0,0.2,1) forwards; }
         @keyframes exact-border-glow {
           0%   { box-shadow: 0px 4px 20px 0px rgba(0,0,0,0.10); border-color: #a8cff8; }
-          12%  { box-shadow: 0px 4px 20px 0px rgba(0,0,0,0.10), 0 0 0 3px rgba(168,207,248,0.7), 0 0 28px 4px rgba(168,207,248,0.55); border-color: #6baed6; }
-          35%  { box-shadow: 0px 4px 20px 0px rgba(0,0,0,0.10), 0 0 0 2px rgba(168,207,248,0.35), 0 0 14px rgba(168,207,248,0.25); border-color: #a8cff8; }
-          75%  { box-shadow: 0px 4px 20px 0px rgba(0,0,0,0.10), 0 0 0 1px rgba(168,207,248,0.1); }
+          8%   { box-shadow: 0px 4px 20px 0px rgba(0,0,0,0.10), 0 0 0 5px rgba(168,207,248,0.85), 0 0 48px 12px rgba(168,207,248,0.75); border-color: #4a9fd6; }
+          22%  { box-shadow: 0px 4px 20px 0px rgba(0,0,0,0.10), 0 0 0 4px rgba(168,207,248,0.6), 0 0 32px 8px rgba(168,207,248,0.5); border-color: #6baed6; }
+          45%  { box-shadow: 0px 4px 20px 0px rgba(0,0,0,0.10), 0 0 0 2px rgba(168,207,248,0.3), 0 0 16px rgba(168,207,248,0.25); border-color: #a8cff8; }
+          80%  { box-shadow: 0px 4px 20px 0px rgba(0,0,0,0.10), 0 0 0 1px rgba(168,207,248,0.1); }
           100% { box-shadow: 0px 4px 20px 0px rgba(0,0,0,0.10); border-color: #a8cff8; }
         }
-        .exact-border-glow { animation: exact-border-glow 2.4s cubic-bezier(0.4,0,0.2,1) 0s 1 both; }
+        .exact-border-glow { animation: exact-border-glow 3.6s cubic-bezier(0.4,0,0.2,1) 0s 1 both; }
       `}</style>
 
       {/* ── Nav ── */}
