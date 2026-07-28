@@ -348,8 +348,8 @@ function FeaturedCard({ domain, isExact, added, onToggle }: {
 
 // ── Result row ────────────────────────────────────────────────────────────────
 
-function ResultRow({ domain, added, onToggle, showLimitedTimeColumn, showRtb, favorited, onFavorite }: {
-  domain: DomainResult; added: boolean; onToggle: () => void; showLimitedTimeColumn: boolean; showRtb?: boolean; favorited?: boolean; onFavorite?: (e: React.MouseEvent) => void
+function ResultRow({ domain, added, onToggle, showLimitedTimeColumn, showRtb, favorited, onFavorite, allResults, cart, onAdd }: {
+  domain: DomainResult; added: boolean; onToggle: () => void; showLimitedTimeColumn: boolean; showRtb?: boolean; favorited?: boolean; onFavorite?: (e: React.MouseEvent) => void; allResults?: DomainResult[]; cart?: Set<string>; onAdd?: (d: DomainResult) => void
 }) {
   const price = domain.salePrice ?? domain.originalPrice
   const hasDiscount = domain.salePrice !== null && domain.salePrice < domain.originalPrice
@@ -480,6 +480,108 @@ function ResultRow({ domain, added, onToggle, showLimitedTimeColumn, showRtb, fa
         </Box>
       </Flex>
     </Box>
+    {/* TLD upsell row — shown when domain is in cart */}
+    {(() => {
+      if (!onAdd || !added) return null
+      const sld = getSld(domain.name)
+      const cartSet = cart ?? new Set<string>()
+      const tlds = pickTldsForDomain(sld, new Set([...cartSet].map((id) => {
+        const r = allResults?.find((x) => x.id === id)
+        return r ? r.name : id
+      })))
+      if (tlds.length === 0) return null
+      const bundleTotal = tlds.reduce((s, t) => s + t.price, 0)
+      const bundleDiscounted = Math.round(bundleTotal * 0.85)
+      return (
+        <Box sx={{
+          display: 'grid',
+          gridTemplateRows: added ? '1fr' : '0fr',
+          transition: 'grid-template-rows 0.3s cubic-bezier(0.4,0,0.2,1)',
+        }}>
+          <Box sx={{ minHeight: 0, overflow: 'hidden' }}>
+            <Box sx={{ px: '16px', pb: '12px', pt: '2px' }}>
+              <Box sx={{ fontFamily: CLARKSON, fontSize: '12px', color: '#4f4f4f', mb: '10px' }}>
+                Add matching domains to secure your brand
+              </Box>
+              <Flex gap="8px" sx={{ flexWrap: 'nowrap', overflowX: 'auto', pb: '2px' }}>
+                {tlds.map((t) => {
+                  const tldId = `${sld}${t.ext}`
+                  const inCart = cartSet.has(tldId)
+                  const domainObj = allResults?.find((r) => r.name === tldId) ?? {
+                    id: tldId, name: tldId, tld: t.ext, badges: [] as DomainBadge[],
+                    originalPrice: t.price, salePrice: null, available: true,
+                  }
+                  return (
+                    <Box
+                      key={t.ext}
+                      onClick={(e: React.MouseEvent) => { e.stopPropagation(); if (!inCart) onAdd(domainObj) }}
+                      sx={{
+                        background: inCart ? '#e0e0e0' : '#f2f2f2', borderRadius: '24px',
+                        px: '12px', py: '8px', display: 'flex', alignItems: 'center', gap: '6px',
+                        flexShrink: 0, cursor: inCart ? 'default' : 'pointer',
+                        transition: 'background 0.12s',
+                        '&:hover': { background: inCart ? '#e0e0e0' : '#eaeaea' },
+                      }}
+                    >
+                      <Box sx={{ fontFamily: CLARKSON, fontSize: '14px', fontWeight: 500, color: '#0e0e0e', letterSpacing: '-0.015px', whiteSpace: 'nowrap' }}>
+                        {t.ext}
+                      </Box>
+                      <Flex alignItems="center" gap="3px">
+                        <Box sx={{ fontFamily: CLARKSON, fontSize: '14px', color: '#0e0e0e', letterSpacing: '-0.015px', whiteSpace: 'nowrap' }}>
+                          ${t.price}
+                        </Box>
+                        {!inCart && (
+                          <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+                            <path d="M5.5 1v9M1 5.5h9" stroke="#0e0e0e" strokeWidth="1.4" strokeLinecap="round"/>
+                          </svg>
+                        )}
+                      </Flex>
+                    </Box>
+                  )
+                })}
+                <Box sx={{ width: '1px', background: '#ddd', flexShrink: 0, alignSelf: 'stretch', my: '4px' }} />
+                <Box
+                  onClick={(e: React.MouseEvent) => {
+                    e.stopPropagation()
+                    tlds.forEach((t) => {
+                      const tid = `${sld}${t.ext}`
+                      if (!cartSet.has(tid)) {
+                        const domainObj = allResults?.find((r) => r.name === tid) ?? {
+                          id: tid, name: tid, tld: t.ext, badges: [] as DomainBadge[],
+                          originalPrice: t.price, salePrice: Math.round(t.price * 0.85), available: true,
+                        }
+                        onAdd({ ...domainObj, salePrice: Math.round(t.price * 0.85) })
+                      }
+                    })
+                  }}
+                  sx={{
+                    background: '#f2f2f2', borderRadius: '24px', px: '12px', py: '8px',
+                    display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0,
+                    cursor: 'pointer', transition: 'background 0.12s',
+                    '&:hover': { background: '#eaeaea' },
+                  }}
+                >
+                  <Box sx={{ fontFamily: CLARKSON, fontSize: '14px', fontWeight: 500, color: '#0e0e0e', letterSpacing: '-0.015px', whiteSpace: 'nowrap' }}>
+                    Bundle & save 15%
+                  </Box>
+                  <Flex alignItems="center" gap="4px">
+                    <Box sx={{ fontFamily: CLARKSON, fontSize: '14px', color: '#888', textDecoration: 'line-through', letterSpacing: '-0.015px', whiteSpace: 'nowrap' }}>
+                      ${bundleTotal}
+                    </Box>
+                    <Box sx={{ fontFamily: CLARKSON, fontSize: '14px', color: '#0e0e0e', letterSpacing: '-0.015px', whiteSpace: 'nowrap' }}>
+                      ${bundleDiscounted}
+                    </Box>
+                    <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+                      <path d="M5.5 1v9M1 5.5h9" stroke="#0e0e0e" strokeWidth="1.4" strokeLinecap="round"/>
+                    </svg>
+                  </Flex>
+                </Box>
+              </Flex>
+            </Box>
+          </Box>
+        </Box>
+      )
+    })()}
     </Box>
   )
 }
@@ -512,8 +614,8 @@ function FilterPill({ label, active, onClick, chevron, muted }: {
 
 // ── Results section ───────────────────────────────────────────────────────────
 
-function ResultsSection({ label, domains, cart, onToggle, showSeeWhy, favorites, onFavorite }: {
-  label: string; domains: DomainResult[]; cart: Set<string>; onToggle: (id: string) => void; showSeeWhy?: boolean; favorites?: Map<string, DomainResult>; onFavorite?: (d: DomainResult, e: React.MouseEvent) => void
+function ResultsSection({ label, domains, cart, onToggle, showSeeWhy, favorites, onFavorite, allResults, onAdd }: {
+  label: string; domains: DomainResult[]; cart: Set<string>; onToggle: (id: string) => void; showSeeWhy?: boolean; favorites?: Map<string, DomainResult>; onFavorite?: (d: DomainResult, e: React.MouseEvent) => void; allResults?: DomainResult[]; onAdd?: (d: DomainResult) => void
 }) {
   const [expanded, setExpanded] = useState(false)
   const hasAnyLimitedTime = domains.some((d) => d.limitedTime)
@@ -545,6 +647,7 @@ function ResultsSection({ label, domains, cart, onToggle, showSeeWhy, favorites,
             showLimitedTimeColumn={hasAnyLimitedTime} showRtb={expanded}
             favorited={favorites?.has(d.id)}
             onFavorite={onFavorite ? (e) => onFavorite(d, e) : undefined}
+            allResults={allResults} cart={cart} onAdd={onAdd}
           />
         ))}
       </Box>
@@ -629,7 +732,6 @@ function MiniCart({ cartItems, allResults, onRemove, onAdd }: {
 }) {
   const navigate = useNavigate()
   const [matchingOpen, setMatchingOpen] = useState<Record<string, boolean>>({})
-  const [tldRows, setTldRows] = useState<Record<string, { ext: string; price: number }[]>>({})
   const prevItemIdsRef = useRef<Set<string>>(new Set())
   const [removingIds, setRemovingIds] = useState<Set<string>>(new Set())
   const [burstingIds, setBurstingIds] = useState<Set<string>>(new Set())
@@ -676,7 +778,6 @@ function MiniCart({ cartItems, allResults, onRemove, onAdd }: {
 
   useEffect(() => {
     const currentIds = new Set(cartItems.map((i) => i.id))
-    const currentNames = new Set(cartItems.map((i) => i.name))
     const newItems = cartItems.filter((i) => !prevItemIdsRef.current.has(i.id))
     if (newItems.length > 0) {
       setMatchingOpen((prev) => {
@@ -685,17 +786,6 @@ function MiniCart({ cartItems, allResults, onRemove, onAdd }: {
           const sld = getSld(item.name)
           const hasMatching = allResults.some((r) => getSld(r.name) === sld && r.available && !currentIds.has(r.id))
           if (hasMatching) next[sld] = true
-        }
-        return next
-      })
-      setTldRows((prev) => {
-        const next = { ...prev }
-        for (const item of newItems) {
-          if (!next[item.id]) {
-            const sld = getSld(item.name)
-            const tlds = pickTldsForDomain(sld, currentNames)
-            if (tlds.length > 0) next[item.id] = tlds
-          }
         }
         return next
       })
@@ -755,134 +845,40 @@ function MiniCart({ cartItems, allResults, onRemove, onAdd }: {
                     const price = item.salePrice ?? item.originalPrice
                     const isRemoving = removingCartIds.has(item.id)
                     const isNew = newCartIds.has(item.id)
-                    const tlds = tldRows[item.id]
-                    const bundleTotal = tlds ? tlds.reduce((s, t) => s + t.price, 0) : 0
-                    const bundleDiscounted = Math.round(bundleTotal * 0.85)
-                    const sld = getSld(item.name)
                     return (
-                      <Box key={item.id}>
-                        <Box
-                          className={isNew ? 'cart-item-in' : ''}
-                          sx={{
-                            maxHeight: isRemoving ? 0 : '64px',
-                            opacity: isRemoving ? 0 : 1,
-                            overflow: 'hidden',
-                            transition: isRemoving ? 'max-height 0.28s cubic-bezier(0.4,0,0.2,1), opacity 0.22s ease' : 'none',
-                          }}
-                        >
-                          <Flex alignItems="center" gap={3} sx={{ minHeight: 40, mb: 1 }}>
-                            <Text.Body
-                              m={0}
-                              sx={{ flex: '1 1 0', minWidth: 0, fontSize: '15px', fontWeight: 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#0e0e0e' }}
-                            >
-                              {item.name}
-                            </Text.Body>
-                            <Text.Body m={0} sx={{ fontSize: '14px', flexShrink: 0, color: '#555' }}>
-                              ${price}/yr
-                            </Text.Body>
-                            <Box
-                              as="button"
-                              onClick={() => handleRemoveCart(item.id)}
-                              aria-label={`Remove ${item.name} from cart`}
-                              sx={{
-                                background: 'none', border: 'none', cursor: 'pointer', p: '4px',
-                                display: 'flex', alignItems: 'center', flexShrink: 0, color: '#aaa',
-                                borderRadius: 4, transition: 'color 0.12s', '&:hover': { color: '#555' },
-                              }}
-                            >
-                              <Trash sx={{ width: 14, height: 14 }} />
-                            </Box>
-                          </Flex>
-                        </Box>
-                        {/* TLD upsell row */}
-                        {tlds && tlds.length > 0 && (
-                          <Box sx={{
-                            display: 'grid',
-                            gridTemplateRows: isRemoving ? '0fr' : '1fr',
-                            opacity: isRemoving ? 0 : 1,
-                            transition: 'grid-template-rows 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.22s ease',
-                          }}>
-                            <Box sx={{ minHeight: 0, overflow: 'hidden' }}>
-                              <Box sx={{ pb: '10px' }}>
-                                <Flex gap="6px" sx={{ overflowX: 'auto', flexWrap: 'nowrap', pb: '2px' }}>
-                                  {tlds.map((t) => {
-                                    const tldId = `${sld}${t.ext}`
-                                    const alreadyAdded = cartIds.has(tldId)
-                                    return (
-                                      <Box
-                                        key={t.ext}
-                                        onClick={() => !alreadyAdded && onAdd({
-                                          id: tldId, name: tldId, tld: t.ext,
-                                          badges: [], originalPrice: t.price,
-                                          salePrice: null, available: true,
-                                        })}
-                                        sx={{
-                                          background: alreadyAdded ? '#e0e0e0' : '#f2f2f2',
-                                          borderRadius: '24px', px: '12px', py: '8px',
-                                          display: 'flex', alignItems: 'center', gap: '6px',
-                                          flexShrink: 0, cursor: alreadyAdded ? 'default' : 'pointer',
-                                          transition: 'background 0.12s',
-                                          '&:hover': { background: alreadyAdded ? '#e0e0e0' : '#e8e8e8' },
-                                        }}
-                                      >
-                                        <Box sx={{ fontFamily: CLARKSON, fontSize: '14px', fontWeight: 500, color: '#0e0e0e', letterSpacing: '-0.015px', whiteSpace: 'nowrap' }}>
-                                          {t.ext}
-                                        </Box>
-                                        <Flex alignItems="center" gap="3px">
-                                          <Box sx={{ fontFamily: CLARKSON, fontSize: '14px', color: '#0e0e0e', letterSpacing: '-0.015px', whiteSpace: 'nowrap' }}>
-                                            ${t.price}
-                                          </Box>
-                                          {!alreadyAdded && (
-                                            <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-                                              <path d="M5.5 1v9M1 5.5h9" stroke="#0e0e0e" strokeWidth="1.4" strokeLinecap="round"/>
-                                            </svg>
-                                          )}
-                                        </Flex>
-                                      </Box>
-                                    )
-                                  })}
-                                  <Box sx={{ width: '1px', background: '#ddd', flexShrink: 0, alignSelf: 'stretch', my: '4px' }} />
-                                  <Box
-                                    onClick={() => {
-                                      tlds.forEach((t) => {
-                                        const tid = `${sld}${t.ext}`
-                                        if (!cartIds.has(tid)) {
-                                          onAdd({
-                                            id: tid, name: tid, tld: t.ext,
-                                            badges: [], originalPrice: t.price,
-                                            salePrice: Math.round(t.price * 0.85),
-                                            available: true,
-                                          })
-                                        }
-                                      })
-                                    }}
-                                    sx={{
-                                      background: '#f2f2f2', borderRadius: '24px', px: '12px', py: '8px',
-                                      display: 'flex', alignItems: 'center', gap: '6px',
-                                      flexShrink: 0, cursor: 'pointer', transition: 'background 0.12s',
-                                      '&:hover': { background: '#e8e8e8' },
-                                    }}
-                                  >
-                                    <Box sx={{ fontFamily: CLARKSON, fontSize: '14px', fontWeight: 500, color: '#0e0e0e', letterSpacing: '-0.015px', whiteSpace: 'nowrap' }}>
-                                      Bundle & save 15%
-                                    </Box>
-                                    <Flex alignItems="center" gap="4px">
-                                      <Box sx={{ fontFamily: CLARKSON, fontSize: '14px', color: '#888', textDecoration: 'line-through', letterSpacing: '-0.015px', whiteSpace: 'nowrap' }}>
-                                        ${bundleTotal}
-                                      </Box>
-                                      <Box sx={{ fontFamily: CLARKSON, fontSize: '14px', color: '#0e0e0e', letterSpacing: '-0.015px', whiteSpace: 'nowrap' }}>
-                                        ${bundleDiscounted}
-                                      </Box>
-                                      <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-                                        <path d="M5.5 1v9M1 5.5h9" stroke="#0e0e0e" strokeWidth="1.4" strokeLinecap="round"/>
-                                      </svg>
-                                    </Flex>
-                                  </Box>
-                                </Flex>
-                              </Box>
-                            </Box>
+                      <Box
+                        key={item.id}
+                        className={isNew ? 'cart-item-in' : ''}
+                        sx={{
+                          maxHeight: isRemoving ? 0 : '64px',
+                          opacity: isRemoving ? 0 : 1,
+                          overflow: 'hidden',
+                          transition: isRemoving ? 'max-height 0.28s cubic-bezier(0.4,0,0.2,1), opacity 0.22s ease' : 'none',
+                        }}
+                      >
+                        <Flex alignItems="center" gap={3} sx={{ minHeight: 40, mb: 1 }}>
+                          <Text.Body
+                            m={0}
+                            sx={{ flex: '1 1 0', minWidth: 0, fontSize: '15px', fontWeight: 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#0e0e0e' }}
+                          >
+                            {item.name}
+                          </Text.Body>
+                          <Text.Body m={0} sx={{ fontSize: '14px', flexShrink: 0, color: '#555' }}>
+                            ${price}/yr
+                          </Text.Body>
+                          <Box
+                            as="button"
+                            onClick={() => handleRemoveCart(item.id)}
+                            aria-label={`Remove ${item.name} from cart`}
+                            sx={{
+                              background: 'none', border: 'none', cursor: 'pointer', p: '4px',
+                              display: 'flex', alignItems: 'center', flexShrink: 0, color: '#aaa',
+                              borderRadius: 4, transition: 'color 0.12s', '&:hover': { color: '#555' },
+                            }}
+                          >
+                            <Trash sx={{ width: 14, height: 14 }} />
                           </Box>
-                        )}
+                        </Flex>
                       </Box>
                     )
                   })}
@@ -1811,13 +1807,15 @@ export default function DomainSearch() {
                 showSeeWhy
                 favorites={favorites}
                 onFavorite={toggleFavorite}
+                allResults={results}
+                onAdd={addToCartDirect}
               />
             </Box>
 
             {/* More results with infinite scroll */}
             {more.length > 0 && (
               <>
-                <ResultsSection label="More results" domains={more.slice(0, visibleMoreCount)} cart={cart} onToggle={toggleCart} favorites={favorites} onFavorite={toggleFavorite} />
+                <ResultsSection label="More results" domains={more.slice(0, visibleMoreCount)} cart={cart} onToggle={toggleCart} favorites={favorites} onFavorite={toggleFavorite} allResults={results} onAdd={addToCartDirect} />
                 {visibleMoreCount < more.length && (
                   <Box>
                     <div ref={sentinelRef} style={{ height: 1 }} />
