@@ -23,8 +23,7 @@ const CLARKSON = '"Clarkson", Helvetica, sans-serif'
 const BLUE = '#0072F0'
 const BLUE_BG = '#D8E8FE'
 
-const TRUSTED_TLDS = new Set(['.com', '.net', '.org', '.co', '.me'])
-const TRENDING_TLDS = new Set(['.studio', '.live', '.store', '.shop', '.io', '.art', '.design', '.online', '.agency'])
+
 
 const TLD_UPSELL_OPTIONS = [
   { ext: '.net', price: 14 }, { ext: '.org', price: 9 }, { ext: '.co', price: 26 },
@@ -154,8 +153,8 @@ function Tooltip({ children, text }: { children: React.ReactNode; text: string }
       <Box className="tt" sx={{
         position: 'absolute', bottom: 'calc(100% + 8px)', left: '50%',
         transform: 'translateX(-50%)', background: '#0e0e0e', color: '#fff',
-        fontFamily: CLARKSON, fontSize: '12px', px: '10px', py: '6px', minWidth: '120px', textAlign: 'center',
-        borderRadius: 6, whiteSpace: 'nowrap', opacity: 0,
+        fontFamily: CLARKSON, fontSize: '12px', px: '10px', py: '6px', minWidth: '120px', maxWidth: '350px', textAlign: 'center',
+        borderRadius: 6, whiteSpace: 'normal', opacity: 0,
         pointerEvents: 'none', transition: 'opacity 0.15s', zIndex: 500,
       }}>
         {text}
@@ -295,7 +294,8 @@ function FeaturedCard({ domain, isExact, added, onToggle }: {
   const hasDiscount = domain.salePrice !== null && domain.salePrice < domain.originalPrice
 
   return (
-    <Box onClick={onToggle} className={isExact ? 'exact-border-glow' : ''} sx={{
+    <Box onClick={onToggle} sx={{
+      position: 'relative', overflow: 'hidden',
       border: isExact ? '1px solid' : 'none', borderColor: '#a8cff8',
       borderRadius: 12, p: '28px',
       display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
@@ -304,6 +304,15 @@ function FeaturedCard({ domain, isExact, added, onToggle }: {
       boxShadow: isExact ? '0px 4px 20px 0px rgba(0,0,0,0.10)' : 'none',
       cursor: 'pointer',
     }}>
+      {isExact && (
+        <svg key="sweep" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }} preserveAspectRatio="none" viewBox="0 0 320 190">
+          <rect x="2" y="2" width="316" height="186" rx="11" ry="11"
+            fill="none" stroke="#5aabf0" strokeWidth="3"
+            className="exact-dash-line"
+            style={{ strokeDasharray: 1400 }}
+          />
+        </svg>
+      )}
       <Box>
         <Flex alignItems="center" gap="5px" mb="10px">
           {isExact ? (
@@ -539,7 +548,7 @@ function ResultRow({ domain, added, onToggle, showLimitedTimeColumn, showRtb, fa
                     </Box>
                   )
                 })}
-                <Box sx={{ width: '1px', background: '#ddd', flexShrink: 0, alignSelf: 'stretch', my: '4px' }} />
+                <Box sx={{ width: '1px', background: '#ddd', flexShrink: 0, alignSelf: 'stretch', my: '4px', mx: '8px' }} />
                 <Box
                   onClick={(e: React.MouseEvent) => {
                     e.stopPropagation()
@@ -562,7 +571,7 @@ function ResultRow({ domain, added, onToggle, showLimitedTimeColumn, showRtb, fa
                   }}
                 >
                   <Box sx={{ fontFamily: CLARKSON, fontSize: '14px', fontWeight: 500, color: '#0e0e0e', letterSpacing: '-0.015px', whiteSpace: 'nowrap' }}>
-                    Bundle & save 15%
+                    Bundle & save
                   </Box>
                   <Flex alignItems="center" gap="4px">
                     <Box sx={{ fontFamily: CLARKSON, fontSize: '14px', color: '#888', textDecoration: 'line-through', letterSpacing: '-0.015px', whiteSpace: 'nowrap' }}>
@@ -724,18 +733,12 @@ function getSld(name: string): string {
   return dot > 0 ? name.slice(0, dot) : name
 }
 
-function MiniCart({ cartItems, allResults, onRemove, onAdd }: {
+function MiniCart({ cartItems, onRemove }: {
   cartItems: DomainResult[]
-  allResults: DomainResult[]
   onRemove: (id: string) => void
-  onAdd: (d: DomainResult) => void
 }) {
   const navigate = useNavigate()
-  const [matchingOpen, setMatchingOpen] = useState<Record<string, boolean>>({})
   const prevItemIdsRef = useRef<Set<string>>(new Set())
-  const [removingIds, setRemovingIds] = useState<Set<string>>(new Set())
-  const [burstingIds, setBurstingIds] = useState<Set<string>>(new Set())
-  const [burstKeys, setBurstKeys] = useState<Record<string, number>>({})
   const [removingCartIds, setRemovingCartIds] = useState<Set<string>>(new Set())
   const [newCartIds, setNewCartIds] = useState<Set<string>>(new Set())
   const prevCartIdsRef = useRef<Set<string>>(new Set())
@@ -759,39 +762,13 @@ function MiniCart({ cartItems, allResults, onRemove, onAdd }: {
     }, 300)
   }
 
-  function handleMatchingAdd(m: DomainResult, e?: React.MouseEvent) {
-    e?.stopPropagation()
-    if (removingIds.has(m.id)) return
-    setRemovingIds((prev) => new Set([...prev, m.id]))
-    setBurstingIds((prev) => new Set([...prev, m.id]))
-    setBurstKeys((prev) => ({ ...prev, [m.id]: (prev[m.id] ?? 0) + 1 }))
-    setTimeout(() => {
-      onAdd(m)
-      setBurstingIds((prev) => { const s = new Set(prev); s.delete(m.id); return s })
-      setRemovingIds((prev) => { const s = new Set(prev); s.delete(m.id); return s })
-    }, 650)
-  }
-
   const visible = cartItems.length > 0
   const subtotal = cartItems.reduce((sum, r) => sum + (r.salePrice ?? r.originalPrice), 0)
-  const cartIds = new Set(cartItems.map((i) => i.id))
+
 
   useEffect(() => {
-    const currentIds = new Set(cartItems.map((i) => i.id))
-    const newItems = cartItems.filter((i) => !prevItemIdsRef.current.has(i.id))
-    if (newItems.length > 0) {
-      setMatchingOpen((prev) => {
-        const next = { ...prev }
-        for (const item of newItems) {
-          const sld = getSld(item.name)
-          const hasMatching = allResults.some((r) => getSld(r.name) === sld && r.available && !currentIds.has(r.id))
-          if (hasMatching) next[sld] = true
-        }
-        return next
-      })
-    }
-    prevItemIdsRef.current = currentIds
-  }, [cartItems, allResults])
+    prevItemIdsRef.current = new Set(cartItems.map((i) => i.id))
+  }, [cartItems])
 
   const sldOrder: string[] = []
   const groups: Record<string, DomainResult[]> = {}
@@ -799,10 +776,6 @@ function MiniCart({ cartItems, allResults, onRemove, onAdd }: {
     const sld = getSld(item.name)
     if (!groups[sld]) { groups[sld] = []; sldOrder.push(sld) }
     groups[sld].push(item)
-  }
-
-  function getMatching(sld: string): DomainResult[] {
-    return allResults.filter((r) => getSld(r.name) === sld && r.available && !cartIds.has(r.id)).slice(0, 3)
   }
 
   return (
@@ -834,9 +807,6 @@ function MiniCart({ cartItems, allResults, onRemove, onAdd }: {
           <Box sx={{ flex: '1 1 0', overflowY: 'auto', px: 6, pb: 4 }}>
             {sldOrder.map((sld) => {
               const groupItems = groups[sld]
-              const matching = getMatching(sld)
-              const isOpen = matchingOpen[sld] ?? false
-
               return (
                 <Box
                   key={sld}
@@ -883,87 +853,6 @@ function MiniCart({ cartItems, allResults, onRemove, onAdd }: {
                     )
                   })}
 
-                  {matching.length > 0 && (
-                    <Box mt={2}>
-                      <Box
-                        as="button"
-                        onClick={() => setMatchingOpen((prev) => ({ ...prev, [sld]: !isOpen }))}
-                        sx={{
-                          width: '100%', background: '#f5f5f5', border: 'none', cursor: 'pointer',
-                          display: 'flex', alignItems: 'center', px: '20px', py: '14px',
-                          borderRadius: isOpen ? '6px 6px 0 0' : 6, textAlign: 'left',
-                          transition: 'background 0.12s',
-                        }}
-                      >
-                        <Text.Caption m={0} sx={{ fontSize: '13px', color: '#555', flex: 1, lineHeight: 1 }}>
-                          Add matching domains to secure your brand
-                        </Text.Caption>
-                        {isOpen
-                          ? <ChevronSmallUp sx={{ width: 14, height: 14, color: '#888', flexShrink: 0 }} />
-                          : <ChevronSmallDown sx={{ width: 14, height: 14, color: '#888', flexShrink: 0 }} />
-                        }
-                      </Box>
-                      <Box sx={{ display: 'grid', gridTemplateRows: isOpen ? '1fr' : '0fr', transition: 'grid-template-rows 0.3s cubic-bezier(0.4,0,0.2,1)' }}>
-                        <Box sx={{ minHeight: 0, overflow: 'hidden' }}>
-                          <Box sx={{ background: '#f5f5f5', borderRadius: '0 0 6px 6px', px: '20px', pb: '14px', display: 'flex', flexDirection: 'column' }}>
-                            {matching.map((m) => {
-                              const stem = getSld(m.name)
-                              const ext = m.name.slice(stem.length + 1)
-                              const price = m.salePrice ?? m.originalPrice
-                              const isRemoving = removingIds.has(m.id)
-                              return (
-                                <Box
-                                  key={m.id}
-                                  sx={{
-                                    maxHeight: isRemoving ? 0 : '52px',
-                                    opacity: isRemoving ? 0 : 1,
-                                    overflow: 'hidden',
-                                    transition: 'max-height 0.38s cubic-bezier(0.4,0,0.2,1), opacity 0.28s ease',
-                                  }}
-                                >
-                                  <Flex
-                                    alignItems="center"
-                                    gap={3}
-                                    onClick={(e: React.MouseEvent) => handleMatchingAdd(m, e)}
-                                    sx={{
-                                      minHeight: 40, py: '6px',
-                                      cursor: 'pointer',
-                                    }}
-                                  >
-                                    <Box sx={{ flex: '1 1 0', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                      <Text.Body as="span" m={0} sx={{ fontSize: '14px', color: '#555' }}>{stem}.</Text.Body>
-                                      <Text.Body as="span" m={0} fontWeight="semibold" sx={{ fontSize: '14px', color: '#0e0e0e' }}>{ext}</Text.Body>
-                                    </Box>
-                                    <Text.Body m={0} sx={{ fontSize: '13px', color: '#555', flexShrink: 0 }}>
-                                      ${price}/yr
-                                    </Text.Body>
-                                    <Box sx={{ position: 'relative', display: 'inline-flex', overflow: 'visible' }}>
-                                      {burstingIds.has(m.id) && <IgBurst key={burstKeys[m.id]} color="#0e0e0e" />}
-                                      <Box
-                                        as="button"
-                                        onClick={(e: React.MouseEvent) => handleMatchingAdd(m, e)}
-                                        sx={{
-                                          background: 'none', border: 'none', cursor: 'pointer', p: '2px',
-                                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                          flexShrink: 0, color: '#0e0e0e', borderRadius: 4,
-                                          transition: 'opacity 0.12s', '&:hover': { opacity: 0.6 },
-                                        }}
-                                      >
-                                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                                          <path d="M7 2V12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                                          <path d="M2 7H12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                                        </svg>
-                                      </Box>
-                                    </Box>
-                                  </Flex>
-                                </Box>
-                              )
-                            })}
-                          </Box>
-                        </Box>
-                      </Box>
-                    </Box>
-                  )}
                 </Box>
               )
             })}
@@ -1017,7 +906,7 @@ export default function DomainSearch() {
   const [activeFilters, setActiveFilters] = useState<Set<string>>(new Set())
   const [searchFocused, setSearchFocused] = useState(false)
   const [showSuggestions, setShowSuggestions] = useState(false)
-  const [tldFilters, setTldFilters] = useState<Set<'trusted' | 'trending'>>(new Set())
+  const [tldFilters, setTldFilters] = useState<Set<string>>(new Set())
   const [tldDropdownOpen, setTldDropdownOpen] = useState(false)
   const [sortBy, setSortBy] = useState<'recommended' | 'price'>('recommended')
   const [sortDropdownOpen, setSortDropdownOpen] = useState(false)
@@ -1119,10 +1008,10 @@ export default function DomainSearch() {
     setSelectedVibes((prev) => prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v])
   }
 
-  function toggleTldFilter(id: 'trusted' | 'trending') {
+  function toggleTldFilter(tld: string) {
     setTldFilters((prev) => {
       const next = new Set(prev)
-      if (next.has(id)) { next.delete(id) } else { next.add(id) }
+      if (next.has(tld)) { next.delete(tld) } else { next.add(tld) }
       return next
     })
   }
@@ -1144,12 +1033,7 @@ export default function DomainSearch() {
   const FILTERS = [`Popular for ${industry || 'your industry'}`, 'Short', 'Bundle deals']
 
   const filteredAvailable = available.filter((d) => {
-    if (tldFilters.size > 0) {
-      const allowed = new Set<string>()
-      if (tldFilters.has('trusted')) TRUSTED_TLDS.forEach((t) => allowed.add(t))
-      if (tldFilters.has('trending')) TRENDING_TLDS.forEach((t) => allowed.add(t))
-      if (!allowed.has(d.tld)) return false
-    }
+    if (tldFilters.size > 0 && !tldFilters.has(d.tld)) return false
     if (activeFilters.has(FILTERS[0]) && !d.badges.includes('promoted')) return false
     if (activeFilters.has('Short') && d.name.replace(/\.[^.]+$/, '').length > 8) return false
     if (activeFilters.has('Bundle deals') && d.salePrice === null) return false
@@ -1259,12 +1143,11 @@ export default function DomainSearch() {
         .ig-particle { animation: ig-particle 0.58s ease-out forwards; }
         @keyframes nav-heart-pop {
           0%   { transform: scale(1); }
-          25%  { transform: scale(1.5); }
-          55%  { transform: scale(0.85); }
-          75%  { transform: scale(1.15); }
+          30%  { transform: scale(1.22); }
+          65%  { transform: scale(0.94); }
           100% { transform: scale(1); }
         }
-        .nav-heart-pop { animation: nav-heart-pop 0.42s cubic-bezier(0.36,0.07,0.19,0.97) forwards; }
+        .nav-heart-pop { animation: nav-heart-pop 0.35s cubic-bezier(0.36,0.07,0.19,0.97) forwards; }
         @keyframes badge-pop {
           0%   { transform: scale(0); opacity: 0; }
           60%  { transform: scale(1.3); opacity: 1; }
@@ -1288,15 +1171,12 @@ export default function DomainSearch() {
           100% { opacity: 1; transform: translateY(0) scale(1); }
         }
         .fav-popover-in { animation: fav-popover-in 0.18s cubic-bezier(0.4,0,0.2,1) forwards; }
-        @keyframes exact-border-glow {
-          0%   { box-shadow: 0px 4px 20px 0px rgba(0,0,0,0.10); border-color: #a8cff8; }
-          8%   { box-shadow: 0px 4px 20px 0px rgba(0,0,0,0.10), 0 0 0 5px rgba(168,207,248,0.85), 0 0 48px 12px rgba(168,207,248,0.75); border-color: #4a9fd6; }
-          22%  { box-shadow: 0px 4px 20px 0px rgba(0,0,0,0.10), 0 0 0 4px rgba(168,207,248,0.6), 0 0 32px 8px rgba(168,207,248,0.5); border-color: #6baed6; }
-          45%  { box-shadow: 0px 4px 20px 0px rgba(0,0,0,0.10), 0 0 0 2px rgba(168,207,248,0.3), 0 0 16px rgba(168,207,248,0.25); border-color: #a8cff8; }
-          80%  { box-shadow: 0px 4px 20px 0px rgba(0,0,0,0.10), 0 0 0 1px rgba(168,207,248,0.1); }
-          100% { box-shadow: 0px 4px 20px 0px rgba(0,0,0,0.10); border-color: #a8cff8; }
+        @keyframes exact-dash {
+          0%   { stroke-dashoffset: 1400; opacity: 1; }
+          75%  { stroke-dashoffset: 0; opacity: 1; }
+          100% { stroke-dashoffset: 0; opacity: 0; }
         }
-        .exact-border-glow { animation: exact-border-glow 3.6s cubic-bezier(0.4,0,0.2,1) 0s 1 both; }
+        .exact-dash-line { animation: exact-dash 1.4s cubic-bezier(0.4,0,0.2,1) 0s 1 forwards; }
       `}</style>
 
       {/* ── Nav ── */}
@@ -1681,38 +1561,31 @@ export default function DomainSearch() {
                   position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 300,
                   background: '#fff', borderRadius: 8,
                   boxShadow: '0px 4px 20px rgba(0,0,0,0.12)',
-                  minWidth: 180, overflow: 'hidden', py: '6px',
+                  minWidth: 160, overflow: 'hidden', py: '6px',
                 }}>
-                  {([
-                    { id: 'trusted' as const, label: 'Trusted', desc: '.com, .net, .org' },
-                    { id: 'trending' as const, label: 'Trending', desc: '.studio, .io, .art' },
-                  ]).map(({ id, label, desc }) => (
+                  {['.com', '.net', '.org', '.co', '.io', '.me', '.studio', '.art', '.design', '.shop', '.online', '.agency'].map((tld) => (
                     <Flex
-                      key={id} as="button" alignItems="center" gap="12px"
-                      onClick={() => toggleTldFilter(id)}
+                      key={tld} as="button" alignItems="center" gap="12px"
+                      onClick={() => toggleTldFilter(tld)}
                       sx={{
-                        width: '100%', px: '14px', py: '10px', border: 'none', textAlign: 'left',
+                        width: '100%', px: '14px', py: '9px', border: 'none', textAlign: 'left',
                         cursor: 'pointer', background: 'transparent',
                         '&:hover': { background: '#f5f5f5' },
                       }}
                     >
-                      {/* Checkbox */}
                       <Box sx={{
                         width: 16, height: 16, borderRadius: '3px', flexShrink: 0,
-                        border: tldFilters.has(id) ? 'none' : '1.5px solid #ccc',
-                        background: tldFilters.has(id) ? BLUE : '#fff',
+                        border: tldFilters.has(tld) ? 'none' : '1.5px solid #ccc',
+                        background: tldFilters.has(tld) ? BLUE : '#fff',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                       }}>
-                        {tldFilters.has(id) && (
+                        {tldFilters.has(tld) && (
                           <svg width="9" height="7" viewBox="0 0 9 7" fill="none">
                             <path d="M1 3.5L3.5 6L8 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                           </svg>
                         )}
                       </Box>
-                      <Box>
-                        <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '14px', color: '#0e0e0e', display: 'block' }}>{label}</Box>
-                        <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '12px', color: '#888', display: 'block' }}>{desc}</Box>
-                      </Box>
+                      <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '14px', color: '#0e0e0e' }}>{tld}</Box>
                     </Flex>
                   ))}
                 </Box>
@@ -1835,7 +1708,7 @@ export default function DomainSearch() {
       </Box>{/* end main content */}
       {/* Cart column */}
       <Box sx={{ pt: '24px', flexShrink: 0, pr: '20px', position: 'sticky', top: '88px', alignSelf: 'flex-start' }}>
-        <MiniCart cartItems={cartItems} allResults={results} onRemove={removeFromCart} onAdd={addToCartDirect} />
+        <MiniCart cartItems={cartItems} onRemove={removeFromCart} />
       </Box>
       </Flex>{/* end content+cart row */}
     </Box>
