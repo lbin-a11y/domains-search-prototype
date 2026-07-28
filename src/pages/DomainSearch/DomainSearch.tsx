@@ -117,9 +117,10 @@ function generateResults(rawQuery: string): DomainResult[] {
 
   const exactTld = !desc && rawQuery.includes('.') ? '.' + rawQuery.trim().split('.').pop()! : '.com'
   const exactCatalog = TLD_CATALOG.find((t) => t.tld === exactTld) ?? { tld: exactTld, base: 20, sale: 14 }
+  const exactAvailable = Math.abs(hashStr(stem + exactTld)) % 5 !== 1
   results.push({
     id: `${stem}${exactTld}`, name: stem + exactTld, tld: exactTld,
-    badges: ['exact'], originalPrice: exactCatalog.base, salePrice: exactCatalog.sale, available: true,
+    badges: ['exact'], originalPrice: exactCatalog.base, salePrice: exactCatalog.sale, available: exactAvailable,
   })
 
   for (const cat of TLD_CATALOG) {
@@ -287,11 +288,173 @@ function HeartBtn({ favorited, onClick }: { favorited: boolean; onClick: (e: Rea
 
 // ── Featured card ─────────────────────────────────────────────────────────────
 
+function LoginModal({ onClose }: { onClose: () => void }) {
+  return (
+    <Box sx={{
+      position: 'fixed', inset: 0, zIndex: 9999,
+      background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }} onClick={onClose}>
+      <Box onClick={(e: React.MouseEvent) => e.stopPropagation()} sx={{
+        background: '#fff', borderRadius: 16, p: '40px', width: 400, maxWidth: '92vw',
+        boxShadow: '0 24px 60px rgba(0,0,0,0.18)', display: 'flex', flexDirection: 'column', gap: '24px',
+      }}>
+        {/* Logo */}
+        <Flex alignItems="center" gap="8px">
+          <LogoSquarespace color="#0e0e0e" />
+        </Flex>
+
+        {/* Heading */}
+        <Box>
+          <Box sx={{ fontFamily: CLARKSON, fontSize: '22px', fontWeight: 300, color: '#0e0e0e', letterSpacing: '-0.5px', mb: '6px' }}>
+            Sign in to get notified
+          </Box>
+          <Box sx={{ fontFamily: CLARKSON, fontSize: '14px', fontWeight: 300, color: '#666', lineHeight: 1.5 }}>
+            Sign in or create an account to get an alert when this domain becomes available.
+          </Box>
+        </Box>
+
+        <Flex flexDirection="column" gap="12px">
+          {/* Google */}
+          <Box as="button" sx={{
+            width: '100%', height: 46, borderRadius: 8, border: '1px solid #ddd',
+            background: '#fff', color: '#0e0e0e',
+            fontFamily: CLARKSON, fontSize: '14px', fontWeight: 400, cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
+            '&:hover': { background: '#f5f5f5' },
+          }}>
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
+              <path d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z" fill="#34A853"/>
+              <path d="M3.964 10.707A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.707V4.961H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.039l3.007-2.332z" fill="#FBBC05"/>
+              <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.961L3.964 7.293C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
+            </svg>
+            Continue with Google
+          </Box>
+
+          {/* Divider */}
+          <Flex alignItems="center" gap="12px">
+            <Box sx={{ flex: 1, height: '1px', background: '#e8e8e8' }} />
+            <Box sx={{ fontFamily: CLARKSON, fontSize: '12px', color: '#999', fontWeight: 300 }}>or</Box>
+            <Box sx={{ flex: 1, height: '1px', background: '#e8e8e8' }} />
+          </Flex>
+
+          {/* Email */}
+          <Box as="input" type="email" placeholder="Email address" sx={{
+            width: '100%', height: 46, borderRadius: 8, border: '1px solid #ddd',
+            px: '14px', fontFamily: CLARKSON, fontSize: '14px', fontWeight: 300, color: '#0e0e0e',
+            outline: 'none', boxSizing: 'border-box',
+            '&:focus': { border: '1px solid #0e0e0e' },
+          }} />
+
+          {/* Password */}
+          <Box as="input" type="password" placeholder="Password" sx={{
+            width: '100%', height: 46, borderRadius: 8, border: '1px solid #ddd',
+            px: '14px', fontFamily: CLARKSON, fontSize: '14px', fontWeight: 300, color: '#0e0e0e',
+            outline: 'none', boxSizing: 'border-box',
+            '&:focus': { border: '1px solid #0e0e0e' },
+          }} />
+
+          {/* Sign in CTA */}
+          <Box as="button" sx={{
+            width: '100%', height: 46, borderRadius: 8, border: 'none',
+            background: '#0e0e0e', color: '#fff',
+            fontFamily: CLARKSON, fontSize: '14px', fontWeight: 400, cursor: 'pointer',
+            '&:hover': { background: '#333' },
+          }}>Sign in</Box>
+        </Flex>
+
+        {/* Footer */}
+        <Flex justifyContent="center" gap="4px">
+          <Box sx={{ fontFamily: CLARKSON, fontSize: '13px', fontWeight: 300, color: '#888' }}>Don't have an account?</Box>
+          <Box as="button" sx={{
+            fontFamily: CLARKSON, fontSize: '13px', fontWeight: 300, color: '#0e0e0e',
+            background: 'none', border: 'none', cursor: 'pointer', p: 0, textDecoration: 'underline',
+          }}>Sign up</Box>
+        </Flex>
+      </Box>
+    </Box>
+  )
+}
+
 function FeaturedCard({ domain, isExact, added, onToggle }: {
   domain: DomainResult; isExact: boolean; added: boolean; onToggle: () => void
 }) {
   const price = domain.salePrice ?? domain.originalPrice
   const hasDiscount = domain.salePrice !== null && domain.salePrice < domain.originalPrice
+  const isTaken = isExact && !domain.available
+
+  const [bellPopping, setBellPopping] = useState(false)
+  const [bellBurst, setBellBurst] = useState(false)
+  const bellBurstKey = useRef(0)
+  const [showLoginModal, setShowLoginModal] = useState(false)
+
+  function handleBell(e: React.MouseEvent) {
+    e.stopPropagation()
+    bellBurstKey.current += 1
+    setBellBurst(true)
+    setBellPopping(true)
+    setTimeout(() => setBellBurst(false), 650)
+    setTimeout(() => setBellPopping(false), 450)
+    setTimeout(() => setShowLoginModal(true), 200)
+  }
+
+  if (isTaken) {
+    return (
+      <>
+        {showLoginModal && <LoginModal onClose={() => setShowLoginModal(false)} />}
+        <Box sx={{
+          position: 'relative',
+          border: 'none',
+          borderRadius: 12, p: '28px',
+          display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+          minHeight: 190,
+          background: '#f8f8f8',
+          boxShadow: 'none',
+        }}>
+          <Box>
+            <Flex alignItems="center" gap="5px" mb="10px">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <circle cx="7" cy="7" r="6" stroke="#C97B2A" strokeWidth="1.4" />
+                <path d="M4.5 4.5L9.5 9.5M9.5 4.5L4.5 9.5" stroke="#C97B2A" strokeWidth="1.4" strokeLinecap="round" />
+              </svg>
+              <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '14px', fontWeight: 300, color: '#C97B2A' }}>Unavailable</Box>
+            </Flex>
+            <Box as="p" m={0} sx={{
+              fontFamily: CLARKSON, fontSize: '22px', fontWeight: 300,
+              letterSpacing: '-0.8px', color: '#0e0e0e', lineHeight: 1.2, wordBreak: 'break-all',
+            }}>
+              {domain.name}
+            </Box>
+          </Box>
+          <Flex alignItems="flex-end" justifyContent="space-between" mt="14px">
+            <Box as="p" m={0} sx={{ fontFamily: CLARKSON, fontSize: '13px', fontWeight: 300, color: '#888', lineHeight: 1.5, maxWidth: '75%' }}>
+              Still interested? Get notified when it becomes available.
+            </Box>
+            <Box sx={{ position: 'relative', display: 'inline-flex', overflow: 'visible' }}>
+              {bellBurst && <IgBurst key={bellBurstKey.current} color="#fff" />}
+              <Box
+                as="button" onClick={handleBell}
+                className={bellPopping ? 'btn-pop' : ''}
+                sx={{
+                  width: 46, height: 46, borderRadius: 8, border: 'none',
+                  background: '#0e0e0e',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', flexShrink: 0,
+                  '&:hover': { background: '#333' },
+                }}
+              >
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                  <path d="M9 2C9 2 5 4 5 9V13H13V9C13 4 9 2 9 2Z" stroke="white" strokeWidth="1.4" strokeLinejoin="round" />
+                  <path d="M7 13C7 14.1 7.9 15 9 15C10.1 15 11 14.1 11 13" stroke="white" strokeWidth="1.4" strokeLinecap="round" />
+                  <circle cx="9" cy="2.5" r="0.8" fill="white" />
+                </svg>
+              </Box>
+            </Box>
+          </Flex>
+        </Box>
+      </>
+    )
+  }
 
   return (
     <Box onClick={onToggle} sx={{
@@ -323,7 +486,7 @@ function FeaturedCard({ domain, isExact, added, onToggle }: {
               <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '14px', fontWeight: 300, color: BLUE }}>Exact match</Box>
             </>
           ) : (
-            <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '14px', fontWeight: 300, color: '#888' }}>Close match</Box>
+            <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '14px', fontWeight: 300, color: BLUE }}>Close match</Box>
           )}
         </Flex>
         <Box as="p" m={0} sx={{
@@ -1537,9 +1700,18 @@ export default function DomainSearch() {
             </>
           ) : (
             <>
-              <FeaturedCard domain={exact} isExact added={cart.has(exact.id)} onToggle={() => toggleCart(exact.id)} />
-              {closeMatch && (
-                <FeaturedCard domain={closeMatch} isExact={false} added={cart.has(closeMatch.id)} onToggle={() => toggleCart(closeMatch.id)} />
+              {closeMatch && !exact.available ? (
+                <>
+                  <FeaturedCard domain={closeMatch} isExact={false} added={cart.has(closeMatch.id)} onToggle={() => toggleCart(closeMatch.id)} />
+                  <FeaturedCard domain={exact} isExact added={cart.has(exact.id)} onToggle={() => toggleCart(exact.id)} />
+                </>
+              ) : (
+                <>
+                  <FeaturedCard domain={exact} isExact added={cart.has(exact.id)} onToggle={() => toggleCart(exact.id)} />
+                  {closeMatch && (
+                    <FeaturedCard domain={closeMatch} isExact={false} added={cart.has(closeMatch.id)} onToggle={() => toggleCart(closeMatch.id)} />
+                  )}
+                </>
               )}
             </>
           )}
