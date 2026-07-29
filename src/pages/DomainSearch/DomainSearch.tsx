@@ -154,7 +154,7 @@ function Tooltip({ children, text }: { children: React.ReactNode; text: string }
       <Box className="tt" sx={{
         position: 'absolute', bottom: 'calc(100% + 8px)', left: '50%',
         transform: 'translateX(-50%)', background: '#0e0e0e', color: '#fff',
-        fontFamily: CLARKSON, fontSize: '12px', px: '10px', py: '6px', minWidth: '120px', maxWidth: '350px', textAlign: 'center',
+        fontFamily: CLARKSON, fontSize: '12px', px: '10px', py: '6px', minWidth: '120px', maxWidth: '500px', textAlign: 'left',
         borderRadius: 6, whiteSpace: 'normal', opacity: 0,
         pointerEvents: 'none', transition: 'opacity 0.15s', zIndex: 500,
       }}>
@@ -207,7 +207,7 @@ function AddBtn({ added, onClick }: { added: boolean; onClick: () => void }) {
       burstKey.current += 1
       setBurst(true)
       setPopping(true)
-      setTimeout(() => setBurst(false), 650)
+      setTimeout(() => setBurst(false), 800)
       setTimeout(() => setPopping(false), 450)
     }
     onClick()
@@ -520,8 +520,8 @@ function FeaturedCard({ domain, isExact, added, onToggle }: {
 
 // ── Result row ────────────────────────────────────────────────────────────────
 
-function ResultRow({ domain, added, onToggle, showLimitedTimeColumn, showRtb, favorited, onFavorite, allResults, cart, onAdd }: {
-  domain: DomainResult; added: boolean; onToggle: () => void; showLimitedTimeColumn: boolean; showRtb?: boolean; favorited?: boolean; onFavorite?: (e: React.MouseEvent) => void; allResults?: DomainResult[]; cart?: Set<string>; onAdd?: (d: DomainResult) => void
+function ResultRow({ domain, added, onToggle, showLimitedTimeColumn, showRtb, favorited, onFavorite, allResults, cart, onAdd, bundleOpen }: {
+  domain: DomainResult; added: boolean; onToggle: () => void; showLimitedTimeColumn: boolean; showRtb?: boolean; favorited?: boolean; onFavorite?: (e: React.MouseEvent) => void; allResults?: DomainResult[]; cart?: Set<string>; onAdd?: (d: DomainResult) => void; bundleOpen?: boolean
 }) {
   const price = domain.salePrice ?? domain.originalPrice
   const hasDiscount = domain.salePrice !== null && domain.salePrice < domain.originalPrice
@@ -652,7 +652,7 @@ function ResultRow({ domain, added, onToggle, showLimitedTimeColumn, showRtb, fa
         </Box>
       </Flex>
     </Box>
-    {/* TLD upsell row — shown when domain is in cart */}
+    {/* TLD upsell row — shown when domain is the active bundle */}
     {(() => {
       if (!onAdd || !added) return null
       const sld = getSld(domain.name)
@@ -667,7 +667,7 @@ function ResultRow({ domain, added, onToggle, showLimitedTimeColumn, showRtb, fa
       return (
         <Box sx={{
           display: 'grid',
-          gridTemplateRows: added ? '1fr' : '0fr',
+          gridTemplateRows: bundleOpen ? '1fr' : '0fr',
           transition: 'grid-template-rows 0.3s cubic-bezier(0.4,0,0.2,1)',
         }}>
           <Box sx={{ minHeight: 0, overflow: 'hidden' }}>
@@ -786,8 +786,8 @@ function FilterPill({ label, active, onClick, chevron, muted }: {
 
 // ── Results section ───────────────────────────────────────────────────────────
 
-function ResultsSection({ label, domains, cart, onToggle, showSeeWhy, favorites, onFavorite, allResults, onAdd }: {
-  label: string; domains: DomainResult[]; cart: Set<string>; onToggle: (id: string) => void; showSeeWhy?: boolean; favorites?: Map<string, DomainResult>; onFavorite?: (d: DomainResult, e: React.MouseEvent) => void; allResults?: DomainResult[]; onAdd?: (d: DomainResult) => void
+function ResultsSection({ label, domains, cart, onToggle, showSeeWhy, favorites, onFavorite, allResults, onAdd, activeBundleId }: {
+  label: string; domains: DomainResult[]; cart: Set<string>; onToggle: (id: string) => void; showSeeWhy?: boolean; favorites?: Map<string, DomainResult>; onFavorite?: (d: DomainResult, e: React.MouseEvent) => void; allResults?: DomainResult[]; onAdd?: (d: DomainResult) => void; activeBundleId?: string | null
 }) {
   const [expanded, setExpanded] = useState(false)
   const hasAnyLimitedTime = domains.some((d) => d.limitedTime)
@@ -820,6 +820,7 @@ function ResultsSection({ label, domains, cart, onToggle, showSeeWhy, favorites,
             favorited={favorites?.has(d.id)}
             onFavorite={onFavorite ? (e) => onFavorite(d, e) : undefined}
             allResults={allResults} cart={cart} onAdd={onAdd}
+            bundleOpen={activeBundleId === d.id}
           />
         ))}
       </Box>
@@ -1086,6 +1087,7 @@ export default function DomainSearch() {
   const guideMeSummary = [businessName, industry, selectedVibes.join(', ')].filter(Boolean).join(' · ')
 
   const [visibleMoreCount, setVisibleMoreCount] = useState(8)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
   const tldDropdownRef = useRef<HTMLDivElement>(null)
   const sortDropdownRef = useRef<HTMLDivElement>(null)
   const suggestionsBlurTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -1102,7 +1104,13 @@ export default function DomainSearch() {
   useEffect(() => {
     if (loadingStage < 2 || !sentinelRef.current) return
     const observer = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting) setVisibleMoreCount((n) => n + 8)
+      if (entries[0].isIntersecting) {
+        setIsLoadingMore(true)
+        setTimeout(() => {
+          setVisibleMoreCount((n) => n + 8)
+          setIsLoadingMore(false)
+        }, 600 + Math.random() * 300)
+      }
     }, { threshold: 0.1 })
     observer.observe(sentinelRef.current)
     return () => observer.disconnect()
@@ -1225,15 +1233,20 @@ export default function DomainSearch() {
   const more = sortedAvailable.slice(3)
 
   const [cartDomains, setCartDomains] = useState<Map<string, DomainResult>>(new Map())
+  const [activeBundleId, setActiveBundleId] = useState<string | null>(null)
 
   function toggleCart(id: string) {
     const domain = results.find(r => r.id === id)
     setCart((prev) => {
       const next = new Set(prev)
-      if (next.has(id)) { next.delete(id); setCartDomains(m => { const n = new Map(m); n.delete(id); return n }) }
-      else {
+      if (next.has(id)) {
+        next.delete(id)
+        setCartDomains(m => { const n = new Map(m); n.delete(id); return n })
+        setActiveBundleId(cur => cur === id ? null : cur)
+      } else {
         next.add(id)
         if (domain) setCartDomains(m => new Map(m).set(id, domain))
+        setActiveBundleId(id)
       }
       return next
     })
@@ -1242,11 +1255,13 @@ export default function DomainSearch() {
   function addToCartDirect(domain: DomainResult) {
     setCart(prev => new Set(prev).add(domain.id))
     setCartDomains(m => new Map(m).set(domain.id, domain))
+    setActiveBundleId(domain.id)
   }
 
   function removeFromCart(id: string) {
     setCart(prev => { const n = new Set(prev); n.delete(id); return n })
     setCartDomains(m => { const n = new Map(m); n.delete(id); return n })
+    setActiveBundleId(cur => cur === id ? null : cur)
   }
 
   const cartItems = [...cartDomains.values()]
@@ -1336,10 +1351,13 @@ export default function DomainSearch() {
         .fav-popover-in { animation: fav-popover-in 0.18s cubic-bezier(0.4,0,0.2,1) forwards; }
         @keyframes exact-dash {
           0%   { stroke-dashoffset: 1400; opacity: 1; }
-          75%  { stroke-dashoffset: 0; opacity: 1; }
+          60%  { stroke-dashoffset: 0; opacity: 1; }
+          70%  { stroke-dashoffset: 0; opacity: 0.3; }
+          80%  { stroke-dashoffset: 0; opacity: 1; }
+          90%  { stroke-dashoffset: 0; opacity: 0.3; }
           100% { stroke-dashoffset: 0; opacity: 0; }
         }
-        .exact-dash-line { animation: exact-dash 1.4s cubic-bezier(0.4,0,0.2,1) 0s 1 forwards; }
+        .exact-dash-line { animation: exact-dash 2s cubic-bezier(0.4,0,0.2,1) 0s 1 forwards; }
       `}</style>
 
       {/* ── Nav ── */}
@@ -1854,16 +1872,17 @@ export default function DomainSearch() {
                 onFavorite={toggleFavorite}
                 allResults={results}
                 onAdd={addToCartDirect}
+                activeBundleId={activeBundleId}
               />
             </Box>
 
             {/* More results with infinite scroll */}
             {more.length > 0 && (
               <>
-                <ResultsSection label="More results" domains={more.slice(0, visibleMoreCount)} cart={cart} onToggle={toggleCart} favorites={favorites} onFavorite={toggleFavorite} allResults={results} onAdd={addToCartDirect} />
-                {visibleMoreCount < more.length && (
+                <ResultsSection label="More results" domains={more.slice(0, visibleMoreCount)} cart={cart} onToggle={toggleCart} favorites={favorites} onFavorite={toggleFavorite} allResults={results} onAdd={addToCartDirect} activeBundleId={activeBundleId} />
+                {(isLoadingMore || visibleMoreCount < more.length) && (
                   <Box>
-                    <div ref={sentinelRef} style={{ height: 1 }} />
+                    {visibleMoreCount < more.length && <div ref={sentinelRef} style={{ height: 1 }} />}
                     <Flex justifyContent="center" sx={{ py: '32px' }}>
                       <Box sx={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                         {[0,1,2].map(i => (

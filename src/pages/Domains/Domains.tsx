@@ -491,7 +491,7 @@ export default function Domains() {
               {(['Fun domains for a pottery studio', 'Short, catchy names for a boutique brand'] as const).map((s) => (
                 <Box
                   key={s} as="button"
-                  onMouseDown={() => { setQuery(s); setShowSuggestions(false) }}
+                  onMouseDown={() => { setQuery(s); setShowSuggestions(false); navigate('/domain-search?q=' + encodeURIComponent(s)) }}
                   sx={{
                     width: '100%', px: '22px', py: '10px', border: 'none', background: 'none',
                     textAlign: 'left', cursor: 'pointer', fontFamily: CLARKSON, fontSize: '15px',
