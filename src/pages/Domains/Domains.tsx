@@ -155,22 +155,22 @@ export default function Domains() {
       <Box sx={{ position: 'relative', height: 820, background: '#fff', overflow: 'hidden' }}>
 
         {/* Blobs background */}
-        <Box sx={{ position: 'absolute', left: 178, top: 308, width: 1152, height: 820, pointerEvents: 'none', zIndex: 0 }}>
+        <Box sx={{ position: 'absolute', left: 'calc(50% - 542px)', top: 308, width: 1152, height: 820, pointerEvents: 'none', zIndex: 0 }}>
           <img src={IMG_BLOBS} style={{ width: '100%', height: '100%', display: 'block', filter: 'brightness(1.05) saturate(1.05)' }} alt="" />
         </Box>
 
         {/* Left screenshot */}
-        <Box sx={{ position: 'absolute', left: -427, top: 528, width: 600, height: 376, borderRadius: 11, overflow: 'hidden', opacity: 0.5, zIndex: 1 }}>
+        <Box sx={{ position: 'absolute', left: 'calc(50% - 1148px)', top: 528, width: 600, height: 376, borderRadius: 11, overflow: 'hidden', opacity: 0.5, zIndex: 1 }}>
           <img src={IMG_SS_LEFT} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} alt="" />
         </Box>
 
         {/* Center screenshot */}
-        <Box sx={{ position: 'absolute', left: 200, top: 463, width: 1042, height: 649, borderRadius: 11, overflow: 'hidden', zIndex: 1 }}>
+        <Box sx={{ position: 'absolute', left: 'calc(50% - 521px)', top: 463, width: 1042, height: 649, borderRadius: 11, overflow: 'hidden', zIndex: 1 }}>
           <img src={IMG_SS_CENTER} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} alt="" />
         </Box>
 
         {/* Right screenshot */}
-        <Box sx={{ position: 'absolute', left: 1269, top: 528, width: 600, height: 374, borderRadius: 11, overflow: 'hidden', opacity: 0.5, zIndex: 1 }}>
+        <Box sx={{ position: 'absolute', left: 'calc(50% + 548px)', top: 528, width: 600, height: 374, borderRadius: 11, overflow: 'hidden', opacity: 0.5, zIndex: 1 }}>
           <img src={IMG_SS_RIGHT} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} alt="" />
         </Box>
 

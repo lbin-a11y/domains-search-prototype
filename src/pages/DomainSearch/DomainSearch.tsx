@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { Box, Flex, Text } from '@sqs/rosetta-primitives'
-import { LogoSquarespace, Search, ArrowRight, ChevronSmallDown, ChevronSmallUp, Sparkles, Checkmark, Trash } from '@sqs/rosetta-icons'
+import { LogoSquarespace, Search, ArrowRight, ChevronSmallDown, ChevronSmallUp, Sparkles, Checkmark, Trash, ShoppingBag } from '@sqs/rosetta-icons'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -154,7 +154,7 @@ function Tooltip({ children, text }: { children: React.ReactNode; text: string }
       <Box className="tt" sx={{
         position: 'absolute', bottom: 'calc(100% + 8px)', left: '50%',
         transform: 'translateX(-50%)', background: '#0e0e0e', color: '#fff',
-        fontFamily: CLARKSON, fontSize: '12px', px: '10px', py: '6px', minWidth: '120px', maxWidth: '500px', textAlign: 'left',
+        fontFamily: CLARKSON, fontSize: '12px', px: '10px', py: '6px', minWidth: '120px', maxWidth: '700px', textAlign: 'left',
         borderRadius: 6, whiteSpace: 'normal', opacity: 0,
         pointerEvents: 'none', transition: 'opacity 0.15s', zIndex: 500,
       }}>
@@ -376,8 +376,8 @@ function LoginModal({ onClose }: { onClose: () => void }) {
   )
 }
 
-function FeaturedCard({ domain, isExact, added, onToggle }: {
-  domain: DomainResult; isExact: boolean; added: boolean; onToggle: () => void
+function FeaturedCard({ domain, isExact, added, onToggle, elevated }: {
+  domain: DomainResult; isExact: boolean; added: boolean; onToggle: () => void; elevated?: boolean
 }) {
   const price = domain.salePrice ?? domain.originalPrice
   const hasDiscount = domain.salePrice !== null && domain.salePrice < domain.originalPrice
@@ -464,7 +464,7 @@ function FeaturedCard({ domain, isExact, added, onToggle }: {
       display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
       minHeight: 190,
       background: isExact ? '#F4F5FD' : '#f8f8f8',
-      boxShadow: isExact ? '0px 4px 20px 0px rgba(0,0,0,0.10)' : 'none',
+      boxShadow: (isExact || elevated) ? '0px 4px 20px 0px rgba(0,0,0,0.10)' : 'none',
       cursor: 'pointer',
     }}>
       {isExact && (
@@ -627,31 +627,6 @@ function ResultRow({ domain, added, onToggle, showLimitedTimeColumn, showRtb, fa
         </Box>
       </Box>
     </Flex>
-    {/* RTB panel */}
-    <Box sx={{
-      px: '16px',
-      py: showRtb ? '10px' : 0,
-      background: 'linear-gradient(8.25deg, rgba(136,188,216,0.3) 0%, rgba(243,255,193,0.3) 95%)',
-      borderRadius: '0 0 8px 8px',
-      maxHeight: showRtb ? '120px' : '0px',
-      overflow: 'hidden',
-      opacity: showRtb ? 1 : 0,
-      transition: 'max-height 0.28s ease, opacity 0.2s ease, padding 0.28s ease',
-      display: 'flex', flexDirection: 'column', gap: '4px',
-    }}>
-      <Flex alignItems="center" gap="10px">
-        <Checkmark sx={{ width: 14, height: 14, color: '#0e0e0e', flexShrink: 0 }} />
-        <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '14px', lineHeight: '22px', color: '#0e0e0e' }}>
-          Popular choice for businesses in this category
-        </Box>
-      </Flex>
-      <Flex alignItems="center" gap="10px">
-        <Checkmark sx={{ width: 14, height: 14, color: '#0e0e0e', flexShrink: 0 }} />
-        <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '14px', lineHeight: '22px', color: '#0e0e0e' }}>
-          Available at a competitive price
-        </Box>
-      </Flex>
-    </Box>
     {/* TLD upsell row — shown when domain is the active bundle */}
     {(() => {
       if (!onAdd || !added) return null
@@ -754,6 +729,31 @@ function ResultRow({ domain, added, onToggle, showLimitedTimeColumn, showRtb, fa
         </Box>
       )
     })()}
+    {/* RTB panel */}
+    <Box sx={{
+      px: '16px',
+      py: showRtb ? '10px' : 0,
+      background: 'linear-gradient(8.25deg, rgba(136,188,216,0.3) 0%, rgba(243,255,193,0.3) 95%)',
+      borderRadius: '0 0 8px 8px',
+      maxHeight: showRtb ? '120px' : '0px',
+      overflow: 'hidden',
+      opacity: showRtb ? 1 : 0,
+      transition: 'max-height 0.28s ease, opacity 0.2s ease, padding 0.28s ease',
+      display: 'flex', flexDirection: 'column', gap: '4px',
+    }}>
+      <Flex alignItems="center" gap="10px">
+        <Checkmark sx={{ width: 14, height: 14, color: '#0e0e0e', flexShrink: 0 }} />
+        <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '14px', lineHeight: '22px', color: '#0e0e0e' }}>
+          Popular choice for businesses in this category
+        </Box>
+      </Flex>
+      <Flex alignItems="center" gap="10px">
+        <Checkmark sx={{ width: 14, height: 14, color: '#0e0e0e', flexShrink: 0 }} />
+        <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '14px', lineHeight: '22px', color: '#0e0e0e' }}>
+          Available at a competitive price
+        </Box>
+      </Flex>
+    </Box>
     </Box>
   )
 }
@@ -1051,6 +1051,245 @@ function MiniCart({ cartItems, onRemove }: {
   )
 }
 
+// ── Mobile mini cart ─────────────────────────────────────────────────────────
+
+function MobileMiniCart({
+  items,
+  results,
+  onRemove,
+  onAdd,
+  onCheckout,
+  lastAddedId,
+}: {
+  items: DomainResult[]
+  results: DomainResult[]
+  onRemove: (id: string) => void
+  onAdd: (result: DomainResult) => void
+  onCheckout: () => void
+  lastAddedId: string | null
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const [slideIn, setSlideIn] = useState(false)
+  const subtotal = items.reduce((sum, r) => sum + (r.salePrice ?? r.originalPrice), 0)
+  const cartIds = new Set(items.map((i) => i.id))
+  const hasItems = items.length > 0
+
+  useEffect(() => {
+    if (hasItems) {
+      const id = requestAnimationFrame(() => setSlideIn(true))
+      return () => cancelAnimationFrame(id)
+    } else {
+      setSlideIn(false)
+      setExpanded(false)
+    }
+  }, [hasItems])
+
+  function getMatching(sld: string): DomainResult[] {
+    return results.filter((r) => getSld(r.name) === sld && r.available && !cartIds.has(r.id)).slice(0, 4)
+  }
+
+  const sldOrder: string[] = []
+  const groups: Record<string, DomainResult[]> = {}
+  for (const item of items) {
+    const sld = getSld(item.name)
+    if (!groups[sld]) { groups[sld] = []; sldOrder.push(sld) }
+    groups[sld].push(item)
+  }
+
+  const lastAddedSld = lastAddedId
+    ? getSld(items.find((i) => i.id === lastAddedId)?.name ?? '')
+    : null
+
+  return (
+    <>
+      <Box
+        onClick={() => setExpanded(false)}
+        sx={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(79,79,79,0.5)',
+          zIndex: 299,
+          opacity: expanded ? 1 : 0,
+          pointerEvents: expanded ? 'auto' : 'none',
+          transition: 'opacity 0.3s ease',
+        }}
+      />
+
+      <Box
+        sx={{
+          position: 'fixed',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          zIndex: 300,
+          background: '#fff',
+          borderTop: '1px solid #ddd',
+          borderTopLeftRadius: expanded ? 6 : 0,
+          borderTopRightRadius: expanded ? 6 : 0,
+          boxShadow: '0px -1px 35px rgba(0,0,0,0.09), 0px 4px 19px rgba(0,0,0,0.1)',
+          transform: slideIn ? 'translateY(0)' : 'translateY(100%)',
+          transition: 'transform 0.3s cubic-bezier(0.4,0,0.2,1), border-radius 0.2s ease',
+        }}
+      >
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateRows: expanded ? '1fr' : '0fr',
+            transition: 'grid-template-rows 0.35s cubic-bezier(0.4,0,0.2,1)',
+          }}
+        >
+          <Box sx={{ minHeight: 0, overflow: 'hidden' }}>
+            <Box sx={{ maxHeight: '65vh', overflowY: 'auto' }}>
+              <Flex alignItems="center" justifyContent="space-between" px={4} pt={6} pb={3}>
+                <Text.Body m={0} sx={{ fontSize: '18px', fontWeight: 500 }}>Cart Overview</Text.Body>
+                <Box
+                  as="button"
+                  onClick={() => setExpanded(false)}
+                  sx={{ background: 'none', border: 'none', cursor: 'pointer', p: 0, display: 'flex', alignItems: 'center' }}
+                >
+                  <ChevronSmallDown sx={{ width: 20, height: 20, color: 'fg.default' }} />
+                </Box>
+              </Flex>
+
+              <Text.Body m={0} sx={{ display: 'block', px: 4, pb: 3, fontSize: '12px', color: '#4f4f4f' }}>
+                Domain ({items.length})
+              </Text.Body>
+
+              <Box px={4} pb={4} sx={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {sldOrder.map((sld) => {
+                  const groupItems = groups[sld]
+                  const matching = getMatching(sld)
+                  const showTlds = sld === lastAddedSld && matching.length > 0
+
+                  return (
+                    <Box
+                      key={sld}
+                      sx={{ border: '1px solid #ddd', borderRadius: 4, background: '#fff', overflow: 'hidden' }}
+                    >
+                      {groupItems.map((item) => {
+                        const price = item.salePrice ?? item.originalPrice
+                        return (
+                          <Flex
+                            key={item.id}
+                            alignItems="center"
+                            justifyContent="space-between"
+                            sx={{ px: 4, py: 3 }}
+                          >
+                            <Text.Body
+                              m={0}
+                              sx={{ fontSize: '15px', fontWeight: 500, flex: '1 1 0', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                            >
+                              {item.name}
+                            </Text.Body>
+                            <Flex alignItems="center" gap={2} sx={{ flexShrink: 0, ml: 2 }}>
+                              <Text.Body m={0} sx={{ fontSize: '14px' }}>${price}</Text.Body>
+                              <Box
+                                as="button"
+                                onClick={() => onRemove(item.id)}
+                                aria-label={`Remove ${item.name}`}
+                                sx={{ background: 'none', border: 'none', cursor: 'pointer', p: '2px', color: 'fg.muted', display: 'flex', alignItems: 'center' }}
+                              >
+                                <Trash sx={{ width: 14, height: 14 }} />
+                              </Box>
+                            </Flex>
+                          </Flex>
+                        )
+                      })}
+
+                      {showTlds && (
+                        <Box sx={{ borderTop: '1px solid #ddd', px: 4, pt: 3, pb: 4 }}>
+                          <Text.Body m={0} sx={{ fontSize: '12px', color: '#4f4f4f', display: 'block', mb: 3 }}>
+                            Purchase additional TLDs
+                          </Text.Body>
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            {matching.map((m) => {
+                              const stem = getSld(m.name)
+                              const ext = m.name.slice(stem.length + 1)
+                              const price = m.salePrice ?? m.originalPrice
+                              return (
+                                <Flex
+                                  key={m.id}
+                                  alignItems="center"
+                                  justifyContent="space-between"
+                                  sx={{ px: 3, py: '10px', background: '#f9f9f9', borderRadius: 4 }}
+                                >
+                                  <Box sx={{ flex: '1 1 0', minWidth: 0 }}>
+                                    <Text.Body as="span" m={0} sx={{ fontSize: '14px', color: '#4f4f4f' }}>{stem}.</Text.Body>
+                                    <Text.Body as="span" m={0} sx={{ fontSize: '14px', fontWeight: 500 }}>{ext}</Text.Body>
+                                  </Box>
+                                  <Flex alignItems="baseline" gap={2} sx={{ flexShrink: 0 }}>
+                                    <Text.Body m={0} sx={{ fontSize: '14px' }}>${price}</Text.Body>
+                                    <Box
+                                      as="button"
+                                      onClick={() => onAdd(m)}
+                                      sx={{ background: 'none', border: 'none', cursor: 'pointer', p: 0, fontSize: '14px', fontWeight: 500, letterSpacing: '0.04em', color: 'fg.default' }}
+                                    >
+                                      ADD
+                                    </Box>
+                                  </Flex>
+                                </Flex>
+                              )
+                            })}
+                          </Box>
+                        </Box>
+                      )}
+                    </Box>
+                  )
+                })}
+              </Box>
+            </Box>
+          </Box>
+        </Box>
+
+        <Box sx={{ px: 4, pt: 4, pb: '16px', borderTop: expanded ? '1px solid #ddd' : 'none' }}>
+          {expanded ? (
+            <Flex alignItems="center" justifyContent="space-between" sx={{ mb: 4 }}>
+              <Text.Body m={0} sx={{ fontSize: '15px' }}>Estimated total</Text.Body>
+              <Text.Body m={0} sx={{ fontSize: '15px' }}>${subtotal}</Text.Body>
+            </Flex>
+          ) : (
+            <Flex alignItems="center" justifyContent="space-between" sx={{ mb: 4 }}>
+              <Flex alignItems="center" gap={2}>
+                <ShoppingBag sx={{ width: 16, height: 16, color: '#4f4f4f' }} />
+                <Text.Body m={0} sx={{ fontSize: '15px', color: '#4f4f4f' }}>
+                  {items.length} item{items.length !== 1 ? 's' : ''}
+                </Text.Body>
+                <Text.Body m={0} sx={{ fontSize: '15px', color: '#ddd' }}>•</Text.Body>
+                <Text.Body m={0} sx={{ fontSize: '15px' }}>${subtotal}</Text.Body>
+              </Flex>
+              <Box
+                as="button"
+                onClick={() => setExpanded(true)}
+                sx={{ background: 'none', border: 'none', cursor: 'pointer', p: 0 }}
+              >
+                <Text.Body m={0} sx={{ fontSize: '15px', fontWeight: 500 }}>View Details</Text.Body>
+              </Box>
+            </Flex>
+          )}
+          <Box
+            as="button"
+            onClick={onCheckout}
+            sx={{
+              width: '100%',
+              background: '#000',
+              color: '#fff',
+              border: 'none',
+              height: 56,
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: 500,
+              letterSpacing: '0.06em',
+              textTransform: 'uppercase',
+            }}
+          >
+            Checkout
+          </Box>
+        </Box>
+      </Box>
+    </>
+  )
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function DomainSearch() {
@@ -1234,6 +1473,7 @@ export default function DomainSearch() {
 
   const [cartDomains, setCartDomains] = useState<Map<string, DomainResult>>(new Map())
   const [activeBundleId, setActiveBundleId] = useState<string | null>(null)
+  const [lastAddedId, setLastAddedId] = useState<string | null>(null)
 
   function toggleCart(id: string) {
     const domain = results.find(r => r.id === id)
@@ -1247,6 +1487,7 @@ export default function DomainSearch() {
         next.add(id)
         if (domain) setCartDomains(m => new Map(m).set(id, domain))
         setActiveBundleId(id)
+        setLastAddedId(id)
       }
       return next
     })
@@ -1256,6 +1497,7 @@ export default function DomainSearch() {
     setCart(prev => new Set(prev).add(domain.id))
     setCartDomains(m => new Map(m).set(domain.id, domain))
     setActiveBundleId(domain.id)
+    setLastAddedId(domain.id)
   }
 
   function removeFromCart(id: string) {
@@ -1523,8 +1765,8 @@ export default function DomainSearch() {
         <Box sx={{
           position: 'relative', zIndex: 50, mb: '32px',
           filter: (searchFocused || guideMe || showSuggestions)
-            ? 'drop-shadow(0px 2px 8px rgba(0,0,0,0.10)) drop-shadow(0px 0px 1px rgba(0,0,0,0.04))'
-            : 'none',
+            ? 'drop-shadow(0px 2px 12px rgba(0,0,0,0.16)) drop-shadow(0px 0px 1px rgba(0,0,0,0.06))'
+            : 'drop-shadow(0px 2px 6px rgba(0,0,0,0.13)) drop-shadow(0px 0px 1px rgba(0,0,0,0.07))',
           transition: 'filter 0.2s ease',
         }}>
           {/* Card */}
@@ -1720,7 +1962,7 @@ export default function DomainSearch() {
             <>
               {closeMatch && !exact.available ? (
                 <>
-                  <FeaturedCard domain={closeMatch} isExact={false} added={cart.has(closeMatch.id)} onToggle={() => toggleCart(closeMatch.id)} />
+                  <FeaturedCard domain={closeMatch} isExact={false} elevated added={cart.has(closeMatch.id)} onToggle={() => toggleCart(closeMatch.id)} />
                   <FeaturedCard domain={exact} isExact added={cart.has(exact.id)} onToggle={() => toggleCart(exact.id)} />
                 </>
               ) : (
@@ -1902,6 +2144,17 @@ export default function DomainSearch() {
         <MiniCart cartItems={cartItems} onRemove={removeFromCart} />
       </Box>
       </Flex>{/* end content+cart row */}
+      {/* Mobile cart */}
+      <Box sx={{ display: 'none', '@media (max-width: 767px)': { display: 'block' } }}>
+        <MobileMiniCart
+          items={cartItems}
+          results={results}
+          onRemove={removeFromCart}
+          onAdd={(d) => { addToCartDirect(d) }}
+          onCheckout={() => navigate('/cart', { state: { items: cartItems } })}
+          lastAddedId={lastAddedId}
+        />
+      </Box>
     </Box>
   )
 }
