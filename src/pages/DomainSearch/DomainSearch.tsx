@@ -23,6 +23,9 @@ const CLARKSON = '"Clarkson", Helvetica, sans-serif'
 const BLUE = '#0072F0'
 const BLUE_BG = '#D8E8FE'
 
+const INDUSTRY_KEYWORDS = ['studio', 'ceramics', 'coffee', 'bakery', 'tech', 'design', 'art', 'shop', 'store', 'fitness', 'food', 'restaurant', 'consulting', 'agency', 'music', 'photo', 'salon', 'spa', 'gym', 'dental', 'medical', 'health', 'fashion', 'jewelry', 'yoga', 'brewery', 'cafe', 'deli', 'market', 'boutique', 'gallery', 'media', 'marketing', 'finance', 'architecture', 'landscape', 'garden', 'pet', 'education', 'coaching', 'wellness', 'legal', 'construction', 'realty', 'estate', 'photography', 'florist', 'bakehouse', 'pizza', 'sushi', 'tacos', 'burger', 'beauty', 'nail', 'barber', 'cleaning', 'plumbing', 'electric']
+const VIBE_KEYWORDS = ['fun', 'catchy', 'modern', 'elegant', 'creative', 'professional', 'cozy', 'artsy', 'bold', 'minimal', 'luxury', 'casual', 'friendly', 'playful', 'sophisticated', 'rustic', 'vintage', 'trendy', 'edgy', 'cool', 'warm', 'bright', 'sleek', 'chic', 'cute', 'witty', 'clever', 'quirky', 'vibrant', 'calm', 'unique', 'artisan', 'organic', 'sustainable', 'fresh', 'clean', 'classic', 'retro', 'indie', 'local', 'handmade', 'simple', 'natural']
+
 
 
 const TLD_UPSELL_OPTIONS = [
@@ -301,7 +304,7 @@ function HeartBtn({ favorited, onClick }: { favorited: boolean; onClick: (e: Rea
 
 // ── Featured card ─────────────────────────────────────────────────────────────
 
-function LoginModal({ onClose }: { onClose: () => void }) {
+function LoginModal({ onClose, onGoogleLogin }: { onClose: () => void; onGoogleLogin?: () => void }) {
   return (
     <Box sx={{
       position: 'fixed', inset: 0, zIndex: 9999,
@@ -328,7 +331,7 @@ function LoginModal({ onClose }: { onClose: () => void }) {
 
         <Flex flexDirection="column" gap="12px">
           {/* Google */}
-          <Box as="button" sx={{
+          <Box as="button" onClick={() => { onGoogleLogin?.(); onClose(); }} sx={{
             width: '100%', height: 46, borderRadius: 8, border: '1px solid #ddd',
             background: '#fff', color: '#0e0e0e',
             fontFamily: CLARKSON, fontSize: '14px', fontWeight: 400, cursor: 'pointer',
@@ -505,16 +508,23 @@ function FeaturedCard({ domain, isExact, added, onToggle, elevated }: {
     }}>
       {isExact && (
         <svg key="sweep" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }} preserveAspectRatio="none" viewBox="0 0 320 190">
+          {/* Trail — 3 layers: faint long body, medium mid, bright short leading */}
           <rect x="2" y="2" width="316" height="186" rx="11" ry="11"
-            fill="none" stroke="#90c8ff" strokeWidth="5" strokeLinecap="round"
-            className="exact-trail"
-            style={{ strokeDasharray: '180 1220' }}
-          />
+            fill="none" stroke="#90c8ff" strokeWidth="5" strokeLinecap="round" strokeOpacity="0.15"
+            className="exact-trail" style={{ strokeDasharray: '170 1230' }} />
           <rect x="2" y="2" width="316" height="186" rx="11" ry="11"
-            fill="none" stroke="#60b4ff" strokeWidth="2.5" strokeLinecap="round"
-            className="exact-head"
-            style={{ strokeDasharray: '50 1350' }}
-          />
+            fill="none" stroke="#90c8ff" strokeWidth="5" strokeLinecap="round" strokeOpacity="0.35"
+            className="exact-trail" style={{ strokeDasharray: '110 1290' }} />
+          <rect x="2" y="2" width="316" height="186" rx="11" ry="11"
+            fill="none" stroke="#a0d0ff" strokeWidth="5" strokeLinecap="round" strokeOpacity="0.70"
+            className="exact-trail" style={{ strokeDasharray: '55 1345' }} />
+          {/* Head — 2 layers: faint body, bright leading tip with glow */}
+          <rect x="2" y="2" width="316" height="186" rx="11" ry="11"
+            fill="none" stroke="#60b4ff" strokeWidth="2.5" strokeLinecap="round" strokeOpacity="0.30"
+            className="exact-head" style={{ strokeDasharray: '50 1350' }} />
+          <rect x="2" y="2" width="316" height="186" rx="11" ry="11"
+            fill="none" stroke="#80d0ff" strokeWidth="2.5" strokeLinecap="round" strokeOpacity="0.95"
+            className="exact-head" style={{ strokeDasharray: '18 1382' }} />
         </svg>
       )}
       {elevated && !isExact && (
@@ -1005,7 +1015,7 @@ function MiniCart({ cartItems, onRemove }: {
   }
 
   const visible = cartItems.length > 0
-  const subtotal = cartItems.reduce((sum, r) => sum + (r.salePrice ?? r.originalPrice), 0)
+  const subtotal = cartItems.reduce((sum, r) => sum + (r.salePrice ?? r.originalPrice) + (r.premiumFee ?? 0), 0)
 
 
   useEffect(() => {
@@ -1081,7 +1091,7 @@ function MiniCart({ cartItems, onRemove }: {
                             </Text.Body>
                             {item.premiumFee && (
                               <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '11px', color: '#888', whiteSpace: 'nowrap' }}>
-                                +${item.premiumFee.toLocaleString()} one-time
+                                +${item.premiumFee.toLocaleString()} one-time fee
                               </Box>
                             )}
                           </Flex>
@@ -1155,7 +1165,7 @@ function MobileMiniCart({
 }) {
   const [expanded, setExpanded] = useState(false)
   const [slideIn, setSlideIn] = useState(false)
-  const subtotal = items.reduce((sum, r) => sum + (r.salePrice ?? r.originalPrice), 0)
+  const subtotal = items.reduce((sum, r) => sum + (r.salePrice ?? r.originalPrice) + (r.premiumFee ?? 0), 0)
   const cartIds = new Set(items.map((i) => i.id))
   const hasItems = items.length > 0
 
@@ -1417,6 +1427,15 @@ export default function DomainSearch() {
   const suggestionsBlurTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const loadingTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const sentinelRef = useRef<HTMLDivElement>(null)
+  const savedScrollY = useRef<number | null>(null)
+
+  const [tipState, setTipState] = useState<'none' | 'show'>('none')
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [navLoginOpen, setNavLoginOpen] = useState(false)
+  const [avatarDropdownOpen, setAvatarDropdownOpen] = useState(false)
+  const [pendingFavorite, setPendingFavorite] = useState<DomainResult | null>(null)
+  const tipTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const avatarRef = useRef<HTMLElement>(null)
 
   // Sync input when URL query changes
   useEffect(() => {
@@ -1480,8 +1499,51 @@ export default function DomainSearch() {
     return () => document.removeEventListener('mousedown', handleOutside)
   }, [tldDropdownOpen, sortDropdownOpen, favoritesOpen])
 
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (avatarRef.current && !avatarRef.current.contains(e.target as Node)) {
+        setAvatarDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  // Restore scroll position after filter state changes
+  useEffect(() => {
+    if (savedScrollY.current !== null) {
+      const y = savedScrollY.current
+      savedScrollY.current = null
+      requestAnimationFrame(() => {
+        window.scrollTo({ top: y, behavior: 'instant' as ScrollBehavior })
+      })
+    }
+  }, [activeFilters, tldFilters])
+
+  // Tip state with 1-second delay
+  useEffect(() => {
+    if (tipTimer.current) clearTimeout(tipTimer.current)
+    if (!searchQuery.trim() || !showSuggestions) {
+      setTipState('none')
+      return
+    }
+    tipTimer.current = setTimeout(() => {
+      setTipState('show')
+    }, 500)
+    return () => { if (tipTimer.current) clearTimeout(tipTimer.current) }
+  }, [searchQuery, showSuggestions])
+
+  useEffect(() => {
+    if (!showSuggestions) setTipState('none')
+  }, [showSuggestions])
+
   function toggleFavorite(domain: DomainResult, e: React.MouseEvent) {
     e.stopPropagation()
+    if (!isLoggedIn) {
+      setPendingFavorite(domain)
+      setNavLoginOpen(true)
+      return
+    }
     const isAdding = !favorites.has(domain.id)
     setFavorites((prev) => {
       const next = new Map(prev)
@@ -1504,6 +1566,7 @@ export default function DomainSearch() {
   }
 
   function toggleTldFilter(groupName: string) {
+    savedScrollY.current = window.scrollY
     setTldFilters((prev) => {
       const next = new Set(prev)
       if (next.has(groupName)) { next.delete(groupName) } else { next.add(groupName) }
@@ -1718,9 +1781,11 @@ export default function DomainSearch() {
             <Box as="span" sx={{ fontFamily: CLARKSON, fontWeight: 500, fontSize: '14px', textTransform: 'uppercase', letterSpacing: '0.02em', color: '#0e0e0e', cursor: 'pointer', '&:hover': { opacity: 0.7 } }}>
               Build a website
             </Box>
-            <Box as="span" sx={{ fontFamily: CLARKSON, fontWeight: 500, fontSize: '14px', textTransform: 'uppercase', letterSpacing: '0.02em', color: '#0e0e0e', cursor: 'pointer', '&:hover': { opacity: 0.7 } }}>
-              Log in
-            </Box>
+            {!isLoggedIn && (
+              <Box as="span" onClick={() => setNavLoginOpen(true)} sx={{ fontFamily: CLARKSON, fontWeight: 500, fontSize: '14px', textTransform: 'uppercase', letterSpacing: '0.02em', color: '#0e0e0e', cursor: 'pointer', '&:hover': { opacity: 0.7 } }}>
+                Log in
+              </Box>
+            )}
             {/* Favorites heart icon */}
             <Box ref={favoritesRef} sx={{ position: 'relative' }}>
               <Box
@@ -1790,6 +1855,27 @@ export default function DomainSearch() {
                               <Box sx={{ flex: 1, minWidth: 0, fontFamily: CLARKSON, fontSize: '15px', fontWeight: 500, color: '#0e0e0e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                 {d.name}
                               </Box>
+                              {/* Remove from favorites */}
+                              <Box
+                                as="button"
+                                onClick={() => {
+                                  setFavorites((prev) => {
+                                    const next = new Map(prev)
+                                    next.delete(d.id)
+                                    return next
+                                  })
+                                }}
+                                sx={{
+                                  background: 'none', border: 'none', cursor: 'pointer',
+                                  p: '2px', display: 'flex', alignItems: 'center', flexShrink: 0,
+                                  color: '#0e0e0e', transition: 'color 0.12s',
+                                  '&:hover': { color: '#e44' },
+                                }}
+                              >
+                                <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor">
+                                  <path d="M8 13.5C8 13.5 1.5 9 1.5 5.25C1.5 3.179 3.179 1.5 5.25 1.5C6.412 1.5 7.447 2.068 8 2.96C8.553 2.068 9.588 1.5 10.75 1.5C12.821 1.5 14.5 3.179 14.5 5.25C14.5 9 8 13.5 8 13.5Z" />
+                                </svg>
+                              </Box>
                               <Box sx={{ fontFamily: CLARKSON, fontSize: '14px', color: '#888', flexShrink: 0 }}>
                                 ${price}/yr
                               </Box>
@@ -1825,6 +1911,64 @@ export default function DomainSearch() {
                 </Box>
               )}
             </Box>
+            {/* Avatar — rightmost nav slot */}
+            {isLoggedIn && (
+              <Box ref={avatarRef} sx={{ position: 'relative' }}>
+                <Box
+                  as="button"
+                  onClick={() => setAvatarDropdownOpen((v) => !v)}
+                  sx={{
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    width: 36, height: 36, borderRadius: 8, color: '#0e0e0e', p: 0,
+                    '&:hover': { opacity: 0.7 },
+                  }}
+                >
+                  <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+                    <circle cx="11" cy="7.5" r="3.5" stroke="#0e0e0e" strokeWidth="1.5"/>
+                    <path d="M3.5 19C3.5 15.134 6.91 12 11 12C15.09 12 18.5 15.134 18.5 19" stroke="#0e0e0e" strokeWidth="1.5" strokeLinecap="round"/>
+                  </svg>
+                </Box>
+                {avatarDropdownOpen && (
+                  <Box sx={{
+                    position: 'absolute', top: 'calc(100% + 8px)', right: 0,
+                    background: '#fff', borderRadius: '10px',
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.13), 0 0 1px rgba(0,0,0,0.08)',
+                    minWidth: 180, zIndex: 9000, overflow: 'hidden',
+                    py: '6px',
+                  }}>
+                    <Box
+                      as="button"
+                      onClick={() => setAvatarDropdownOpen(false)}
+                      sx={{
+                        width: '100%', px: '16px', py: '12px', border: 'none', background: 'none',
+                        textAlign: 'left', cursor: 'pointer', fontFamily: CLARKSON,
+                        fontSize: '14px', color: '#0e0e0e', letterSpacing: '-0.01em',
+                        '&:hover': { background: '#f5f5f5' },
+                      }}
+                    >
+                      Owns a domain
+                    </Box>
+                    <Box
+                      as="button"
+                      onClick={() => {
+                        setIsLoggedIn(false)
+                        setAvatarDropdownOpen(false)
+                        window.location.reload()
+                      }}
+                      sx={{
+                        width: '100%', px: '16px', py: '12px', border: 'none', background: 'none',
+                        textAlign: 'left', cursor: 'pointer', fontFamily: CLARKSON,
+                        fontSize: '14px', color: '#0e0e0e', letterSpacing: '-0.01em',
+                        '&:hover': { background: '#f5f5f5' },
+                      }}
+                    >
+                      Log out
+                    </Box>
+                  </Box>
+                )}
+              </Box>
+            )}
           </Flex>
         </Flex>
       </Box>
@@ -1921,13 +2065,55 @@ export default function DomainSearch() {
               borderTop: '1px solid #e7e7e7',
               overflow: 'hidden', py: '8px',
             }}>
-              {searchQuery.trim().split(/\s+/).filter(Boolean).length <= 2 && searchQuery.trim().length > 0 && searchQuery.trim().length <= 20 && (
-                <Box sx={{ px: '22px', py: '10px' }}>
-                  <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '14px', color: '#888', lineHeight: 1.4 }}>
-                    <Box as="strong" sx={{ fontWeight: 600 }}>Tip:</Box>{' '}Add more info about your business for better results — vibe, location, or industry
+              {tipState === 'show' && (() => {
+                const q = searchQuery.toLowerCase()
+                const hasIndustry = INDUSTRY_KEYWORDS.some(k => q.includes(k))
+                const hasVibe = VIBE_KEYWORDS.some(k => q.includes(k))
+                const hasBusinessName = (() => {
+                  const rawWords = searchQuery.trim().split(/\s+/).filter(Boolean)
+                  return rawWords.some((w, i) => i > 0 && w[0] === w[0].toUpperCase() && w[0] !== w[0].toLowerCase()) ||
+                    rawWords.length >= 3
+                })()
+
+                function TipChip({ detected, label }: { detected: boolean; label: string }) {
+                  return (
+                    <Flex alignItems="center" gap="3px" sx={{ flexShrink: 0 }}>
+                      {detected ? (
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ flexShrink: 0 }}>
+                          <path d="M2.5 7.5L5.5 10.5L11.5 4" stroke="#1b754f" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      ) : (
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ flexShrink: 0 }}>
+                          <path d="M4 4L10 10M10 4L4 10" stroke="#888" strokeWidth="1.4" strokeLinecap="round"/>
+                        </svg>
+                      )}
+                      <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '12px', color: detected ? '#1b754f' : '#666', letterSpacing: '-0.012px', whiteSpace: 'nowrap' }}>
+                        {label}
+                      </Box>
+                    </Flex>
+                  )
+                }
+
+                return (
+                  <Box sx={{
+                    overflow: 'hidden',
+                    maxHeight: tipState === 'show' ? '60px' : '0px',
+                    opacity: tipState === 'show' ? 1 : 0,
+                    transition: 'max-height 0.35s cubic-bezier(0.4,0,0.2,1), opacity 0.3s ease',
+                  }}>
+                    <Box sx={{ pl: '22px', pr: '22px', py: '10px' }}>
+                      <Flex alignItems="center" gap="12px" flexWrap="wrap">
+                        <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '12px', color: '#666', letterSpacing: '-0.012px', whiteSpace: 'nowrap', lineHeight: 1.4 }}>
+                          Get smarter name suggestions by including:
+                        </Box>
+                        <TipChip detected={hasIndustry} label="Industry" />
+                        <TipChip detected={hasBusinessName} label="Business name" />
+                        <TipChip detected={hasVibe} label="Vibe" />
+                      </Flex>
+                    </Box>
                   </Box>
-                </Box>
-              )}
+                )
+              })()}
               {PERSONALIZED_SUGGESTIONS.map((s) => (
                 <Box
                   key={s} as="button"
@@ -2094,46 +2280,84 @@ export default function DomainSearch() {
                   boxShadow: '0px 4px 20px rgba(0,0,0,0.12)',
                   minWidth: 200, overflow: 'hidden', py: '6px',
                 }}>
-                  {TLD_GROUPS.map(({ name, sample }) => {
-                    const selected = tldFilters.has(name)
-                    return (
-                      <Flex
-                        key={name} as="button" alignItems="center" gap="12px"
-                        onClick={() => toggleTldFilter(name)}
-                        sx={{
-                          width: '100%', px: '16px', py: '12px', border: 'none', textAlign: 'left',
-                          cursor: 'pointer', background: 'transparent',
-                          '&:hover': { background: '#f5f5f5' },
-                        }}
-                      >
-                        <Box sx={{
-                          width: 16, height: 16, borderRadius: '3px', flexShrink: 0,
-                          border: selected ? 'none' : '1.5px solid #ccc',
-                          background: selected ? BLUE : '#fff',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        }}>
-                          {selected && (
-                            <svg width="9" height="7" viewBox="0 0 9 7" fill="none">
-                              <path d="M1 3.5L3.5 6L8 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                            </svg>
-                          )}
+                  {(() => {
+                    const groupHasResults = (g: typeof TLD_GROUPS[0]) =>
+                      available.some(d => g.tlds.includes(d.tld))
+                    const orderedGroups = [
+                      ...TLD_GROUPS.filter(groupHasResults),
+                      ...TLD_GROUPS.filter(g => !groupHasResults(g)),
+                    ]
+                    return orderedGroups.map(({ name, sample, tlds }) => {
+                      const selected = tldFilters.has(name)
+                      const hasResults = groupHasResults({ name, sample, tlds })
+                      return (
+                        <Box key={name}>
+                          <Flex
+                            as={hasResults ? 'button' : 'div'}
+                            alignItems="center" gap="12px"
+                            onClick={hasResults ? () => toggleTldFilter(name) : undefined}
+                            onMouseDown={hasResults ? (e: React.MouseEvent) => e.preventDefault() : undefined}
+                            sx={{
+                              width: '100%', px: '16px', py: '12px', border: 'none', textAlign: 'left',
+                              cursor: hasResults ? 'pointer' : 'not-allowed',
+                              background: 'transparent', opacity: hasResults ? 1 : 0.45,
+                              '&:hover': hasResults ? { background: '#f5f5f5' } : {},
+                            }}
+                          >
+                            <Box sx={{
+                              width: 16, height: 16, borderRadius: '3px', flexShrink: 0,
+                              border: selected ? 'none' : (hasResults ? '1.5px solid #ccc' : '1.5px dashed #ccc'),
+                              background: selected ? BLUE : '#fff',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            }}>
+                              {selected && (
+                                <svg width="9" height="7" viewBox="0 0 9 7" fill="none">
+                                  <path d="M1 3.5L3.5 6L8 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
+                              )}
+                            </Box>
+                            <Box>
+                              <Box sx={{ fontFamily: CLARKSON, fontSize: '14px', color: '#0e0e0e', fontWeight: 400 }}>{name}</Box>
+                              <Box sx={{ fontFamily: CLARKSON, fontSize: '11px', color: '#999', mt: '1px' }}>{sample}</Box>
+                              {!hasResults && (
+                                <Box
+                                  as="span"
+                                  onMouseDown={(e: React.MouseEvent) => { e.preventDefault(); e.stopPropagation() }}
+                                  onClick={(e: React.MouseEvent) => {
+                                    e.stopPropagation()
+                                    setTldDropdownOpen(false)
+                                    const newQ = `${searchQuery.trim()} ${tlds[0]}`.trim()
+                                    setSearchQuery(newQ)
+                                    navigate(`/domain-search?q=${encodeURIComponent(newQ)}`)
+                                  }}
+                                  sx={{
+                                    display: 'inline-block', mt: '3px',
+                                    fontFamily: CLARKSON, fontSize: '11px', color: BLUE,
+                                    textDecoration: 'underline', cursor: 'pointer',
+                                    opacity: 1,
+                                  }}
+                                >
+                                  Want this TLD? Search
+                                </Box>
+                              )}
+                            </Box>
+                          </Flex>
                         </Box>
-                        <Box>
-                          <Box sx={{ fontFamily: CLARKSON, fontSize: '14px', color: '#0e0e0e', fontWeight: 400 }}>{name}</Box>
-                          <Box sx={{ fontFamily: CLARKSON, fontSize: '11px', color: '#999', mt: '1px' }}>{sample}</Box>
-                        </Box>
-                      </Flex>
-                    )
-                  })}
+                      )
+                    })
+                  })()}
                 </Box>
               )}
             </div>
             {FILTERS.map((f) => (
-              <FilterPill key={f} label={f} active={activeFilters.has(f)} onClick={() => setActiveFilters((prev) => {
-                const next = new Set(prev)
-                if (next.has(f)) next.delete(f); else next.add(f)
-                return next
-              })} />
+              <FilterPill key={f} label={f} active={activeFilters.has(f)} onClick={() => {
+                savedScrollY.current = window.scrollY
+                setActiveFilters((prev) => {
+                  const next = new Set(prev)
+                  if (next.has(f)) next.delete(f); else next.add(f)
+                  return next
+                })
+              }} />
             ))}
           </Flex>
 
@@ -2261,6 +2485,31 @@ export default function DomainSearch() {
           lastAddedId={lastAddedId}
         />
       </Box>
+      {navLoginOpen && (
+        <LoginModal
+          onClose={() => { setNavLoginOpen(false); setPendingFavorite(null) }}
+          onGoogleLogin={() => {
+            setIsLoggedIn(true)
+            setNavLoginOpen(false)
+            if (pendingFavorite) {
+              const domain = pendingFavorite
+              setPendingFavorite(null)
+              setFavorites((prev) => {
+                const next = new Map(prev)
+                next.set(domain.id, domain)
+                return next
+              })
+              navHeartDropKey.current += 1
+              setNavHeartDrop(true)
+              setTimeout(() => setNavHeartDrop(false), 600)
+              setTimeout(() => {
+                setNavHeartPop(true)
+                setTimeout(() => setNavHeartPop(false), 450)
+              }, 420)
+            }
+          }}
+        />
+      )}
     </Box>
   )
 }
