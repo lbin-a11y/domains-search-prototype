@@ -84,6 +84,14 @@ const TLD_CATALOG: Array<{
   { tld: '.agency', base: 28, sale: null },
 ]
 
+const TLD_GROUPS = [
+  { name: 'Tech', tlds: ['.io', '.ai', '.app'], sample: '.io, .ai, .app' },
+  { name: 'Trusted', tlds: ['.com', '.org', '.net'], sample: '.com, .org, .net' },
+  { name: 'Business', tlds: ['.co', '.biz', '.company', '.inc', '.llc'], sample: '.co, .biz, .inc' },
+  { name: 'Creative', tlds: ['.design', '.studio', '.art', '.photography', '.gallery'], sample: '.design, .studio, .art' },
+  { name: 'Retail', tlds: ['.shop', '.store', '.market', '.boutique', '.sale'], sample: '.shop, .store, .market' },
+]
+
 const STOP_WORDS = new Set(['a','an','the','and','or','of','in','for','to','my','our','i','is','with','at','by','from','as','be','that','on','are','we','it','us','about','but','not','this','have','has','want','need','idea','business','company','brand','shop','store','service','based'])
 
 function extractKeywords(query: string): string[] {
@@ -159,7 +167,7 @@ function Tooltip({ children, text }: { children: React.ReactNode; text: string }
       <Box className="tt" sx={{
         position: 'absolute', bottom: 'calc(100% + 8px)', left: '50%',
         transform: 'translateX(-50%)', background: '#0e0e0e', color: '#fff',
-        fontFamily: CLARKSON, fontSize: '12px', px: '10px', py: '6px', minWidth: '120px', maxWidth: '900px', textAlign: 'left',
+        fontFamily: CLARKSON, fontSize: '12px', px: '10px', py: '6px', minWidth: '280px', maxWidth: '900px', textAlign: 'left',
         borderRadius: 6, whiteSpace: 'normal', opacity: 0,
         pointerEvents: 'none', transition: 'opacity 0.15s', zIndex: 500,
       }}>
@@ -463,7 +471,7 @@ function FeaturedCard({ domain, isExact, added, onToggle, elevated }: {
 
   return (
     <Box onClick={onToggle} sx={{
-      position: 'relative', overflow: 'hidden',
+      position: 'relative',
       border: (isExact || elevated) ? '1px solid' : 'none', borderColor: '#a8cff8',
       borderRadius: 12, p: '28px',
       display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
@@ -582,8 +590,10 @@ function ResultRow({ domain, added, onToggle, showLimitedTimeColumn, showRtb, fa
           <Flex alignItems="center" gap="5px" sx={{
             background: BLUE_BG, borderRadius: 20, px: '12px', py: '6px', flexShrink: 0,
           }}>
-            <Sparkles sx={{ width: 13, height: 13, color: BLUE, flexShrink: 0 }} />
-            <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '13px', fontWeight: 400, color: BLUE }}>Popular</Box>
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style={{ flexShrink: 0 }}>
+              <path d="M6.5 1.5L7.927 5.073H11.75L8.661 7.327L9.927 11.5L6.5 9.173L3.073 11.5L4.339 7.327L1.25 5.073H5.073L6.5 1.5Z" stroke={BLUE} strokeWidth="1.2" strokeLinejoin="round"/>
+            </svg>
+            <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '13px', fontWeight: 400, color: BLUE }}>Premium</Box>
           </Flex>
         </Tooltip>
       )}
@@ -624,9 +634,18 @@ function ResultRow({ domain, added, onToggle, showLimitedTimeColumn, showRtb, fa
           </Box>
         </Flex>
         {domain.premiumFee && (
-          <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '11px', color: '#888', letterSpacing: '-0.01px', whiteSpace: 'nowrap' }}>
-            +${domain.premiumFee.toLocaleString()} one-time
-          </Box>
+          <Tooltip text="This domain has a one-time premium registration fee in addition to the annual renewal price.">
+            <Flex alignItems="center" gap="3px" sx={{ cursor: 'default' }}>
+              <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '11px', color: '#888', letterSpacing: '-0.01px', whiteSpace: 'nowrap' }}>
+                +${domain.premiumFee.toLocaleString()} one-time fee
+              </Box>
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0 }}>
+                <circle cx="6" cy="6" r="5.25" stroke="#bbb" strokeWidth="1.1"/>
+                <path d="M6 5.5V8.5" stroke="#bbb" strokeWidth="1.1" strokeLinecap="round"/>
+                <circle cx="6" cy="3.75" r="0.6" fill="#bbb"/>
+              </svg>
+            </Flex>
+          </Tooltip>
         )}
       </Flex>
 
@@ -1447,10 +1466,10 @@ export default function DomainSearch() {
     setSelectedVibes((prev) => prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v])
   }
 
-  function toggleTldFilter(tld: string) {
+  function toggleTldFilter(groupName: string) {
     setTldFilters((prev) => {
       const next = new Set(prev)
-      if (next.has(tld)) { next.delete(tld) } else { next.add(tld) }
+      if (next.has(groupName)) { next.delete(groupName) } else { next.add(groupName) }
       return next
     })
   }
@@ -1472,7 +1491,10 @@ export default function DomainSearch() {
   const FILTERS = [`Popular for ${industry || 'your industry'}`, 'Short', 'Bundle deals']
 
   const filteredAvailable = available.filter((d) => {
-    if (tldFilters.size > 0 && !tldFilters.has(d.tld)) return false
+    if (tldFilters.size > 0) {
+      const inSelectedGroup = TLD_GROUPS.some(g => tldFilters.has(g.name) && g.tlds.includes(d.tld))
+      if (!inSelectedGroup) return false
+    }
     if (activeFilters.has(FILTERS[0]) && !d.badges.includes('promoted')) return false
     if (activeFilters.has('Short') && d.name.replace(/\.[^.]+$/, '').length >= 10) return false
     if (activeFilters.has('Bundle deals') && !domainHasUpsell(getSld(d.name))) return false
@@ -1728,7 +1750,7 @@ export default function DomainSearch() {
                               </Box>
                               <Box
                                 as="button"
-                                onClick={() => { if (!inCart) setCart((prev) => new Set([...prev, d.id])) }}
+                                onClick={() => { if (!inCart) addToCartDirect(d) }}
                                 sx={{
                                   background: 'none', border: 'none', cursor: inCart ? 'default' : 'pointer',
                                   p: '2px', display: 'flex', alignItems: 'center', flexShrink: 0,
@@ -1854,6 +1876,14 @@ export default function DomainSearch() {
               borderTop: '1px solid #e7e7e7',
               overflow: 'hidden', py: '8px',
             }}>
+              {searchQuery.trim().split(/\s+/).filter(Boolean).length <= 2 && searchQuery.trim().length > 0 && searchQuery.trim().length <= 20 && (
+                <Flex alignItems="flex-start" gap="10px" sx={{ px: '22px', py: '10px', borderBottom: '1px solid #f0f0f0', mb: '4px' }}>
+                  <Sparkles sx={{ width: 14, height: 14, color: '#aaa', flexShrink: 0, mt: '2px' }} />
+                  <Box sx={{ fontFamily: CLARKSON, fontSize: '13px', color: '#999', lineHeight: 1.45 }}>
+                    Tip: Add more info about your business for better results — vibe, location, or industry
+                  </Box>
+                </Flex>
+              )}
               {PERSONALIZED_SUGGESTIONS.map((s) => (
                 <Box
                   key={s} as="button"
@@ -1866,10 +1896,7 @@ export default function DomainSearch() {
                     '&:hover': { background: 'rgba(0,0,0,0.03)' },
                   }}
                 >
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
-                    <path d="M8 1.5C5.515 1.5 3.5 3.515 3.5 6c0 1.657.898 3.105 2.23 3.88V11.5h4.54V9.88C11.602 9.105 12.5 7.657 12.5 6c0-2.485-2.015-4.5-4.5-4.5Z" stroke="#aaa" strokeWidth="1.3" strokeLinejoin="round"/>
-                    <path d="M5.75 13h4.5M6.5 14.5h3" stroke="#aaa" strokeWidth="1.3" strokeLinecap="round"/>
-                  </svg>
+                  <Sparkles sx={{ width: 16, height: 16, color: '#aaa', flexShrink: 0 }} />
                   {s}
                 </Box>
               ))}
@@ -2021,43 +2048,39 @@ export default function DomainSearch() {
                   position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 300,
                   background: '#fff', borderRadius: 8,
                   boxShadow: '0px 4px 20px rgba(0,0,0,0.12)',
-                  minWidth: 180, overflow: 'hidden', py: '6px',
+                  minWidth: 200, overflow: 'hidden', py: '6px',
                 }}>
-                  {([
-                    { group: 'Trusted', tlds: ['.com', '.net', '.org', '.co', '.io', '.me'] },
-                    { group: 'Trending', tlds: ['.studio', '.art', '.design', '.shop', '.online', '.agency'] },
-                  ] as Array<{ group: string; tlds: string[] }>).map(({ group, tlds }) => (
-                    <Box key={group}>
-                      <Box sx={{ px: '14px', pt: '8px', pb: '4px', fontFamily: CLARKSON, fontSize: '11px', fontWeight: 500, color: '#888', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                        {group}
-                      </Box>
-                      {tlds.map((tld) => (
-                        <Flex
-                          key={tld} as="button" alignItems="center" gap="12px"
-                          onClick={() => toggleTldFilter(tld)}
-                          sx={{
-                            width: '100%', px: '14px', py: '9px', border: 'none', textAlign: 'left',
-                            cursor: 'pointer', background: 'transparent',
-                            '&:hover': { background: '#f5f5f5' },
-                          }}
-                        >
-                          <Box sx={{
-                            width: 16, height: 16, borderRadius: '3px', flexShrink: 0,
-                            border: tldFilters.has(tld) ? 'none' : '1.5px solid #ccc',
-                            background: tldFilters.has(tld) ? BLUE : '#fff',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          }}>
-                            {tldFilters.has(tld) && (
-                              <svg width="9" height="7" viewBox="0 0 9 7" fill="none">
-                                <path d="M1 3.5L3.5 6L8 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                              </svg>
-                            )}
-                          </Box>
-                          <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '14px', color: '#0e0e0e' }}>{tld}</Box>
-                        </Flex>
-                      ))}
-                    </Box>
-                  ))}
+                  {TLD_GROUPS.map(({ name, sample }) => {
+                    const selected = tldFilters.has(name)
+                    return (
+                      <Flex
+                        key={name} as="button" alignItems="center" gap="12px"
+                        onClick={() => toggleTldFilter(name)}
+                        sx={{
+                          width: '100%', px: '16px', py: '12px', border: 'none', textAlign: 'left',
+                          cursor: 'pointer', background: 'transparent',
+                          '&:hover': { background: '#f5f5f5' },
+                        }}
+                      >
+                        <Box sx={{
+                          width: 16, height: 16, borderRadius: '3px', flexShrink: 0,
+                          border: selected ? 'none' : '1.5px solid #ccc',
+                          background: selected ? BLUE : '#fff',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        }}>
+                          {selected && (
+                            <svg width="9" height="7" viewBox="0 0 9 7" fill="none">
+                              <path d="M1 3.5L3.5 6L8 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          )}
+                        </Box>
+                        <Box>
+                          <Box sx={{ fontFamily: CLARKSON, fontSize: '14px', color: '#0e0e0e', fontWeight: 400 }}>{name}</Box>
+                          <Box sx={{ fontFamily: CLARKSON, fontSize: '11px', color: '#999', mt: '1px' }}>{sample}</Box>
+                        </Box>
+                      </Flex>
+                    )
+                  })}
                 </Box>
               )}
             </div>

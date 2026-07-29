@@ -488,6 +488,16 @@ export default function Domains() {
               borderTop: '1px solid #e7e7e7',
               overflow: 'hidden', py: '8px',
             }}>
+              {query.trim().split(/\s+/).filter(Boolean).length <= 2 && query.trim().length > 0 && query.trim().length <= 20 && (
+                <Flex alignItems="flex-start" gap="10px" sx={{ px: '22px', py: '10px', borderBottom: '1px solid #f0f0f0', mb: '4px' }}>
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0, marginTop: 2 }}>
+                    <path d="M8 1l1.5 4.5L14 7l-4.5 1.5L8 13l-1.5-4.5L2 7l4.5-1.5L8 1z" stroke="#aaa" strokeWidth="1.3" strokeLinejoin="round"/>
+                  </svg>
+                  <Box sx={{ fontFamily: CLARKSON, fontSize: '13px', color: '#999', lineHeight: 1.45 }}>
+                    Tip: Add more info about your business for better results — vibe, location, or industry
+                  </Box>
+                </Flex>
+              )}
               {(['Fun domains for a pottery studio', 'Short, catchy names for a boutique brand'] as const).map((s) => (
                 <Box
                   key={s} as="button"
@@ -501,8 +511,7 @@ export default function Domains() {
                   }}
                 >
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
-                    <path d="M8 1.5C5.515 1.5 3.5 3.515 3.5 6c0 1.657.898 3.105 2.23 3.88V11.5h4.54V9.88C11.602 9.105 12.5 7.657 12.5 6c0-2.485-2.015-4.5-4.5-4.5Z" stroke="#aaa" strokeWidth="1.3" strokeLinejoin="round"/>
-                    <path d="M5.75 13h4.5M6.5 14.5h3" stroke="#aaa" strokeWidth="1.3" strokeLinecap="round"/>
+                    <path d="M8 1.5l1.5 4L14 7l-4.5 1.5L8 13.5l-1.5-5L2 7l4.5-1.5L8 1.5z" stroke="#aaa" strokeWidth="1.3" strokeLinejoin="round"/>
                   </svg>
                   {s}
                 </Box>
