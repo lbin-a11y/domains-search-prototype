@@ -475,7 +475,7 @@ function FeaturedCard({ domain, isExact, added, onToggle, elevated }: {
       {isExact && (
         <svg key="sweep" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }} preserveAspectRatio="none" viewBox="0 0 320 190">
           <rect x="2" y="2" width="316" height="186" rx="11" ry="11"
-            fill="none" stroke="#5aabf0" strokeWidth="3"
+            fill="none" stroke="#60b4ff" strokeWidth="2.5"
             className="exact-dash-line"
             style={{ strokeDasharray: 1400 }}
           />
@@ -484,7 +484,7 @@ function FeaturedCard({ domain, isExact, added, onToggle, elevated }: {
       {elevated && !isExact && (
         <svg key="sweep-elevated" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }} preserveAspectRatio="none" viewBox="0 0 320 190">
           <rect x="2" y="2" width="316" height="186" rx="11" ry="11"
-            fill="none" stroke="#5aabf0" strokeWidth="3"
+            fill="none" stroke="#60b4ff" strokeWidth="2.5"
             className="exact-dash-line"
             style={{ strokeDasharray: 1400 }}
           />
@@ -1474,8 +1474,8 @@ export default function DomainSearch() {
   const filteredAvailable = available.filter((d) => {
     if (tldFilters.size > 0 && !tldFilters.has(d.tld)) return false
     if (activeFilters.has(FILTERS[0]) && !d.badges.includes('promoted')) return false
-    if (activeFilters.has('Short') && d.name.replace(/\.[^.]+$/, '').length > 8) return false
-    if (activeFilters.has('Bundle deals') && d.salePrice === null) return false
+    if (activeFilters.has('Short') && d.name.replace(/\.[^.]+$/, '').length >= 10) return false
+    if (activeFilters.has('Bundle deals') && !domainHasUpsell(getSld(d.name))) return false
     return true
   })
 
@@ -1621,14 +1621,13 @@ export default function DomainSearch() {
         }
         .fav-popover-in { animation: fav-popover-in 0.18s cubic-bezier(0.4,0,0.2,1) forwards; }
         @keyframes exact-dash {
-          0%   { stroke-dashoffset: 1400; opacity: 1; }
-          60%  { stroke-dashoffset: 0; opacity: 1; }
-          70%  { stroke-dashoffset: 0; opacity: 0.3; }
-          80%  { stroke-dashoffset: 0; opacity: 1; }
-          90%  { stroke-dashoffset: 0; opacity: 0.3; }
-          100% { stroke-dashoffset: 0; opacity: 0; }
+          0%   { stroke-dashoffset: 1400; opacity: 0; filter: drop-shadow(0 0 0px #5aabf0); }
+          5%   { opacity: 1; }
+          70%  { stroke-dashoffset: 0; opacity: 1; filter: drop-shadow(0 0 8px #5aabf0) drop-shadow(0 0 3px #fff); }
+          85%  { stroke-dashoffset: 0; opacity: 0.6; filter: drop-shadow(0 0 12px #5aabf0); }
+          100% { stroke-dashoffset: 0; opacity: 0; filter: drop-shadow(0 0 0px #5aabf0); }
         }
-        .exact-dash-line { animation: exact-dash 2s cubic-bezier(0.4,0,0.2,1) 0s 1 forwards; }
+        .exact-dash-line { animation: exact-dash 1.8s cubic-bezier(0.25,0.46,0.45,0.94) 0s 1 forwards; }
       `}</style>
 
       {/* ── Nav ── */}
@@ -1764,8 +1763,8 @@ export default function DomainSearch() {
       </Box>
 
       {/* ── Content + Cart ── */}
-      <Flex sx={{ justifyContent: 'center', alignItems: 'flex-start', gap: '56px', px: '40px', pr: '60px', '@media (max-width: 600px)': { px: '16px', pr: '16px' } }}>
-      <Box sx={{ flex: '0 1 810px', minWidth: 0, pb: '120px' }}>
+      <Flex sx={{ justifyContent: 'center', alignItems: 'flex-start', gap: '56px', px: '40px', pr: '60px', '@media (max-width: 767px)': { px: '16px', pr: '16px', gap: 0 } }}>
+      <Box sx={{ flex: '0 1 810px', minWidth: 0, pb: '120px', '@media (max-width: 767px)': { flex: '1 1 auto', width: '100%' } }}>
 
         {/* Header, search, cards, filters — 16px inset to align with row content */}
         <Box sx={{ mx: '16px' }}>
@@ -2022,32 +2021,42 @@ export default function DomainSearch() {
                   position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 300,
                   background: '#fff', borderRadius: 8,
                   boxShadow: '0px 4px 20px rgba(0,0,0,0.12)',
-                  minWidth: 160, overflow: 'hidden', py: '6px',
+                  minWidth: 180, overflow: 'hidden', py: '6px',
                 }}>
-                  {['.com', '.net', '.org', '.co', '.io', '.me', '.studio', '.art', '.design', '.shop', '.online', '.agency'].map((tld) => (
-                    <Flex
-                      key={tld} as="button" alignItems="center" gap="12px"
-                      onClick={() => toggleTldFilter(tld)}
-                      sx={{
-                        width: '100%', px: '14px', py: '9px', border: 'none', textAlign: 'left',
-                        cursor: 'pointer', background: 'transparent',
-                        '&:hover': { background: '#f5f5f5' },
-                      }}
-                    >
-                      <Box sx={{
-                        width: 16, height: 16, borderRadius: '3px', flexShrink: 0,
-                        border: tldFilters.has(tld) ? 'none' : '1.5px solid #ccc',
-                        background: tldFilters.has(tld) ? BLUE : '#fff',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      }}>
-                        {tldFilters.has(tld) && (
-                          <svg width="9" height="7" viewBox="0 0 9 7" fill="none">
-                            <path d="M1 3.5L3.5 6L8 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                          </svg>
-                        )}
+                  {([
+                    { group: 'Trusted', tlds: ['.com', '.net', '.org', '.co', '.io', '.me'] },
+                    { group: 'Trending', tlds: ['.studio', '.art', '.design', '.shop', '.online', '.agency'] },
+                  ] as Array<{ group: string; tlds: string[] }>).map(({ group, tlds }) => (
+                    <Box key={group}>
+                      <Box sx={{ px: '14px', pt: '8px', pb: '4px', fontFamily: CLARKSON, fontSize: '11px', fontWeight: 500, color: '#888', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                        {group}
                       </Box>
-                      <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '14px', color: '#0e0e0e' }}>{tld}</Box>
-                    </Flex>
+                      {tlds.map((tld) => (
+                        <Flex
+                          key={tld} as="button" alignItems="center" gap="12px"
+                          onClick={() => toggleTldFilter(tld)}
+                          sx={{
+                            width: '100%', px: '14px', py: '9px', border: 'none', textAlign: 'left',
+                            cursor: 'pointer', background: 'transparent',
+                            '&:hover': { background: '#f5f5f5' },
+                          }}
+                        >
+                          <Box sx={{
+                            width: 16, height: 16, borderRadius: '3px', flexShrink: 0,
+                            border: tldFilters.has(tld) ? 'none' : '1.5px solid #ccc',
+                            background: tldFilters.has(tld) ? BLUE : '#fff',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          }}>
+                            {tldFilters.has(tld) && (
+                              <svg width="9" height="7" viewBox="0 0 9 7" fill="none">
+                                <path d="M1 3.5L3.5 6L8 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
+                            )}
+                          </Box>
+                          <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '14px', color: '#0e0e0e' }}>{tld}</Box>
+                        </Flex>
+                      ))}
+                    </Box>
                   ))}
                 </Box>
               )}
@@ -2168,13 +2177,13 @@ export default function DomainSearch() {
           </>
         )}
       </Box>{/* end main content */}
-      {/* Cart column */}
-      <Box sx={{ pt: '24px', flexShrink: 0, pr: '20px', position: 'sticky', top: '88px', alignSelf: 'flex-start' }}>
+      {/* Cart column — desktop only */}
+      <Box sx={{ pt: '24px', flexShrink: 0, pr: '20px', position: 'sticky', top: '88px', alignSelf: 'flex-start', '@media (max-width: 767px)': { display: 'none' } }}>
         <MiniCart cartItems={cartItems} onRemove={removeFromCart} />
       </Box>
       </Flex>{/* end content+cart row */}
       {/* Mobile cart */}
-      <Box sx={{ display: 'none', '@media (max-width: 767px)': { display: 'block' } }}>
+      <Box sx={{ display: 'none', '@media (max-width: 767px)': { display: 'block' }, width: '100%' }}>
         <MobileMiniCart
           items={cartItems}
           results={results}

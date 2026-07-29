@@ -127,7 +127,7 @@ export default function Domains() {
           as="nav"
           alignItems="center"
           justifyContent="space-between"
-          sx={{ height: '100%', px: '40px', maxWidth: 1440, mx: 'auto' }}
+          sx={{ height: '100%', px: '40px', maxWidth: 1440, mx: 'auto', '@media (max-width: 767px)': { px: '16px' } }}
         >
           <Flex alignItems="center" gap="12px">
             <LogoSquarespace color="fg.default" />
@@ -178,7 +178,7 @@ export default function Domains() {
         <Flex
           flexDirection="column"
           alignItems="center"
-          sx={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', top: 70, width: 'min(777px, calc(100vw - 40px))', zIndex: 2, gap: '33px' }}
+          sx={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', top: 70, width: 'min(777px, calc(100vw - 32px))', zIndex: 2, gap: '33px' }}
         >
           {/* Buy / Transfer toggle */}
           <Box sx={{
@@ -542,7 +542,7 @@ export default function Domains() {
       </Box>
 
       {/* ── Pricing ──────────────────────────────────────────────────────────── */}
-      <Box sx={{ background: '#f9f9f9', py: '120px', px: '40px' }}>
+      <Box sx={{ background: '#f9f9f9', py: '120px', px: '40px', '@media (max-width: 767px)': { px: '16px' } }}>
         <Flex gap="156px" alignItems="flex-start" sx={{ maxWidth: 1360, mx: 'auto' }}>
 
           {/* Left: heading + copy */}
