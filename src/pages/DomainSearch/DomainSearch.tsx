@@ -32,6 +32,10 @@ const TLD_UPSELL_OPTIONS = [
   { ext: '.design', price: 29 }, { ext: '.xyz', price: 10 }, { ext: '.shop', price: 26 },
 ]
 
+function domainHasUpsell(sld: string): boolean {
+  return hashStr(sld + 'upsell') % 3 !== 0  // ~67% of domains get upsell
+}
+
 function pickTldsForDomain(name: string, exclude: Set<string>, count = 3): { ext: string; price: number }[] {
   let h = 0
   for (let i = 0; i < name.length; i++) h = (Math.imul(31, h) + name.charCodeAt(i)) | 0
@@ -129,10 +133,11 @@ function generateResults(rawQuery: string): DomainResult[] {
     const badges: DomainBadge[] = []
     if (cat.promoted) badges.push('promoted')
     if (cat.premium) badges.push('premium')
+    const premiumFee = cat.premiumFee ?? (cat.promoted && hashStr(stem + cat.tld + 'fee') % 4 === 0 ? [500, 750, 1000, 1200][hashStr(stem + cat.tld) % 4] : undefined)
     results.push({
       id: `${stem}${cat.tld}`, name: stem + cat.tld, tld: cat.tld,
       badges, originalPrice: cat.base, salePrice: cat.sale, available,
-      premiumFee: cat.premiumFee, limitedTime: cat.limitedTime,
+      premiumFee, limitedTime: cat.limitedTime,
     })
   }
 
@@ -154,7 +159,7 @@ function Tooltip({ children, text }: { children: React.ReactNode; text: string }
       <Box className="tt" sx={{
         position: 'absolute', bottom: 'calc(100% + 8px)', left: '50%',
         transform: 'translateX(-50%)', background: '#0e0e0e', color: '#fff',
-        fontFamily: CLARKSON, fontSize: '12px', px: '10px', py: '6px', minWidth: '120px', maxWidth: '700px', textAlign: 'left',
+        fontFamily: CLARKSON, fontSize: '12px', px: '10px', py: '6px', minWidth: '120px', maxWidth: '900px', textAlign: 'left',
         borderRadius: 6, whiteSpace: 'normal', opacity: 0,
         pointerEvents: 'none', transition: 'opacity 0.15s', zIndex: 500,
       }}>
@@ -459,7 +464,7 @@ function FeaturedCard({ domain, isExact, added, onToggle, elevated }: {
   return (
     <Box onClick={onToggle} sx={{
       position: 'relative', overflow: 'hidden',
-      border: isExact ? '1px solid' : 'none', borderColor: '#a8cff8',
+      border: (isExact || elevated) ? '1px solid' : 'none', borderColor: '#a8cff8',
       borderRadius: 12, p: '28px',
       display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
       minHeight: 190,
@@ -469,6 +474,15 @@ function FeaturedCard({ domain, isExact, added, onToggle, elevated }: {
     }}>
       {isExact && (
         <svg key="sweep" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }} preserveAspectRatio="none" viewBox="0 0 320 190">
+          <rect x="2" y="2" width="316" height="186" rx="11" ry="11"
+            fill="none" stroke="#5aabf0" strokeWidth="3"
+            className="exact-dash-line"
+            style={{ strokeDasharray: 1400 }}
+          />
+        </svg>
+      )}
+      {elevated && !isExact && (
+        <svg key="sweep-elevated" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }} preserveAspectRatio="none" viewBox="0 0 320 190">
           <rect x="2" y="2" width="316" height="186" rx="11" ry="11"
             fill="none" stroke="#5aabf0" strokeWidth="3"
             className="exact-dash-line"
@@ -598,15 +612,22 @@ function ResultRow({ domain, added, onToggle, showLimitedTimeColumn, showRtb, fa
       )}
 
       {/* Prices */}
-      <Flex alignItems="baseline" gap="5px" sx={{ flexShrink: 0, minWidth: 72, justifyContent: 'flex-end' }}>
-        {hasDiscount && (
-          <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '16px', color: '#bbb', textDecoration: 'line-through' }}>
-            ${domain.originalPrice}
+      <Flex flexDirection="column" alignItems="flex-end" sx={{ flexShrink: 0 }}>
+        <Flex alignItems="baseline" gap="5px">
+          {hasDiscount && (
+            <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '16px', color: '#bbb', textDecoration: 'line-through' }}>
+              ${domain.originalPrice}
+            </Box>
+          )}
+          <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '16px', color: '#0e0e0e', letterSpacing: '-0.015px' }}>
+            ${price}
+          </Box>
+        </Flex>
+        {domain.premiumFee && (
+          <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '11px', color: '#888', letterSpacing: '-0.01px', whiteSpace: 'nowrap' }}>
+            +${domain.premiumFee.toLocaleString()} one-time
           </Box>
         )}
-        <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '16px', color: '#0e0e0e', letterSpacing: '-0.015px' }}>
-          ${price}
-        </Box>
       </Flex>
 
       {/* + / ✓ with pop + burst */}
@@ -629,8 +650,9 @@ function ResultRow({ domain, added, onToggle, showLimitedTimeColumn, showRtb, fa
     </Flex>
     {/* TLD upsell row — shown when domain is the active bundle */}
     {(() => {
-      if (!onAdd || !added) return null
+      if (!onAdd) return null
       const sld = getSld(domain.name)
+      if (!domainHasUpsell(sld)) return null
       const cartSet = cart ?? new Set<string>()
       const tlds = pickTldsForDomain(sld, new Set([...cartSet].map((id) => {
         const r = allResults?.find((x) => x.id === id)
@@ -642,7 +664,7 @@ function ResultRow({ domain, added, onToggle, showLimitedTimeColumn, showRtb, fa
       return (
         <Box sx={{
           display: 'grid',
-          gridTemplateRows: bundleOpen ? '1fr' : '0fr',
+          gridTemplateRows: (bundleOpen && added) ? '1fr' : '0fr',
           transition: 'grid-template-rows 0.3s cubic-bezier(0.4,0,0.2,1)',
         }}>
           <Box sx={{ minHeight: 0, overflow: 'hidden' }}>
@@ -664,22 +686,22 @@ function ResultRow({ domain, added, onToggle, showLimitedTimeColumn, showRtb, fa
                       onClick={(e: React.MouseEvent) => { e.stopPropagation(); if (!inCart) onAdd(domainObj) }}
                       sx={{
                         background: inCart ? '#e0e0e0' : '#f2f2f2', borderRadius: '24px',
-                        px: '12px', py: '8px', display: 'flex', alignItems: 'center', gap: '6px',
+                        px: '10px', py: '6px', display: 'flex', alignItems: 'center', gap: '6px',
                         flexShrink: 0, cursor: inCart ? 'default' : 'pointer',
                         transition: 'background 0.12s',
                         '&:hover': { background: inCart ? '#e0e0e0' : '#eaeaea' },
                       }}
                     >
-                      <Box sx={{ fontFamily: CLARKSON, fontSize: '14px', fontWeight: 500, color: '#0e0e0e', letterSpacing: '-0.015px', whiteSpace: 'nowrap' }}>
+                      <Box sx={{ fontFamily: CLARKSON, fontSize: '12px', fontWeight: 500, color: '#0e0e0e', letterSpacing: '-0.015px', whiteSpace: 'nowrap' }}>
                         {t.ext}
                       </Box>
                       <Flex alignItems="center" gap="3px">
-                        <Box sx={{ fontFamily: CLARKSON, fontSize: '14px', color: '#0e0e0e', letterSpacing: '-0.015px', whiteSpace: 'nowrap' }}>
+                        <Box sx={{ fontFamily: CLARKSON, fontSize: '12px', color: '#0e0e0e', letterSpacing: '-0.015px', whiteSpace: 'nowrap' }}>
                           ${t.price}
                         </Box>
                         {!inCart && (
-                          <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-                            <path d="M5.5 1v9M1 5.5h9" stroke="#0e0e0e" strokeWidth="1.4" strokeLinecap="round"/>
+                          <svg width="9" height="9" viewBox="0 0 9 9" fill="none">
+                            <path d="M4.5 1v7M1 4.5h7" stroke="#0e0e0e" strokeWidth="1.4" strokeLinecap="round"/>
                           </svg>
                         )}
                       </Flex>
@@ -702,24 +724,24 @@ function ResultRow({ domain, added, onToggle, showLimitedTimeColumn, showRtb, fa
                     })
                   }}
                   sx={{
-                    background: '#f2f2f2', borderRadius: '24px', px: '12px', py: '8px',
+                    background: '#f2f2f2', borderRadius: '24px', px: '10px', py: '6px',
                     display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0,
                     cursor: 'pointer', transition: 'background 0.12s',
                     '&:hover': { background: '#eaeaea' },
                   }}
                 >
-                  <Box sx={{ fontFamily: CLARKSON, fontSize: '14px', fontWeight: 500, color: '#0e0e0e', letterSpacing: '-0.015px', whiteSpace: 'nowrap' }}>
+                  <Box sx={{ fontFamily: CLARKSON, fontSize: '12px', fontWeight: 500, color: '#0e0e0e', letterSpacing: '-0.015px', whiteSpace: 'nowrap' }}>
                     Bundle & save
                   </Box>
                   <Flex alignItems="center" gap="4px">
-                    <Box sx={{ fontFamily: CLARKSON, fontSize: '14px', color: '#888', textDecoration: 'line-through', letterSpacing: '-0.015px', whiteSpace: 'nowrap' }}>
+                    <Box sx={{ fontFamily: CLARKSON, fontSize: '12px', color: '#888', textDecoration: 'line-through', letterSpacing: '-0.015px', whiteSpace: 'nowrap' }}>
                       ${bundleTotal}
                     </Box>
-                    <Box sx={{ fontFamily: CLARKSON, fontSize: '14px', color: '#0e0e0e', letterSpacing: '-0.015px', whiteSpace: 'nowrap' }}>
+                    <Box sx={{ fontFamily: CLARKSON, fontSize: '12px', color: '#0e0e0e', letterSpacing: '-0.015px', whiteSpace: 'nowrap' }}>
                       ${bundleDiscounted}
                     </Box>
-                    <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-                      <path d="M5.5 1v9M1 5.5h9" stroke="#0e0e0e" strokeWidth="1.4" strokeLinecap="round"/>
+                    <svg width="9" height="9" viewBox="0 0 9 9" fill="none">
+                      <path d="M4.5 1v7M1 4.5h7" stroke="#0e0e0e" strokeWidth="1.4" strokeLinecap="round"/>
                     </svg>
                   </Flex>
                 </Box>
@@ -997,9 +1019,16 @@ function MiniCart({ cartItems, onRemove }: {
                           >
                             {item.name}
                           </Text.Body>
-                          <Text.Body m={0} sx={{ fontSize: '14px', flexShrink: 0, color: '#555' }}>
-                            ${price}/yr
-                          </Text.Body>
+                          <Flex flexDirection="column" alignItems="flex-end" sx={{ flexShrink: 0 }}>
+                            <Text.Body m={0} sx={{ fontSize: '14px', color: '#555' }}>
+                              ${price}/yr
+                            </Text.Body>
+                            {item.premiumFee && (
+                              <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '11px', color: '#888', whiteSpace: 'nowrap' }}>
+                                +${item.premiumFee.toLocaleString()} one-time
+                              </Box>
+                            )}
+                          </Flex>
                           <Box
                             as="button"
                             onClick={() => handleRemoveCart(item.id)}
@@ -1799,7 +1828,7 @@ export default function DomainSearch() {
                 onClick={() => setGuideMe((g) => !g)}
                 sx={{
                   background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0,
-                  color: '#666', fontFamily: CLARKSON, fontSize: '15px',
+                  color: '#666', fontFamily: CLARKSON, fontSize: '12px',
                   letterSpacing: '-0.015px', lineHeight: 1.4, p: 0,
                   display: 'flex', alignItems: 'center', gap: '4px',
                 }}

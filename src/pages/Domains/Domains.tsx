@@ -370,7 +370,7 @@ export default function Domains() {
                 onClick={() => setGuideMe(g => !g)}
                 sx={{
                   background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0,
-                  color: '#666', fontFamily: CLARKSON, fontSize: '15px', letterSpacing: '-0.015px',
+                  color: '#666', fontFamily: CLARKSON, fontSize: '12px', letterSpacing: '-0.015px',
                   lineHeight: 1.4, p: 0, gap: '2px',
                 }}
               >
