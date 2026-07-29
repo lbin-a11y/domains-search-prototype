@@ -400,6 +400,18 @@ function FeaturedCard({ domain, isExact, added, onToggle, elevated }: {
   const [bellBurst, setBellBurst] = useState(false)
   const bellBurstKey = useRef(0)
   const [showLoginModal, setShowLoginModal] = useState(false)
+  const [hovered, setHovered] = useState(false)
+  const [cardBurst, setCardBurst] = useState(false)
+  const cardBurstKey = useRef<number>(0)
+
+  function handleCardClick() {
+    if (!added) {
+      cardBurstKey.current += 1
+      setCardBurst(true)
+      setTimeout(() => setCardBurst(false), 800)
+    }
+    onToggle()
+  }
 
   function handleBell(e: React.MouseEvent) {
     e.stopPropagation()
@@ -415,14 +427,18 @@ function FeaturedCard({ domain, isExact, added, onToggle, elevated }: {
     return (
       <>
         {showLoginModal && <LoginModal onClose={() => setShowLoginModal(false)} />}
-        <Box sx={{
+        <Box
+          onMouseEnter={() => setHovered(true)}
+          onMouseLeave={() => setHovered(false)}
+          sx={{
           position: 'relative',
           border: 'none',
           borderRadius: 12, p: '28px',
           display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
           minHeight: 190,
-          background: '#f8f8f8',
+          background: hovered ? '#efefef' : '#f8f8f8',
           boxShadow: 'none',
+          transition: 'background 0.15s',
         }}>
           <Box>
             <Flex alignItems="center" gap="5px" mb="10px">
@@ -470,31 +486,48 @@ function FeaturedCard({ domain, isExact, added, onToggle, elevated }: {
   }
 
   return (
-    <Box onClick={onToggle} sx={{
+    <Box
+      onClick={handleCardClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      sx={{
       position: 'relative',
       border: (isExact || elevated) ? '1px solid' : 'none', borderColor: '#a8cff8',
       borderRadius: 12, p: '28px',
       display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
       minHeight: 190,
-      background: isExact ? '#F4F5FD' : '#f8f8f8',
+      background: isExact
+        ? (hovered ? '#e8eaf8' : '#F4F5FD')
+        : (hovered ? '#efefef' : '#f8f8f8'),
       boxShadow: (isExact || elevated) ? '0px 4px 20px 0px rgba(0,0,0,0.10)' : 'none',
       cursor: 'pointer',
+      transition: 'background 0.15s',
     }}>
       {isExact && (
         <svg key="sweep" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }} preserveAspectRatio="none" viewBox="0 0 320 190">
           <rect x="2" y="2" width="316" height="186" rx="11" ry="11"
-            fill="none" stroke="#60b4ff" strokeWidth="2.5"
-            className="exact-dash-line"
-            style={{ strokeDasharray: 1400 }}
+            fill="none" stroke="#90c8ff" strokeWidth="5" strokeLinecap="round"
+            className="exact-trail"
+            style={{ strokeDasharray: '180 1220' }}
+          />
+          <rect x="2" y="2" width="316" height="186" rx="11" ry="11"
+            fill="none" stroke="#60b4ff" strokeWidth="2.5" strokeLinecap="round"
+            className="exact-head"
+            style={{ strokeDasharray: '50 1350' }}
           />
         </svg>
       )}
       {elevated && !isExact && (
         <svg key="sweep-elevated" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }} preserveAspectRatio="none" viewBox="0 0 320 190">
           <rect x="2" y="2" width="316" height="186" rx="11" ry="11"
-            fill="none" stroke="#60b4ff" strokeWidth="2.5"
-            className="exact-dash-line"
-            style={{ strokeDasharray: 1400 }}
+            fill="none" stroke="#90c8ff" strokeWidth="5" strokeLinecap="round"
+            className="exact-trail"
+            style={{ strokeDasharray: '180 1220' }}
+          />
+          <rect x="2" y="2" width="316" height="186" rx="11" ry="11"
+            fill="none" stroke="#60b4ff" strokeWidth="2.5" strokeLinecap="round"
+            className="exact-head"
+            style={{ strokeDasharray: '50 1350' }}
           />
         </svg>
       )}
@@ -534,7 +567,10 @@ function FeaturedCard({ domain, isExact, added, onToggle, elevated }: {
             {domain.premiumFee ? `per year + $${domain.premiumFee.toLocaleString()} one-time fee` : 'per year'}
           </Box>
         </Box>
-        <AddBtn added={added} onClick={onToggle} />
+        <Box sx={{ position: 'relative', display: 'inline-flex' }}>
+          {cardBurst && <IgBurst key={cardBurstKey.current} color="#fff" />}
+          <AddBtn added={added} onClick={onToggle} />
+        </Box>
       </Flex>
     </Box>
   )
@@ -622,7 +658,7 @@ function ResultRow({ domain, added, onToggle, showLimitedTimeColumn, showRtb, fa
       )}
 
       {/* Prices */}
-      <Flex flexDirection="column" alignItems="flex-end" sx={{ flexShrink: 0 }}>
+      <Flex flexDirection="column" alignItems="flex-end" sx={{ flexShrink: 0, ml: showLimitedTimeColumn ? '4px' : 0 }}>
         <Flex alignItems="baseline" gap="5px">
           {hasDiscount && (
             <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '16px', color: '#bbb', textDecoration: 'line-through' }}>
@@ -635,14 +671,14 @@ function ResultRow({ domain, added, onToggle, showLimitedTimeColumn, showRtb, fa
         </Flex>
         {domain.premiumFee && (
           <Tooltip text="This domain has a one-time premium registration fee in addition to the annual renewal price.">
-            <Flex alignItems="center" gap="3px" sx={{ cursor: 'default' }}>
+            <Flex alignItems="center" gap="5px" sx={{ cursor: 'default' }}>
               <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '11px', color: '#888', letterSpacing: '-0.01px', whiteSpace: 'nowrap' }}>
                 +${domain.premiumFee.toLocaleString()} one-time fee
               </Box>
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0 }}>
-                <circle cx="6" cy="6" r="5.25" stroke="#bbb" strokeWidth="1.1"/>
-                <path d="M6 5.5V8.5" stroke="#bbb" strokeWidth="1.1" strokeLinecap="round"/>
-                <circle cx="6" cy="3.75" r="0.6" fill="#bbb"/>
+                <circle cx="6" cy="6" r="5.25" stroke="#888" strokeWidth="1.1"/>
+                <path d="M6 5.5V8.5" stroke="#888" strokeWidth="1.1" strokeLinecap="round"/>
+                <circle cx="6" cy="3.75" r="0.6" fill="#888"/>
               </svg>
             </Flex>
           </Tooltip>
@@ -807,6 +843,7 @@ function FilterPill({ label, active, onClick, chevron, muted }: {
   return (
     <Flex
       as="button" alignItems="center" gap="3px" onClick={onClick}
+      onMouseDown={(e: React.MouseEvent) => e.preventDefault()}
       sx={{
         height: 40, px: '16px', py: '10px',
         backdropFilter: 'blur(25px)',
@@ -1642,14 +1679,22 @@ export default function DomainSearch() {
           100% { opacity: 1; transform: translateY(0) scale(1); }
         }
         .fav-popover-in { animation: fav-popover-in 0.18s cubic-bezier(0.4,0,0.2,1) forwards; }
-        @keyframes exact-dash {
-          0%   { stroke-dashoffset: 1400; opacity: 0; filter: drop-shadow(0 0 0px #5aabf0); }
-          5%   { opacity: 1; }
-          70%  { stroke-dashoffset: 0; opacity: 1; filter: drop-shadow(0 0 8px #5aabf0) drop-shadow(0 0 3px #fff); }
-          85%  { stroke-dashoffset: 0; opacity: 0.6; filter: drop-shadow(0 0 12px #5aabf0); }
-          100% { stroke-dashoffset: 0; opacity: 0; filter: drop-shadow(0 0 0px #5aabf0); }
+        @keyframes exact-trail {
+          0%   { stroke-dashoffset: 1460; opacity: 0; }
+          5%   { opacity: 0.4; }
+          78%  { stroke-dashoffset: 60; opacity: 0.3; }
+          92%  { opacity: 0; }
+          100% { stroke-dashoffset: 60; opacity: 0; }
         }
-        .exact-dash-line { animation: exact-dash 1.8s cubic-bezier(0.25,0.46,0.45,0.94) 0s 1 forwards; }
+        @keyframes exact-head {
+          0%   { stroke-dashoffset: 1400; opacity: 0; filter: drop-shadow(0 0 0px #b8dcff); }
+          4%   { opacity: 1; filter: drop-shadow(0 0 5px #90c8ff) drop-shadow(0 0 2px #fff); }
+          70%  { stroke-dashoffset: 0; opacity: 1; filter: drop-shadow(0 0 10px #68b8ff) drop-shadow(0 0 4px #fff); }
+          84%  { stroke-dashoffset: 0; opacity: 0.7; filter: drop-shadow(0 0 14px #50a8f0) drop-shadow(0 0 2px #d0e8ff); }
+          100% { stroke-dashoffset: 0; opacity: 0; filter: drop-shadow(0 0 0px transparent); }
+        }
+        .exact-trail { animation: exact-trail 2.2s cubic-bezier(0.25,0.46,0.45,0.94) 0s 1 forwards; }
+        .exact-head  { animation: exact-head  2.0s cubic-bezier(0.25,0.46,0.45,0.94) 0s 1 forwards; }
       `}</style>
 
       {/* ── Nav ── */}
@@ -1877,12 +1922,11 @@ export default function DomainSearch() {
               overflow: 'hidden', py: '8px',
             }}>
               {searchQuery.trim().split(/\s+/).filter(Boolean).length <= 2 && searchQuery.trim().length > 0 && searchQuery.trim().length <= 20 && (
-                <Flex alignItems="flex-start" gap="10px" sx={{ px: '22px', py: '10px', borderBottom: '1px solid #f0f0f0', mb: '4px' }}>
-                  <Sparkles sx={{ width: 14, height: 14, color: '#aaa', flexShrink: 0, mt: '2px' }} />
-                  <Box sx={{ fontFamily: CLARKSON, fontSize: '13px', color: '#999', lineHeight: 1.45 }}>
-                    Tip: Add more info about your business for better results — vibe, location, or industry
+                <Box sx={{ px: '22px', py: '10px' }}>
+                  <Box as="span" sx={{ fontFamily: CLARKSON, fontSize: '14px', color: '#888', lineHeight: 1.4 }}>
+                    <Box as="strong" sx={{ fontWeight: 600 }}>Tip:</Box>{' '}Add more info about your business for better results — vibe, location, or industry
                   </Box>
-                </Flex>
+                </Box>
               )}
               {PERSONALIZED_SUGGESTIONS.map((s) => (
                 <Box
@@ -2098,6 +2142,7 @@ export default function DomainSearch() {
             <Flex
               as="button" alignItems="center" gap="3px"
               onClick={() => setSortDropdownOpen((o) => !o)}
+              onMouseDown={(e: React.MouseEvent) => e.preventDefault()}
               sx={{
                 height: 40, px: '16px', py: '10px',
                 backdropFilter: 'blur(25px)',
