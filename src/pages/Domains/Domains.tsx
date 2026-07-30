@@ -13,11 +13,11 @@ const SEARCH_HINTS = [
   'A photography portfolio for a travel photographer',
 ]
 
-// Figma asset URLs — valid for ~7 days from 2026-07-24
-const IMG_BLOBS = 'https://www.figma.com/api/mcp/asset/14128ebd-bda4-4e1a-a56d-64cd92954e36'
-const IMG_SS_LEFT = 'https://www.figma.com/api/mcp/asset/881c869e-d268-41c5-a9ba-1f2902cf13e2'
-const IMG_SS_CENTER = 'https://www.figma.com/api/mcp/asset/33b48426-03ea-4fc2-b184-9b114bdf7050'
-const IMG_SS_RIGHT = 'https://www.figma.com/api/mcp/asset/69ee33f3-aea1-4085-ba03-9911825c4c8a'
+// Figma asset URLs — valid for ~7 days from 2026-07-30
+const IMG_BLOBS = 'https://www.figma.com/api/mcp/asset/38f6e583-5a17-4deb-9811-8ad33847d035'
+const IMG_SS_LEFT = 'https://www.figma.com/api/mcp/asset/e424e611-5eb6-4fab-93cc-c0e97c3ef3e7'
+const IMG_SS_CENTER = 'https://www.figma.com/api/mcp/asset/8783f036-8276-45dc-8e5d-867471694a7e'
+const IMG_SS_RIGHT = 'https://www.figma.com/api/mcp/asset/ad781531-606f-40a6-a971-19955cc93dc3'
 
 const CLARKSON = '"Clarkson", Helvetica, sans-serif'
 const CLARKSON_SERIF = '"Clarkson Serif TT", "Clarkson Serif", Georgia, serif'
@@ -67,6 +67,7 @@ function XIcon() {
 
 export default function Domains() {
   const navigate = useNavigate()
+  const [imgScale, setImgScale] = useState(1)
   const [query, setQuery] = useState('')
   const [tab, setTab] = useState<'buy' | 'transfer'>('buy')
   const [searchFocused, setSearchFocused] = useState(false)
@@ -78,6 +79,13 @@ export default function Domains() {
   const [businessName, setBusinessName] = useState('')
 
   const guideMeSummary = [businessName, industry, selectedVibes.join(', ')].filter(Boolean).join(' · ')
+
+  useEffect(() => {
+    const update = () => setImgScale(Math.min(1, (window.innerWidth - 40) / 1187))
+    update()
+    window.addEventListener('resize', update)
+    return () => window.removeEventListener('resize', update)
+  }, [])
 
   useEffect(() => {
     if (query || tab === 'transfer') return
@@ -152,33 +160,20 @@ export default function Domains() {
       </Box>
 
       {/* ── Hero ─────────────────────────────────────────────────────────────── */}
-      <Box sx={{ position: 'relative', height: 820, background: '#fff', overflow: 'hidden' }}>
+      <Box sx={{ position: 'relative', height: 820, overflow: 'hidden',
+        background: 'radial-gradient(ellipse 700px 560px at 22% 92%, rgba(230,215,255,0.55) 0%, transparent 70%), radial-gradient(ellipse 660px 520px at 78% 90%, rgba(195,240,225,0.55) 0%, transparent 70%), #fff',
+      }}>
 
         {/* Blobs background */}
-        <Box sx={{ position: 'absolute', left: 'calc(50% - 542px)', top: 308, width: 1152, height: 820, pointerEvents: 'none', zIndex: 0 }}>
-          <img src={IMG_BLOBS} style={{ width: '100%', height: '100%', display: 'block', filter: 'brightness(1.05) saturate(1.05)' }} alt="" />
-        </Box>
-
-        {/* Left screenshot */}
-        <Box sx={{ position: 'absolute', left: 'calc(50% - 1148px)', top: 528, width: 600, height: 376, borderRadius: 11, overflow: 'hidden', opacity: 0.5, zIndex: 1 }}>
-          <img src={IMG_SS_LEFT} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} alt="" />
-        </Box>
-
-        {/* Center screenshot */}
-        <Box sx={{ position: 'absolute', left: 'calc(50% - 521px)', top: 463, width: 1042, height: 649, borderRadius: 11, overflow: 'hidden', zIndex: 1 }}>
-          <img src={IMG_SS_CENTER} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} alt="" />
-        </Box>
-
-        {/* Right screenshot */}
-        <Box sx={{ position: 'absolute', left: 'calc(50% + 548px)', top: 528, width: 600, height: 374, borderRadius: 11, overflow: 'hidden', opacity: 0.5, zIndex: 1 }}>
-          <img src={IMG_SS_RIGHT} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} alt="" />
+        <Box sx={{ position: 'absolute', left: 'calc(50% - 542px)', top: 308, width: 1152, height: 820, pointerEvents: 'none', zIndex: 0, overflow: 'visible' }}>
+          <img src={IMG_BLOBS} style={{ position: 'absolute', top: '-33.75%', right: '-20.76%', bottom: '-33.85%', left: '-14.51%', width: 'calc(100% + 14.51% + 20.76%)', height: 'calc(100% + 33.75% + 33.85%)', display: 'block' }} alt="" />
         </Box>
 
         {/* Hero content */}
         <Flex
           flexDirection="column"
           alignItems="center"
-          sx={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', top: 70, width: 'min(777px, calc(100vw - 32px))', zIndex: 2, gap: '33px' }}
+          sx={{ position: 'relative', mx: 'auto', pt: 40, pb: '52px', width: 'min(777px, calc(100vw - 32px))', zIndex: 2, gap: '33px' }}
         >
           {/* Buy / Transfer toggle */}
           <Box sx={{
@@ -241,16 +236,16 @@ export default function Domains() {
             sx={{
               fontFamily: CLARKSON,
               fontWeight: 300,
-              fontSize: '80px',
+              fontSize: 'clamp(32px, 5vw, 56px)',
               lineHeight: 0.93,
-              letterSpacing: '-4px',
+              letterSpacing: 'clamp(-1.5px, -0.25vw, -2.5px)',
               color: '#0e0e0e',
               textAlign: 'center',
               width: '100%',
               animation: 'heroTextIn 0.3s cubic-bezier(0.4,0,0.2,1) forwards',
             }}
           >
-            {tab === 'buy' ? 'Buy your dream domain' : <>Transfer your<br />domain</>}
+            {tab === 'buy' ? 'Buy your dream domain' : 'Transfer your domain'}
           </Box>
 
           {/* Subtitle */}
@@ -264,10 +259,11 @@ export default function Domains() {
               fontSize: '15px',
               lineHeight: 1.4,
               letterSpacing: '-0.015px',
-              color: '#0e0e0e',
+              color: '#666',
               textAlign: 'center',
               textShadow: '0px 1.802px 99.11px #432619',
-              width: 544,
+              width: '100%',
+              maxWidth: 544,
               animation: 'heroTextIn 0.35s cubic-bezier(0.4,0,0.2,1) 0.05s both',
             }}
           >
@@ -301,7 +297,7 @@ export default function Domains() {
               background: '#fff',
               boxShadow: searchFocused
                 ? '0px 0px 2px 0px rgba(0,0,0,0.14), 0px 12px 40px 0px rgba(0,0,0,0.18)'
-                : '0px 0px 1px 0px rgba(0,0,0,0.04), 0px 2px 8px 0px rgba(0,0,0,0.06)',
+                : '0px 0px 2px 0px rgba(0,0,0,0.10), 0px 4px 16px 0px rgba(0,0,0,0.13)',
               transition: 'box-shadow 0.2s ease, border-radius 0.1s ease',
               overflow: 'hidden',
               flexShrink: 0,
@@ -548,6 +544,32 @@ export default function Domains() {
           )}
           </Box>{/* end position:relative wrapper */}
         </Flex>
+
+        {/* Screenshots — in-flow, scaled to fit viewport */}
+        <Box sx={{ position: 'relative', width: '100%', height: 552 * imgScale, zIndex: 1, pointerEvents: 'none' }}>
+          <Box style={{ position: 'absolute', left: '50%', transform: `translateX(-50%) scale(${imgScale})`, transformOrigin: 'top center', width: 1187, height: 552 }}>
+            {/* Left — rotated -10deg */}
+            <Box sx={{ position: 'absolute', left: 'calc(50% - 594px)', top: 73, zIndex: 1 }}>
+              <Box sx={{ transform: 'rotate(-10deg)', transformOrigin: 'center center' }}>
+                <Box sx={{ width: 408, height: 256, borderRadius: 11, overflow: 'hidden', opacity: 0.5 }}>
+                  <img src={IMG_SS_LEFT} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} alt="" />
+                </Box>
+              </Box>
+            </Box>
+            {/* Center */}
+            <Box sx={{ position: 'absolute', left: 'calc(50% - 444px)', top: 0, width: 885, height: 552, borderRadius: 11, overflow: 'hidden', zIndex: 2 }}>
+              <img src={IMG_SS_CENTER} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} alt="" />
+            </Box>
+            {/* Right — rotated +10deg */}
+            <Box sx={{ position: 'absolute', left: 'calc(50% + 147px)', top: 73, zIndex: 1 }}>
+              <Box sx={{ transform: 'rotate(10deg)', transformOrigin: 'center center' }}>
+                <Box sx={{ width: 408, height: 254, borderRadius: 11, overflow: 'hidden', opacity: 0.5 }}>
+                  <img src={IMG_SS_RIGHT} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} alt="" />
+                </Box>
+              </Box>
+            </Box>
+          </Box>
+        </Box>
       </Box>
 
       {/* ── Pricing ──────────────────────────────────────────────────────────── */}
@@ -560,7 +582,7 @@ export default function Domains() {
               fontFamily: CLARKSON_SERIF,
               fontWeight: 300,
               fontSize: '40px',
-              lineHeight: 1,
+              lineHeight: 1.2,
               letterSpacing: '-1.6px',
               color: '#000',
               mb: '24px',
@@ -733,7 +755,7 @@ export default function Domains() {
               fontFamily: CLARKSON_SERIF,
               fontWeight: 300,
               fontSize: '40px',
-              lineHeight: 1,
+              lineHeight: 1.2,
               letterSpacing: '-1.6px',
               color: '#000',
             }}>

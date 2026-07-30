@@ -1085,7 +1085,7 @@ function MiniCart({ cartItems, onRemove }: {
                           >
                             {item.name}
                           </Text.Body>
-                          <Flex flexDirection="column" alignItems="flex-end" sx={{ flexShrink: 0 }}>
+                          <Flex flexDirection="column" alignItems="flex-end" gap="2px" sx={{ flexShrink: 0 }}>
                             <Text.Body m={0} sx={{ fontSize: '14px', color: '#555' }}>
                               ${price}/yr
                             </Text.Body>
