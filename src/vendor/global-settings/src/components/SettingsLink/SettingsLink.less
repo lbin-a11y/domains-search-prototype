@@ -1,0 +1,20 @@
+@import '~@sqs/styles/variables.less';
+@import '~@sqs/rosetta-themes/less/default';
+
+:local {
+  .container {
+    padding-top: @grid * 3;
+    padding-bottom: @grid * 3;
+    margin-top: auto;
+
+    @media @breakpoints-mobile-0 {
+      padding-top: @grid * 5;
+      padding-bottom: @space-4;
+    }
+  }
+
+  .navText {
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+  }
+}

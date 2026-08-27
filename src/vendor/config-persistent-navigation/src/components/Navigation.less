@@ -1,0 +1,14 @@
+@import '~@sqs/rosetta-themes/less/default';
+@import '~@sqs/styles/variables';
+
+:local {
+  .logo_bounce {
+    @easing: @global-transition-easing-bounce;
+    transition: all @global-transition-duration @easing;
+
+    &:active {
+      transform: scale(.5);
+      transition: all @time-50 @easing;
+    }
+  }
+}

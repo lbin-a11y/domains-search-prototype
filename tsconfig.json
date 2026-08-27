@@ -10,10 +10,25 @@
     "noEmit": true,
     "skipLibCheck": true,
     "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
+    // Off because src/vendor holds source copied verbatim from
+    // sqsp/config-frontend, which uses the classic JSX runtime convention of
+    // importing React in every file. Those files are part of the program (the
+    // app imports them), so these checks would flag upstream code we do not own.
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true,
-    "noUncheckedSideEffectImports": true
+    "noUncheckedSideEffectImports": true,
+    "baseUrl": ".",
+    "paths": {
+      "@sqs/dashboard-framework": ["./src/vendor/dashboard-framework/src/index.ts"],
+      "@sqs/dashboard-components": ["./src/vendor/dashboard-components/src/index.ts"],
+      "@sqs/home-dashboard": ["./src/vendor/home-dashboard/src/index.ts"]
+    }
   },
-  "include": ["src", "vite.config.ts"]
+  "include": ["src", "vite.config.ts"],
+  // src/vendor holds source copied verbatim from sqsp/config-frontend. Much of
+  // it is kept only for reference and imports internal packages that are not
+  // installed here. Excluding it stops those files being type-check roots; the
+  // ones the app actually imports are still pulled in and checked.
+  "exclude": ["src/vendor"]
 }

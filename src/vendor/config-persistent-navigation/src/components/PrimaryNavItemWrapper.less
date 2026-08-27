@@ -1,0 +1,61 @@
+@keyframes ~":local(toggleSlideIn)" {
+  0% { transform: scale(0.5); }
+  100% { transform: scale(1); }
+}
+
+@keyframes ~":local(toggleSlideOut)" {
+  0% { transform: scale(1); }
+  100% { transform: scale(0.5); }
+}
+
+@keyframes ~":local(toggleFadeIn)" {
+  0% { opacity: 0; }
+  22% { opacity: 0; }
+  25% { opacity: 1; }
+  100% { opacity: 1; }
+}
+
+@keyframes ~":local(toggleFadeOut)" {
+  0% { opacity: 1; }
+  22% { opacity: 1; }
+  25% { opacity: 0; }
+  100% { opacity: 0; }
+}
+
+:local {
+  .toggleVisible, .toggleNotVisible {
+    animation-duration: 1s, 1s;
+    animation-timing-function: cubic-bezier(0.6, 0, 0.1, 1), linear;
+    animation-fill-mode: forwards, forwards;
+  }
+
+  .toggleVisible { animation-name: toggleSlideIn, toggleFadeIn; }
+  .toggleNotVisible { animation-name: toggleSlideOut, toggleFadeOut; }
+
+  .toggleWrapper {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: 0;
+    margin-right: 27px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+
+    &.editing:has(.customNavNotTriggered),
+    &.editing:has(.toggleNotVisible) {
+      opacity: 1;
+
+      .toggleNotVisible { animation: none; }
+    }
+
+    &.notEditing:has(.customNavNotTriggered),
+    &.notEditing:has(.toggleVisible) {
+      opacity: 0;
+
+      .toggleVisible { animation: none; }
+    }
+    
+    .customNavNotTriggered { opacity: inherit }
+  }
+}

@@ -9,31 +9,56 @@
     "preview": "pnpm run build && vite preview"
   },
   "dependencies": {
+    "@opentelemetry/api": "^1.9.1",
+    "@sqs/config-context": "^1.8.0",
+    "@sqs/config-sentry-integration": "^1.3.1",
+    "@sqs/config-ui-preferences-ts-client": "^0.0.11",
+    "@sqs/enums": "^2.523.0",
     "@sqs/i18n-cldr": "^2.9.0",
     "@sqs/i18n-react": "^1.15.4",
     "@sqs/i18n-react-context": "^1.0.0",
-    "@sqs/rosetta-compositions": "^12.25.1",
-    "@sqs/rosetta-dashboard": "^12.25.1",
-    "@sqs/rosetta-elements": "^12.25.1",
-    "@sqs/rosetta-glyphs": "^12.25.1",
-    "@sqs/rosetta-icons": "^12.25.1",
-    "@sqs/rosetta-primitives": "^12.25.1",
-    "@sqs/rosetta-styled": "^12.25.1",
-    "@sqs/rosetta-themes": "^12.25.1",
-    "@sqs/rosetta-tokens": "^12.25.1",
-    "@sqs/rosetta-utilities": "^12.25.1",
+    "@sqs/rosetta-compositions": "^13.14.0",
+    "@sqs/rosetta-elements": "^13.14.0",
+    "@sqs/rosetta-glyphs": "^13.14.0",
+    "@sqs/rosetta-icons": "^13.14.0",
+    "@sqs/rosetta-primitives": "^13.14.0",
+    "@sqs/rosetta-react": "13.14.0",
+    "@sqs/rosetta-styled": "^13.14.0",
+    "@sqs/rosetta-themes": "^13.14.0",
+    "@sqs/rosetta-utilities": "^13.14.0",
+    "@sqs/tracing": "^1.1.3",
+    "@sqs/tunnel": "^1.1.1",
+    "@sqs/universal-panel-components": "^2.10.4",
+    "@sqs/universal-router": "^1.7.4",
+    "@sqs/universal-utils": "^2.4.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^7.13.0"
+    "react-focus-lock": "^2.13.7",
+    "react-router-dom": "^7.13.0",
+    "react-use": "^17.6.1"
   },
   "devDependencies": {
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
     "@vitejs/plugin-react-swc": "^4.0.0",
+    "less": "^4.9.0",
     "typescript": "~5.8.3",
     "vite": "^6.3.5"
   },
   "overrides": {
     "react-native": "0.75.5"
+  },
+  "pnpm": {
+    "overrides": {
+      "@sqs/rosetta-compositions": "13.14.0",
+      "@sqs/rosetta-elements": "13.14.0",
+      "@sqs/rosetta-glyphs": "13.14.0",
+      "@sqs/rosetta-icons": "13.14.0",
+      "@sqs/rosetta-primitives": "13.14.0",
+      "@sqs/rosetta-react": "13.14.0",
+      "@sqs/rosetta-styled": "13.14.0",
+      "@sqs/rosetta-themes": "13.14.0",
+      "@sqs/rosetta-utilities": "13.14.0"
+    }
   }
 }
