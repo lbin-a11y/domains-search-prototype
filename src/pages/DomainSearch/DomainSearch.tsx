@@ -19,7 +19,6 @@ import {
 // ── Types ────────────────────────────────────────────────────────────────────
 
 type DomainBadge = 'exact' | 'premium' | 'promoted'
-type MyrVariant = 'divider' | 'label' | 'subtext'
 
 interface MyrDiscount {
   type: 'flat' | 'incremental'
@@ -249,96 +248,6 @@ function Badge({ kind }: { kind: DomainBadge }) {
     )
   }
   return null
-}
-
-// ── Variant nav ───────────────────────────────────────────────────────────────
-
-const VARIANT_LABELS: Record<MyrVariant, string> = {
-  divider: 'Divider',
-  label: 'Label',
-  subtext: 'Subtext',
-}
-
-const VARIANT_FIGMA: Record<MyrVariant, string> = {
-  divider: 'https://www.figma.com/design/LRN00J69dEcl5X5BHvhQJ6/Multi-year-term-discount?node-id=196-11538',
-  label: 'https://www.figma.com/design/LRN00J69dEcl5X5BHvhQJ6/Multi-year-term-discount?node-id=196-10572',
-  subtext: 'https://www.figma.com/design/LRN00J69dEcl5X5BHvhQJ6/Multi-year-term-discount?node-id=200-14480',
-}
-
-const VARIANT_KEY = 'myr-variant'
-
-function VariantNav({ variant, onChange }: { variant: MyrVariant; onChange: (v: MyrVariant) => void }) {
-  return (
-    <Box
-      sx={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        zIndex: 400,
-        background: '#f5f5f5',
-        borderBottom: '1px solid #e2e2e2',
-        height: 44,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: '6px',
-        px: 4,
-      }}
-    >
-      <Text.Caption m={0} color="fg.muted" sx={{ fontSize: '11px', letterSpacing: '0.06em', textTransform: 'uppercase', mr: 2, flexShrink: 0 }}>
-        Dropdown variant
-      </Text.Caption>
-      {(['divider', 'label', 'subtext'] as MyrVariant[]).map((v) => {
-        const active = variant === v
-        return (
-          <Flex key={v} alignItems="center" gap={1}>
-            <Box
-              as="button"
-              onClick={() => { onChange(v); try { localStorage.setItem(VARIANT_KEY, v) } catch {} }}
-              sx={{
-                px: '12px',
-                py: '5px',
-                borderRadius: 20,
-                border: '1px solid',
-                borderColor: active ? 'fg.default' : '#d0d0d0',
-                background: active ? 'var(--colors-fg-default)' : '#fff',
-                color: active ? '#fff' : 'var(--colors-fg-muted)',
-                cursor: 'pointer',
-                fontSize: '12px',
-                fontWeight: active ? 600 : 400,
-                letterSpacing: '0.02em',
-                transition: 'all 0.15s ease',
-                '&:hover': {
-                  borderColor: 'fg.default',
-                  background: active ? 'var(--colors-fg-default)' : '#f0f0f0',
-                },
-              }}
-            >
-              {VARIANT_LABELS[v]}
-            </Box>
-            <Box
-              as="a"
-              href={VARIANT_FIGMA[v]}
-              target="_blank"
-              rel="noopener noreferrer"
-              title="Figma reference"
-              sx={{
-                color: '#aaa',
-                fontSize: '10px',
-                textDecoration: 'none',
-                display: 'flex',
-                alignItems: 'center',
-                '&:hover': { color: '#0862d1' },
-              }}
-            >
-              ↗
-            </Box>
-          </Flex>
-        )
-      })}
-    </Box>
-  )
 }
 
 // ── Result row ────────────────────────────────────────────────────────────────
@@ -960,20 +869,11 @@ function MobileMiniCart({
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
-const VARIANT_NAV_HEIGHT = 44
-
 export default function DomainSearch() {
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const q = searchParams.get('q') ?? ''
 
-  const [variant, setVariant] = useState<MyrVariant>(() => {
-    try {
-      const v = localStorage.getItem(VARIANT_KEY)
-      if (v === 'divider' || v === 'label' || v === 'subtext') return v
-    } catch {}
-    return 'divider'
-  })
   const [inputValue, setInputValue] = useState(q)
   const [results, setResults] = useState<DomainResult[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -1079,16 +979,13 @@ export default function DomainSearch() {
   const hasCart = cartCount > 0
 
   return (
-    <Box sx={{ minHeight: '100vh', background: '#fff', pt: `${VARIANT_NAV_HEIGHT}px` }}>
-
-      {/* ── Variant nav ── */}
-      <VariantNav variant={variant} onChange={setVariant} />
+    <Box sx={{ minHeight: '100vh', background: '#fff' }}>
 
       {/* ── Nav ── */}
       <Box
         sx={{
           position: 'fixed',
-          top: VARIANT_NAV_HEIGHT,
+          top: 0,
           left: 0,
           right: 0,
           zIndex: 200,
@@ -1296,7 +1193,7 @@ export default function DomainSearch() {
 
           {/* ── Right: cart sidebar ── */}
           {hasCart && (
-            <Box sx={{ flex: 2, minWidth: 0, alignSelf: 'flex-start', position: 'sticky', top: VARIANT_NAV_HEIGHT + 80, '@media (max-width: 767px)': { display: 'none' } }}>
+            <Box sx={{ flex: 2, minWidth: 0, alignSelf: 'flex-start', position: 'sticky', top: 80, '@media (max-width: 767px)': { display: 'none' } }}>
               <CartSidebar items={cartItems} results={results} onRemove={removeFromCart} onAdd={toggleCart} />
             </Box>
           )}

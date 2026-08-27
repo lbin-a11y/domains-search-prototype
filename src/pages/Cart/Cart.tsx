@@ -15,7 +15,6 @@ import { InfoCircleFilled } from '@sqs/rosetta-glyphs'
 // ── Types ──────────────────────────────────────────────────────────────────
 
 type DomainBadge = 'exact' | 'premium' | 'promoted'
-type MyrVariant = 'divider' | 'label' | 'subtext'
 
 interface MyrDiscount {
   type: 'flat' | 'incremental'
@@ -89,22 +88,6 @@ function termDiscount(item: DomainResult, years: number): number {
   return termOriginalPrice(item, years) - termPrice(item, years)
 }
 
-// ── Variant helpers ────────────────────────────────────────────────────────
-
-const VARIANT_KEY = 'myr-variant'
-
-function readVariant(): MyrVariant {
-  try {
-    const v = localStorage.getItem(VARIANT_KEY)
-    if (v === 'divider' || v === 'label' || v === 'subtext') return v
-  } catch {}
-  return 'divider'
-}
-
-function writeVariant(v: MyrVariant) {
-  try { localStorage.setItem(VARIANT_KEY, v) } catch {}
-}
-
 // ── Breadcrumb ─────────────────────────────────────────────────────────────
 
 function Breadcrumb() {
@@ -152,99 +135,16 @@ function Breadcrumb() {
   )
 }
 
-// ── Variant nav ────────────────────────────────────────────────────────────
-
-const VARIANT_LABELS: Record<MyrVariant, string> = {
-  divider: 'Divider',
-  label: 'Label',
-  subtext: 'Subtext',
-}
-
-const VARIANT_FIGMA: Record<MyrVariant, string> = {
-  divider: 'https://www.figma.com/design/LRN00J69dEcl5X5BHvhQJ6/Multi-year-term-discount?node-id=196-11538',
-  label:   'https://www.figma.com/design/LRN00J69dEcl5X5BHvhQJ6/Multi-year-term-discount?node-id=196-10572',
-  subtext: 'https://www.figma.com/design/LRN00J69dEcl5X5BHvhQJ6/Multi-year-term-discount?node-id=200-14480',
-}
-
-function VariantNav({ variant, onChange }: { variant: MyrVariant; onChange: (v: MyrVariant) => void }) {
-  return (
-    <Box
-      sx={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        zIndex: 500,
-        background: '#f5f5f5',
-        borderBottom: '1px solid #e2e2e2',
-        height: 44,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: '6px',
-        px: 4,
-      }}
-    >
-      <Text.Caption m={0} color="fg.muted" sx={{ fontSize: '11px', letterSpacing: '0.06em', textTransform: 'uppercase', mr: 2, flexShrink: 0 }}>
-        Dropdown variant
-      </Text.Caption>
-      {(['divider', 'label', 'subtext'] as MyrVariant[]).map((v) => {
-        const active = variant === v
-        return (
-          <Flex key={v} alignItems="center" gap={1}>
-            <Box
-              as="button"
-              onClick={() => { onChange(v); writeVariant(v) }}
-              sx={{
-                px: '12px',
-                py: '5px',
-                borderRadius: 20,
-                border: '1px solid',
-                borderColor: active ? 'fg.default' : '#d0d0d0',
-                background: active ? 'var(--colors-fg-default)' : '#fff',
-                color: active ? '#fff' : 'var(--colors-fg-muted)',
-                cursor: 'pointer',
-                fontSize: '12px',
-                fontWeight: active ? 600 : 400,
-                letterSpacing: '0.02em',
-                transition: 'all 0.15s ease',
-                '&:hover': {
-                  borderColor: 'fg.default',
-                  background: active ? 'var(--colors-fg-default)' : '#f0f0f0',
-                },
-              }}
-            >
-              {VARIANT_LABELS[v]}
-            </Box>
-            <Box
-              as="a"
-              href={VARIANT_FIGMA[v]}
-              target="_blank"
-              rel="noopener noreferrer"
-              title="Figma reference"
-              sx={{ color: '#aaa', fontSize: '10px', textDecoration: 'none', display: 'flex', alignItems: 'center', '&:hover': { color: '#0862d1' } }}
-            >
-              ↗
-            </Box>
-          </Flex>
-        )
-      })}
-    </Box>
-  )
-}
-
 // ── Term dropdown (desktop) ────────────────────────────────────────────────
 
 function TermDropdown({
   item,
   selectedYears,
-  variant,
   onSelect,
   onClose,
 }: {
   item: DomainResult
   selectedYears: number
-  variant: MyrVariant
   onSelect: (years: number) => void
   onClose: () => void
 }) {
@@ -315,62 +215,15 @@ function TermDropdown({
         py: '6px',
       }}
     >
-      {variant === 'divider' && (() => {
-        const noDisc = years.filter((y) => !disc || getYearDiscount(y, disc) === null)
-        const withDisc = years.filter((y) => disc && getYearDiscount(y, disc) !== null)
-        return (
-          <>
-            {noDisc.map((y) => renderRow(y, null))}
-            {withDisc.length > 0 && (
-              <>
-                {/* Section divider */}
-                <Flex alignItems="center" gap={3} px={3} py={2}>
-                  <Box sx={{ flex: 1, height: '1px', background: '#e7e7e7' }} />
-                  <Text.Caption
-                    m={0}
-                    sx={{ fontSize: '9.75px', fontWeight: 500, letterSpacing: '0.75px', textTransform: 'uppercase', color: '#666', whiteSpace: 'nowrap', flexShrink: 0 }}
-                  >
-                    Save on your first year
-                  </Text.Caption>
-                  <Box sx={{ flex: 1, height: '1px', background: '#e7e7e7' }} />
-                </Flex>
-                {withDisc.map((y) => {
-                  const d = disc ? getYearDiscount(y, disc) : null
-                  const chip = d !== null ? (
-                    <Box sx={{ px: '8px', py: '3px', borderRadius: 20, background: '#dbeafe', flexShrink: 0 }}>
-                      <Text.Caption m={0} sx={{ fontSize: '11px', fontWeight: 500, color: '#0862d1', lineHeight: 1 }}>
-                        {d === 'FREE' ? 'FREE' : `${d}%`} off
-                      </Text.Caption>
-                    </Box>
-                  ) : null
-                  return renderRow(y, chip)
-                })}
-              </>
-            )}
-          </>
-        )
-      })()}
-
-      {variant === 'label' && years.map((y) => {
+      {years.map((y) => {
         const d = disc ? getYearDiscount(y, disc) : null
-        const labelText = d === null ? null : d === 'FREE' ? 'FREE FIRST YEAR' : `${d}% OFF FIRST YEAR`
+        const labelText = d === null ? null : d === 'FREE' ? 'FREE' : `${d}% OFF`
         const label = labelText ? (
           <Text.Caption m={0} sx={{ fontSize: '10px', fontWeight: 500, letterSpacing: '0.06em', color: '#0862d1', flexShrink: 0 }}>
             {labelText}
           </Text.Caption>
         ) : null
         return renderRow(y, label)
-      })}
-
-      {variant === 'subtext' && years.map((y) => {
-        const d = disc ? getYearDiscount(y, disc) : null
-        const captionText = d === null ? null : d === 'FREE' ? 'FREE first year' : `${d}% off first year`
-        const caption = captionText ? (
-          <Text.Caption m={0} sx={{ fontSize: '11px', color: '#0862d1', display: 'block', mt: '2px' }}>
-            {captionText}
-          </Text.Caption>
-        ) : null
-        return renderRow(y, null, caption)
       })}
     </Box>
   )
@@ -381,13 +234,11 @@ function TermDropdown({
 function TermBottomSheet({
   item,
   selectedYears,
-  variant,
   onSelect,
   onClose,
 }: {
   item: DomainResult
   selectedYears: number
-  variant: MyrVariant
   onSelect: (years: number) => void
   onClose: () => void
 }) {
@@ -405,14 +256,8 @@ function TermBottomSheet({
     const label = y === 1 ? '1 year' : `${y} years`
     const isSelected = y === selectedYears
     const d = disc ? getYearDiscount(y, disc) : null
-    const captionText = variant === 'subtext' && d !== null
-      ? (d === 'FREE' ? 'FREE first year' : `${d}% off first year`)
-      : null
-    const inlineLabel = variant === 'label' && d !== null
-      ? (d === 'FREE' ? 'FREE FIRST YEAR' : `${d}% OFF FIRST YEAR`)
-      : null
-    const chip = variant === 'divider' && d !== null
-      ? (d === 'FREE' ? 'FREE' : `${d}%`) + ' off'
+    const inlineLabel = d !== null
+      ? (d === 'FREE' ? 'FREE' : `${d}% OFF`)
       : null
 
     return (
@@ -437,22 +282,12 @@ function TermBottomSheet({
         <Box sx={{ flex: '1 0 0' }}>
           <Flex alignItems="center" gap={2}>
             <Text.Body m={0} sx={{ fontSize: '16px', color: 'fg.default' }}>{label}</Text.Body>
-            {chip && (
-              <Box sx={{ px: '8px', py: '3px', borderRadius: 20, background: '#dbeafe', flexShrink: 0 }}>
-                <Text.Caption m={0} sx={{ fontSize: '11px', fontWeight: 500, color: '#0862d1', lineHeight: 1 }}>{chip}</Text.Caption>
-              </Box>
-            )}
             {inlineLabel && (
               <Text.Caption m={0} sx={{ fontSize: '10px', fontWeight: 500, letterSpacing: '0.06em', color: '#0862d1', flexShrink: 0 }}>
                 {inlineLabel}
               </Text.Caption>
             )}
           </Flex>
-          {captionText && (
-            <Text.Caption m={0} sx={{ fontSize: '12px', color: '#0862d1', display: 'block', mt: '2px' }}>
-              {captionText}
-            </Text.Caption>
-          )}
         </Box>
         <Box sx={{ width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           {isSelected && <Checkmark sx={{ width: 16, height: 16, color: 'fg.default' }} />}
@@ -460,9 +295,6 @@ function TermBottomSheet({
       </Box>
     )
   }
-
-  const noDiscYears = years.filter((y) => !disc || getYearDiscount(y, disc) === null)
-  const discYears = years.filter((y) => disc && getYearDiscount(y, disc) !== null)
 
   return (
     <>
@@ -489,25 +321,7 @@ function TermBottomSheet({
           </Box>
         </Flex>
 
-        {variant === 'divider' ? (
-          <>
-            {noDiscYears.map(sheetRow)}
-            {discYears.length > 0 && (
-              <>
-                <Flex alignItems="center" gap={3} px={4} py={2} sx={{ borderTop: '1px solid #e7e7e7', borderBottom: '1px solid #e7e7e7' }}>
-                  <Box sx={{ flex: 1, height: '1px', background: '#e7e7e7' }} />
-                  <Text.Caption m={0} sx={{ fontSize: '9.75px', fontWeight: 500, letterSpacing: '0.75px', textTransform: 'uppercase', color: '#666', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                    Save on your first year
-                  </Text.Caption>
-                  <Box sx={{ flex: 1, height: '1px', background: '#e7e7e7' }} />
-                </Flex>
-                {discYears.map(sheetRow)}
-              </>
-            )}
-          </>
-        ) : (
-          years.map(sheetRow)
-        )}
+        {years.map(sheetRow)}
       </Box>
     </>
   )
@@ -518,13 +332,11 @@ function TermBottomSheet({
 function DomainCard({
   item,
   selectedYears,
-  variant,
   onTermChange,
   onRemove,
 }: {
   item: DomainResult
   selectedYears: number
-  variant: MyrVariant
   onTermChange: (id: string, years: number) => void
   onRemove: (id: string) => void
 }) {
@@ -648,7 +460,6 @@ function DomainCard({
               <TermDropdown
                 item={item}
                 selectedYears={selectedYears}
-                variant={variant}
                 onSelect={(years) => onTermChange(item.id, years)}
                 onClose={() => setDropdownOpen(false)}
               />
@@ -661,7 +472,6 @@ function DomainCard({
               <TermBottomSheet
                 item={item}
                 selectedYears={selectedYears}
-                variant={variant}
                 onSelect={(years) => onTermChange(item.id, years)}
                 onClose={() => setDropdownOpen(false)}
               />
@@ -822,8 +632,6 @@ function OrderSummary({ items, terms }: { items: DomainResult[]; terms: Record<s
 
 // ── Page ───────────────────────────────────────────────────────────────────
 
-const VARIANT_NAV_HEIGHT = 44
-
 export default function Cart() {
   const location = useLocation()
   const navigate = useNavigate()
@@ -832,7 +640,6 @@ export default function Cart() {
     try { return JSON.parse(localStorage.getItem('domains-cart-items') ?? '[]') } catch { return [] }
   })()
 
-  const [variant, setVariant] = useState<MyrVariant>(readVariant)
   const [items, setItems] = useState<DomainResult[]>(initialItems)
   const [terms, setTerms] = useState<Record<string, number>>(() => {
     let saved: Record<string, number> = {}
@@ -870,8 +677,7 @@ export default function Cart() {
   const subtotal = items.reduce((s, r) => s + (r.salePrice ?? r.originalPrice), 0)
 
   return (
-    <Box sx={{ minHeight: '100vh', background: '#fff', pt: `${VARIANT_NAV_HEIGHT}px` }}>
-      <VariantNav variant={variant} onChange={setVariant} />
+    <Box sx={{ minHeight: '100vh', background: '#fff' }}>
       <Breadcrumb />
 
       <Box sx={{ maxWidth: 960, mx: 'auto', px: 6, pt: 7, pb: 8, '@media (max-width: 767px)': { px: 4, pt: 5, pb: 6 } }}>
@@ -899,7 +705,6 @@ export default function Cart() {
                   key={item.id}
                   item={item}
                   selectedYears={terms[item.id] ?? 1}
-                  variant={variant}
                   onTermChange={handleTermChange}
                   onRemove={removeItem}
                 />
